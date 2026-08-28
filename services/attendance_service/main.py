@@ -2,12 +2,11 @@
 Schoolers Attendance Service — standalone microservice.
 Reads all configuration from the single shared common/.env via common.config.
 """
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from common.config import settings
-from common.exceptions import AppError
+from common.exception_handlers import register_exception_handlers
 
 from router import router
 
@@ -22,10 +21,7 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(AppError)
-def app_error_handler(request: Request, exc: AppError):
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
-
+register_exception_handlers(app)
 
 @app.get("/health")
 def health():
