@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class SchoolBase(BaseModel):
@@ -9,9 +9,15 @@ class SchoolBase(BaseModel):
     state: str
     country: str = "India"
     primary_contact: str
-    alternative_contact: str | None = None
+    alternative_contact: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("alternative_contact", "alternate_contact"),
+    )
     primary_email: str
-    alternative_email: str | None = None
+    alternative_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("alternative_email", "alternate_email"),
+    )
 
 
 class SchoolCreate(SchoolBase):
@@ -26,9 +32,15 @@ class SchoolUpdate(BaseModel):
     state: str | None = None
     country: str | None = None
     primary_contact: str | None = None
-    alternative_contact: str | None = None
+    alternative_contact: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("alternative_contact", "alternate_contact"),
+    )
     primary_email: str | None = None
-    alternative_email: str | None = None
+    alternative_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("alternative_email", "alternate_email"),
+    )
 
 
 class FeatureFlags(BaseModel):

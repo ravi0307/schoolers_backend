@@ -36,7 +36,7 @@ curl http://localhost:8000/api/v1/schools \
 
 curl -X POST http://localhost:8000/api/v1/schools \
   -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
-  -d '{"name":"Demo School","address":"1 Main Road","pincode":"560001","city":"Bengaluru","state":"Karnataka","country":"India","primary_contact":"9876543210","primary_email":"admin@demo.school"}' | jq
+  -d '{"name":"Demo School","address":"1 Main Road","pincode":"560001","city":"Bengaluru","state":"Karnataka","country":"India","primary_contact":"9876543210","alternate_contact":"9876500000","primary_email":"admin@demo.school","alternate_email":"alternate@demo.school"}' | jq
 
 curl http://localhost:8000/api/v1/schools/1 -H "$AUTH_HEADER" | jq
 curl http://localhost:8000/api/v1/schools/1/stats -H "$AUTH_HEADER" | jq
