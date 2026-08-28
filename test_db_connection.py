@@ -2,30 +2,8 @@
 # Run: pytest -q test_db_connection.py
 
 import os
-import bcrypt
 import psycopg2
 import pytest
-from psycopg2 import sql
-
-
-ENTITY_TABLES = (
-    "activities",
-    "barter_listings",
-    "broadcasts",
-    "classes",
-    "leave_requests",
-    "media",
-    "parents",
-    "routes",
-    "schools",
-    "staff",
-    "students",
-    "teachers",
-    "users",
-    "website_pages",
-    "website_settings",
-    "website_testimonials",
-)
 
 
 def _connect_with_params(params):
@@ -36,7 +14,7 @@ def _connect_with_params(params):
 
 
 def _on_success(conn, label):
-    """Print connection details and reset all user passwords safely."""
+    """Print connection details and query school 102."""
     try:
         info = conn.get_dsn_parameters()
     except Exception:
@@ -56,30 +34,6 @@ def _on_success(conn, label):
 
     try:
         with conn.cursor() as cur:
-            for table_name in ENTITY_TABLES:
-                cur.execute(
-                    sql.SQL(
-                        "ALTER TABLE {}.{} "
-                        "ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
-                    ).format(
-                        sql.Identifier("schoolers"),
-                        sql.Identifier(table_name),
-                    )
-                )
-            conn.commit()
-            print("Ensured is_active exists on all entity tables.")
-
-            password_hash = bcrypt.hashpw(
-                b"admin123",
-                bcrypt.gensalt(),
-            ).decode("utf-8")
-            cur.execute(
-                "UPDATE schoolers.users SET password_hash = %s",
-                (password_hash,),
-            )
-            print(f"Updated password_hash for {cur.rowcount} user(s).")
-            conn.commit()
-
             query = """
                 SELECT *
                 FROM schoolers.schools
