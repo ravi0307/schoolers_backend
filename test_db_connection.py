@@ -81,21 +81,18 @@ def _on_success(conn, label):
             conn.commit()
 
             query = """
-                SELECT
-                    u.user_id,
-                    u.username,
-                    u.password_hash
-                FROM schoolers.users AS u
-                WHERE u.user_id = %s
+                SELECT *
+                FROM schoolers.schools
+                WHERE school_id = %s
             """
-            cur.execute(query, (4,))
+            cur.execute(query, (102,))
             rows = cur.fetchall()
             if cur.description:
                 cols = [d[0] for d in cur.description]
             else:
                 cols = []
 
-            print("Query output (rows):")
+            print("School 102 query output (rows):")
             if not rows:
                 print("  (no rows returned)")
             else:
