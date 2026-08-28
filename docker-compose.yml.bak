@@ -1,0 +1,120 @@
+version: "3.9"
+
+# One compose file, one shared common/.env, one Postgres instance shared by
+# every service's relational schema. The gateway is the only service
+# exposed to the host, on the port the frontend already expects (8000).
+
+x-service-defaults: &service_defaults
+  depends_on:
+    db:
+      condition: service_healthy
+  environment:
+    DATABASE_URL: postgresql+psycopg2://postgres:schoolers_dev_pw@db:5432/schoolers
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: schoolers_dev_pw
+      POSTGRES_DB: schoolers
+    volumes:
+      - schoolers_pgdata:/var/lib/postgresql/data
+      - ../schoolers_schema_and_data.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_HOSTS: '{"auth":"http://auth_service:8001","schools":"http://schools_service:8002","academics":"http://academics_service:8003","people":"http://people_service:8004","attendance":"http://attendance_service:8005","marks":"http://marks_service:8006","timetable":"http://timetable_service:8007","transport":"http://transport_service:8008","leave":"http://leave_service:8009","communication":"http://communication_service:8010","barter":"http://barter_service:8011","activities":"http://activities_service:8012","website":"http://website_service:8013","notifications":"http://notifications_service:8014","reports":"http://reports_service:8015"}'
+    depends_on:
+      - auth_service
+      - schools_service
+      - academics_service
+      - people_service
+      - attendance_service
+      - marks_service
+      - timetable_service
+      - transport_service
+      - leave_service
+      - communication_service
+      - barter_service
+      - activities_service
+      - website_service
+      - notifications_service
+      - reports_service
+    restart: unless-stopped
+
+  auth_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/auth_service/Dockerfile }
+
+  schools_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/schools_service/Dockerfile }
+
+  academics_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/academics_service/Dockerfile }
+
+  people_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/people_service/Dockerfile }
+
+  attendance_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/attendance_service/Dockerfile }
+
+  marks_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/marks_service/Dockerfile }
+
+  timetable_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/timetable_service/Dockerfile }
+
+  transport_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/transport_service/Dockerfile }
+
+  leave_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/leave_service/Dockerfile }
+
+  communication_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/communication_service/Dockerfile }
+
+  barter_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/barter_service/Dockerfile }
+
+  activities_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/activities_service/Dockerfile }
+
+  website_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/website_service/Dockerfile }
+
+  notifications_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/notifications_service/Dockerfile }
+
+  reports_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/reports_service/Dockerfile }
+
+volumes:
+  schoolers_pgdata:

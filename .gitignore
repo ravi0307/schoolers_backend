@@ -1,0 +1,20 @@
+# Local configuration and credentials
+.env
+.env.*
+common/.env
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime logs and local state
+.logs/
+*.log
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/

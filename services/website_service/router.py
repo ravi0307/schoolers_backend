@@ -1,0 +1,112 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from common.database import get_db
+from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.exceptions import NotFoundError
+import repository as repo
+from schemas import (
+    WebsiteSettingsUpdate, WebsiteSettingsRead,
+    WebsitePageUpsert, WebsitePageRead,
+    TestimonialCreate, TestimonialRead,
+)
+
+router = APIRouter(prefix="/website", tags=["website"])
+
+VALID_SLUGS = {"home", "about", "academics", "admissions", "contact"}
+
+
+# ---- Admin-authenticated editing ----
+@router.get("/settings", response_model=WebsiteSettingsRead)
+def get_settings(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    settings = repo.get_settings(db, school_id)
+    if not settings:
+        raise NotFoundError("Website settings not yet created for this school")
+    return settings
+
+
+@router.put("/settings", response_model=WebsiteSettingsRead)
+def update_settings(
+    payload: WebsiteSettingsUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.upsert_settings(db, school_id, payload.model_dump(exclude_unset=True), default_name="My School")
+
+
+@router.get("/pages/{slug}", response_model=WebsitePageRead)
+def get_page(
+    slug: str,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    page = repo.get_page(db, school_id, slug)
+    if not page:
+        raise NotFoundError(f"Page '{slug}' not yet created")
+    return page
+
+
+@router.put("/pages/{slug}", response_model=WebsitePageRead)
+def upsert_page(
+    slug: str,
+    payload: WebsitePageUpsert,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if slug not in VALID_SLUGS:
+        raise NotFoundError(f"Unknown page slug '{slug}'")
+    return repo.upsert_page(db, school_id, slug, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/testimonials", response_model=list[TestimonialRead])
+def list_testimonials(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.list_testimonials(db, school_id)
+
+
+@router.post("/testimonials", response_model=TestimonialRead, status_code=201)
+def add_testimonial(
+    payload: TestimonialCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.add_testimonial(db, school_id, payload.model_dump())
+
+
+@router.delete("/testimonials/{testimonial_id}", status_code=204)
+def delete_testimonial(
+    testimonial_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    repo.delete_testimonial(db, school_id, testimonial_id)
+
+
+# ---- Public, unauthenticated read-only site ----
+public_router = APIRouter(prefix="/public/sites", tags=["public-website"])
+
+
+@public_router.get("/{school_id}")
+def public_site(school_id: int, db: Session = Depends(get_db)):
+    settings = repo.get_settings(db, school_id)
+    if not settings:
+        raise NotFoundError("This school has not published a website yet")
+    pages = {p.slug: p for p in repo.list_pages(db, school_id)}
+    testimonials = repo.list_testimonials(db, school_id)
+    return {
+        "settings": WebsiteSettingsRead.model_validate(settings),
+        "pages": {slug: WebsitePageRead.model_validate(p) for slug, p in pages.items()},
+        "testimonials": [TestimonialRead.model_validate(t) for t in testimonials],
+    }

@@ -1,0 +1,230 @@
+Schoolers API curl examples
+===========================
+
+Base URL:
+  http://localhost:8000
+
+The examples below use the gateway. Replace IDs with IDs returned by earlier
+requests. Run the login command first and set ACCESS_TOKEN from its response.
+
+HEALTH
+------
+curl http://localhost:8000/health | jq
+curl http://localhost:8000/health/services | jq
+
+AUTH
+----
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin1","password":"admin123"}' | jq
+
+curl http://localhost:8000/api/v1/auth/me \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+
+curl -X POST http://localhost:8000/api/v1/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refresh_token":"REPLACE_WITH_REFRESH_TOKEN"}' | jq
+
+For protected requests:
+  export ACCESS_TOKEN='REPLACE_WITH_ACCESS_TOKEN'
+  export AUTH_HEADER="Authorization: Bearer $ACCESS_TOKEN"
+
+SCHOOLS
+-------
+curl http://localhost:8000/api/v1/schools \
+  -H "$AUTH_HEADER" | jq
+
+curl -X POST http://localhost:8000/api/v1/schools \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Demo School","address":"1 Main Road","pincode":"560001","city":"Bengaluru","state":"Karnataka","country":"India","primary_contact":"9876543210","primary_email":"admin@demo.school"}' | jq
+
+curl http://localhost:8000/api/v1/schools/1 -H "$AUTH_HEADER" | jq
+curl http://localhost:8000/api/v1/schools/1/stats -H "$AUTH_HEADER" | jq
+
+curl -X PATCH http://localhost:8000/api/v1/schools/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Demo School Updated","primary_contact":"9876543211"}' | jq
+
+curl -X PATCH http://localhost:8000/api/v1/schools/1/features \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"route_enabled":true,"website_enabled":true,"library_enabled":false,"fees_enabled":true,"salary_enabled":false}' | jq
+
+curl -X PATCH http://localhost:8000/api/v1/schools/1/status \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"status":"Active"}' | jq
+
+curl -X DELETE http://localhost:8000/api/v1/schools/1 -H "$AUTH_HEADER" | jq
+
+ACADEMICS
+---------
+curl http://localhost:8000/api/v1/classes -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/classes \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Class 6A","class_teacher_id":null}' | jq
+curl -X PATCH http://localhost:8000/api/v1/classes/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Class 6A Updated","student_count":30}' | jq
+curl -X DELETE http://localhost:8000/api/v1/classes/1 -H "$AUTH_HEADER" | jq
+
+curl http://localhost:8000/api/v1/subjects -H "$AUTH_HEADER" | jq
+curl http://localhost:8000/api/v1/periods -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/periods/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"period_time":"09:00-09:45"}' | jq
+curl http://localhost:8000/api/v1/holidays -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/holidays/Mon \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"is_holiday":false}' | jq
+
+PEOPLE
+------
+curl http://localhost:8000/api/v1/teachers -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/teachers \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Anita Rao","role_title":"Mathematics Teacher","phone":"9876543210","email":"anita@example.com"}' | jq
+curl -X PATCH http://localhost:8000/api/v1/teachers/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"attendance_status":"On time"}' | jq
+curl -X DELETE http://localhost:8000/api/v1/teachers/1 -H "$AUTH_HEADER" | jq
+curl http://localhost:8000/api/v1/teachers/1/load -H "$AUTH_HEADER" | jq
+
+curl http://localhost:8000/api/v1/staff -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/staff \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Ramesh Kumar","role":"Office Assistant","phone":"9876500000"}' | jq
+curl -X PATCH http://localhost:8000/api/v1/staff/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"role":"Senior Office Assistant"}' | jq
+curl -X DELETE http://localhost:8000/api/v1/staff/1 -H "$AUTH_HEADER" | jq
+
+curl http://localhost:8000/api/v1/parents -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/parents \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Priya Sharma","phone":"9876512345","email":"priya@example.com"}' | jq
+curl http://localhost:8000/api/v1/parents/1/children -H "$AUTH_HEADER" | jq
+
+curl http://localhost:8000/api/v1/students -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/students \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"class_id":1,"admission_no":"ADM-1001","name":"Aarav Sharma","date_of_birth":"2014-05-12","gender":"Male","parent_id":1}' | jq
+curl -X PATCH http://localhost:8000/api/v1/students/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Aarav S. Sharma","present_today":true}' | jq
+curl -X DELETE http://localhost:8000/api/v1/students/1 -H "$AUTH_HEADER" | jq
+
+curl -X POST http://localhost:8000/api/v1/teachers/assignments \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"teacher_id":2,"class_id":1,"subject_id":1,"is_class_teacher":true}' | jq
+
+ATTENDANCE
+----------
+curl -X POST http://localhost:8000/api/v1/attendance/mark \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"class_id":1,"date":"2026-08-26","entries":[{"student_id":1,"status":"Present"},{"student_id":2,"status":"Absent"}]}' | jq
+curl 'http://localhost:8000/api/v1/attendance?student_id=1&date_from=2026-08-26&date_to=2026-08-26' -H "$AUTH_HEADER" | jq
+curl 'http://localhost:8000/api/v1/attendance/class/1/summary?date=2026-08-26' -H "$AUTH_HEADER" | jq
+
+MARKS
+-----
+curl http://localhost:8000/api/v1/marks/student/1 -H "$AUTH_HEADER" | jq
+curl -X PUT http://localhost:8000/api/v1/marks/2/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"term":"Term 1","score":87}' | jq
+
+TIMETABLE
+---------
+curl http://localhost:8000/api/v1/timetable/class/1 -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/timetable/entry/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"subject_id":1,"teacher_id":1}' | jq
+curl -X PATCH http://localhost:8000/api/v1/timetable/entry/1/clear-override \
+  -H "$AUTH_HEADER" | jq
+
+TRANSPORT
+---------
+curl http://localhost:8000/api/v1/routes -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/routes \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Route A","vehicle":"KA-01-AB-1234","driver_name":"Mohan Das","status":"Scheduled"}' | jq
+curl -X PATCH http://localhost:8000/api/v1/routes/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"status":"Active"}' | jq
+curl -X POST http://localhost:8000/api/v1/routes/1/stops \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Main Gate","stop_time":"07:30","stop_type":"pickup","stop_order":1}' | jq
+curl http://localhost:8000/api/v1/routes/1/stops -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/routes/1/students/1 -H "$AUTH_HEADER" | jq
+curl http://localhost:8000/api/v1/routes/1/students -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/routes/1/students/1/status \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"status":"picked"}' | jq
+curl -X DELETE http://localhost:8000/api/v1/routes/stops/1 -H "$AUTH_HEADER" | jq
+curl -X DELETE http://localhost:8000/api/v1/routes/1/students/1 -H "$AUTH_HEADER" | jq
+curl -X DELETE http://localhost:8000/api/v1/routes/1 -H "$AUTH_HEADER" | jq
+
+LEAVE
+-----
+curl -X POST http://localhost:8000/api/v1/leave \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"requester_type":"Teacher","requester_name":"Anita Rao","from_date":"2026-09-01","to_date":"2026-09-02","reason":"Personal work"}' | jq
+curl http://localhost:8000/api/v1/leave -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/leave/1/approve -H "$AUTH_HEADER" | jq
+curl -X PATCH http://localhost:8000/api/v1/leave/1/reject -H "$AUTH_HEADER" | jq
+
+COMMUNICATION
+-------------
+curl -X POST http://localhost:8000/api/v1/broadcasts \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"scope":"school","class_id":null,"from_name":"Admin","message":"Parent meeting on Friday."}' | jq
+curl http://localhost:8000/api/v1/broadcasts -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/media \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"class_id":1,"title":"Annual Day Photos","posted_by":"Admin","icon":"photo"}' | jq
+curl http://localhost:8000/api/v1/media -H "$AUTH_HEADER" | jq
+
+BARTER
+------
+curl http://localhost:8000/api/v1/barter -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/barter \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"title":"Used school books","price":"500 INR","icon":"books","listed_by":"admin1"}' | jq
+curl -X PATCH http://localhost:8000/api/v1/barter/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"price":"400 INR"}' | jq
+curl -X DELETE http://localhost:8000/api/v1/barter/1 -H "$AUTH_HEADER" | jq
+
+ACTIVITIES
+----------
+curl http://localhost:8000/api/v1/activities -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/activities \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"tag":"Sports","title":"Inter-house football","description":"Football event for classes 6-8"}' | jq
+
+WEBSITE
+-------
+curl http://localhost:8000/api/v1/website/settings -H "$AUTH_HEADER" | jq
+curl -X PUT http://localhost:8000/api/v1/website/settings \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"school_name":"Demo School","tagline":"Learn. Grow. Lead.","accent_color":"#2563eb"}' | jq
+curl http://localhost:8000/api/v1/website/pages/home -H "$AUTH_HEADER" | jq
+curl -X PUT http://localhost:8000/api/v1/website/pages/home \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"heading":"Welcome to Demo School","subheading":"A better learning journey","body":"Welcome to our school.","extra_json":{"show_admissions":true}}' | jq
+curl http://localhost:8000/api/v1/website/testimonials -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/website/testimonials \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"name":"Priya Sharma","role":"Parent","quote":"A wonderful school community."}' | jq
+curl -X DELETE http://localhost:8000/api/v1/website/testimonials/1 -H "$AUTH_HEADER" | jq
+
+NOTIFICATIONS
+-------------
+curl http://localhost:8000/api/v1/notifications/school/1 -H "$AUTH_HEADER" | jq
+curl -X POST http://localhost:8000/api/v1/notifications/school/1 \
+  -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+  -d '{"type":"General","message":"School will remain closed tomorrow."}' | jq
+curl -X PATCH http://localhost:8000/api/v1/notifications/1/read -H "$AUTH_HEADER" | jq
+
+REPORTS
+-------
+curl http://localhost:8000/api/v1/reports/school/1/overview -H "$AUTH_HEADER" | jq
+curl http://localhost:8000/api/v1/reports/class/1/attendance-trend -H "$AUTH_HEADER" | jq
