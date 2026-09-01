@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, CurrentUser
-from common.exceptions import NotFoundError, ForbiddenError
+from common.exceptions import NotFoundError, ForbiddenError, AppError
+from common.storage import (
+    ALLOWED_IMAGE_TYPES,
+    media_type_for_filename,
+    resolve_upload_path,
+    save_image,
+)
 import repository as repo
 from schemas import (
     SchoolCreate, SchoolUpdate, SchoolRead, FeatureFlags, SchoolStatusUpdate, SchoolStats,
@@ -26,6 +33,63 @@ def _guard_school_access(current_user: CurrentUser, school_id: int):
     if current_user.role == "admin" and current_user.school_id == school_id:
         return
     raise ForbiddenError("Not allowed to access this school")
+
+
+async def _save_school_logo(
+    school_id: int,
+    file: UploadFile,
+    db: Session,
+    current_user: CurrentUser,
+):
+    _guard_school_access(current_user, school_id)
+    school = _get_or_404(db, school_id)
+
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise AppError("Only JPEG, PNG, GIF, WebP, and SVG images are allowed")
+    data = await file.read()
+    try:
+        filename = save_image(data, content_type, filename_prefix=school.name)
+    except ValueError as exc:
+        raise AppError(str(exc)) from exc
+
+    school.logo_url = f"/api/v1/schools/uploads/{filename}"
+    db.commit()
+    db.refresh(school)
+    return {"url": school.logo_url, "filename": filename, "school_id": school_id}
+
+
+@router.api_route("/{school_id}/upload", methods=["POST", "PUT", "PATCH"])
+async def upload_school_logo(
+    school_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("master", "admin")),
+):
+    return await _save_school_logo(school_id, file, db, current_user)
+
+
+@router.api_route("/upload", methods=["POST", "PUT", "PATCH"])
+async def upload_school_logo_legacy(
+    school_id: int | None = Form(default=None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("master", "admin")),
+):
+    if school_id is None:
+        school_id = current_user.school_id
+    if school_id is None:
+        raise ForbiddenError("school_id is required for users without a school")
+    return await _save_school_logo(school_id, file, db, current_user)
+
+
+@router.get("/uploads/{filename}")
+def serve_upload(filename: str):
+    try:
+        path = resolve_upload_path(filename)
+    except FileNotFoundError:
+        raise NotFoundError("File not found") from None
+    return FileResponse(path, media_type=media_type_for_filename(filename))
 
 
 @router.get("", response_model=list[SchoolRead])

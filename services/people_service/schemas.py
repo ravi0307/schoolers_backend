@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class TeacherCreate(BaseModel):
@@ -32,14 +32,61 @@ class TeacherRead(BaseModel):
 
 class StaffCreate(BaseModel):
     name: str
-    role: str
+    role: str = Field(validation_alias=AliasChoices("role", "role_title"))
     phone: str | None = None
+    email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("email", "email_id"),
+    )
+    present_address: str | None = None
+    permanent_address: str | None = None
+    aadhaar_card: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "aadhaar_card",
+            "aadhaar_number",
+            "aadhaar_card_number",
+        ),
+    )
+    emergency_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "emergency_number",
+            "emergency_contact_number",
+            "emergency_contact",
+        ),
+    )
 
 
 class StaffUpdate(BaseModel):
     name: str | None = None
-    role: str | None = None
+    role: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("role", "role_title"),
+    )
     phone: str | None = None
+    email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("email", "email_id"),
+    )
+    present_address: str | None = None
+    permanent_address: str | None = None
+    aadhaar_card: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "aadhaar_card",
+            "aadhaar_number",
+            "aadhaar_card_number",
+        ),
+    )
+    emergency_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "emergency_number",
+            "emergency_contact_number",
+            "emergency_contact",
+        ),
+    )
 
 
 class StaffRead(BaseModel):
@@ -48,6 +95,11 @@ class StaffRead(BaseModel):
     name: str
     role: str
     phone: str | None
+    email: str | None
+    present_address: str | None
+    permanent_address: str | None
+    aadhaar_card: str | None
+    emergency_number: str | None
 
     class Config:
         from_attributes = True
@@ -77,6 +129,11 @@ class StudentCreate(BaseModel):
     date_of_birth: date | None = None
     gender: str | None = None
     parent_id: int | None = None  # optionally link on create
+    parent_name: str | None = None
+    parent_phone: str | None = None
+    parent_email: str | None = None
+    parent_address: str | None = None
+    parent_emergency_number: str | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -86,6 +143,12 @@ class StudentUpdate(BaseModel):
     date_of_birth: date | None = None
     gender: str | None = None
     present_today: bool | None = None
+    parent_id: int | None = None
+    parent_name: str | None = None
+    parent_phone: str | None = None
+    parent_email: str | None = None
+    parent_address: str | None = None
+    parent_emergency_number: str | None = None
 
 
 class StudentRead(BaseModel):
@@ -97,6 +160,12 @@ class StudentRead(BaseModel):
     date_of_birth: date | None
     gender: str | None
     present_today: bool
+    parent_id: int | None = None
+    parent_name: str | None = None
+    parent_phone: str | None = None
+    parent_email: str | None = None
+    parent_address: str | None = None
+    parent_emergency_number: str | None = None
 
     class Config:
         from_attributes = True

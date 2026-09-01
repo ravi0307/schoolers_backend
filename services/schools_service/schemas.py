@@ -18,6 +18,7 @@ class SchoolBase(BaseModel):
         default=None,
         validation_alias=AliasChoices("alternative_email", "alternate_email"),
     )
+    logo_url: str | None = None
 
 
 class SchoolCreate(SchoolBase):
@@ -41,6 +42,7 @@ class SchoolUpdate(BaseModel):
         default=None,
         validation_alias=AliasChoices("alternative_email", "alternate_email"),
     )
+    logo_url: str | None = None
 
 
 class FeatureFlags(BaseModel):

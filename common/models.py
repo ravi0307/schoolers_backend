@@ -33,6 +33,7 @@ class School(Base):
     alternative_contact = Column(String(30))
     primary_email = Column(String(120), nullable=False)
     alternative_email = Column(String(120))
+    logo_url = Column(String(255))
     status = Column(String(10), nullable=False, default="Active")
     route_enabled = Column(Boolean, nullable=False, default=False)
     website_enabled = Column(Boolean, nullable=False, default=False)
@@ -135,6 +136,11 @@ class Staff(Base):
     name = Column(String(100), nullable=False)
     role = Column(String(60), nullable=False)
     phone = Column(String(30))
+    email = Column(String(120))
+    present_address = Column(String(255))
+    permanent_address = Column(String(255))
+    aadhaar_card = Column(String(30))
+    emergency_number = Column(String(30))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
@@ -147,6 +153,8 @@ class Parent(Base):
     name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=False)
     email = Column(String(120))
+    address = Column(String(255))
+    emergency_number = Column(String(30))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 

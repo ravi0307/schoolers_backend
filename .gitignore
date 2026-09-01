@@ -13,6 +13,7 @@ __pycache__/
 # Runtime logs and local state
 .logs/
 *.log
+services/*/uploads/
 
 # OS/editor files
 .DS_Store

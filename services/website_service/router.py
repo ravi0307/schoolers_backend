@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
-from common.exceptions import NotFoundError
+from common.exceptions import AppError, NotFoundError
+from common.storage import (
+    ALLOWED_IMAGE_TYPES,
+    media_type_for_filename,
+    resolve_upload_path,
+    save_image,
+)
 import repository as repo
 from schemas import (
     WebsiteSettingsUpdate, WebsiteSettingsRead,
@@ -92,6 +99,31 @@ def delete_testimonial(
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     repo.delete_testimonial(db, school_id, testimonial_id)
+
+
+@router.post("/uploads")
+async def upload_image(
+    file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(require_role("admin", "teacher", "master")),
+):
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise AppError("Only JPEG, PNG, GIF, WebP, and SVG images are allowed")
+    data = await file.read()
+    try:
+        filename = save_image(data, content_type)
+    except ValueError as exc:
+        raise AppError(str(exc)) from exc
+    return {"url": f"/api/v1/website/uploads/{filename}", "filename": filename}
+
+
+@router.get("/uploads/{filename}")
+def serve_upload(filename: str):
+    try:
+        path = resolve_upload_path(filename)
+    except FileNotFoundError:
+        raise NotFoundError("File not found") from None
+    return FileResponse(path, media_type=media_type_for_filename(filename))
 
 
 # ---- Public, unauthenticated read-only site ----

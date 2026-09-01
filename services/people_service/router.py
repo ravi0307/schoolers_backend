@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
-from common.exceptions import NotFoundError
+from common.exceptions import AppError, NotFoundError
 import repository as repo
 from schemas import (
     TeacherCreate, TeacherUpdate, TeacherRead,
@@ -155,7 +155,7 @@ def children_of_parent(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("parent", "admin")),
 ):
-    return repo.children_of_parent(db, parent_id)
+    return repo.student_responses(db, repo.children_of_parent(db, parent_id))
 
 
 # ---- Students ----
@@ -167,7 +167,7 @@ def list_students(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
-    return repo.list_students(db, school_id, search, class_id)
+    return repo.student_responses(db, repo.list_students(db, school_id, search, class_id))
 
 
 @router.post("/students", response_model=StudentRead, status_code=201)
@@ -179,10 +179,22 @@ def create_student(
 ):
     data = payload.model_dump()
     parent_id = data.pop("parent_id", None)
+    parent_data = {
+        "name": data.pop("parent_name", None),
+        "phone": data.pop("parent_phone", None),
+        "email": data.pop("parent_email", None),
+        "address": data.pop("parent_address", None),
+        "emergency_number": data.pop("parent_emergency_number", None),
+    }
+    parent_data = {key: value for key, value in parent_data.items() if value is not None}
+    if parent_data and ("name" not in parent_data or "phone" not in parent_data):
+        raise AppError("parent_name and parent_phone are required for a new parent")
     student = repo.create_student(db, school_id, data)
     if parent_id:
         repo.link_parent_student(db, parent_id, student.student_id)
-    return student
+    elif parent_data:
+        repo.create_student_parent(db, school_id, student.student_id, parent_data)
+    return repo.student_response(db, student)
 
 
 @router.patch("/students/{student_id}", response_model=StudentRead)
@@ -196,7 +208,20 @@ def update_student(
     student = repo.get_student(db, school_id, student_id)
     if not student:
         raise NotFoundError("Student not found")
-    return repo.update_student(db, student, payload.model_dump(exclude_unset=True))
+    data = payload.model_dump(exclude_unset=True)
+    parent_id = data.pop("parent_id", None)
+    parent_data = {
+        "name": data.pop("parent_name", None),
+        "phone": data.pop("parent_phone", None),
+        "email": data.pop("parent_email", None),
+        "address": data.pop("parent_address", None),
+        "emergency_number": data.pop("parent_emergency_number", None),
+    }
+    parent_data = {key: value for key, value in parent_data.items() if value is not None}
+    repo.update_student(db, student, data)
+    if parent_id is not None or parent_data:
+        repo.update_student_parent(db, school_id, student_id, parent_id, parent_data)
+    return repo.student_response(db, student)
 
 
 @router.delete("/students/{student_id}", status_code=204)

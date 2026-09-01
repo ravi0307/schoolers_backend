@@ -14,7 +14,7 @@ def _connect_with_params(params):
 
 
 def _on_success(conn, label):
-    """Print connection details and query school 102."""
+    """Print connection details and query school 100."""
     try:
         info = conn.get_dsn_parameters()
     except Exception:
@@ -39,7 +39,7 @@ def _on_success(conn, label):
                 FROM schoolers.schools
                 WHERE school_id = %s
             """
-            cur.execute(query, (102,))
+            cur.execute(query, (100,))
             rows = cur.fetchall()
             if cur.description:
                 cols = [d[0] for d in cur.description]
