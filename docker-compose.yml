@@ -5,33 +5,11 @@ version: "3.9"
 # exposed to the host, on the port the frontend already expects (8000).
 
 x-service-defaults: &service_defaults
-  depends_on:
-    db:
-      condition: service_healthy
   environment:
     DATABASE_URL: "postgresql+psycopg2://ravi:schoolers_dev_pw@db:5432/schoolersdb?options=-csearch_path%3Dschoolers"
   restart: unless-stopped
 
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: ravi
-      POSTGRES_PASSWORD: schoolers_dev_pw
-      POSTGRES_DB: schoolersdb
-    volumes:
-      - schoolers_pgdata:/var/lib/postgresql/data
-      - ./db-init-schema.sql:/docker-entrypoint-initdb.d/00-create-schema.sql:ro
-      - ../schoolers/schoolers_schema_and_data.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./db-migrations.sql:/docker-entrypoint-initdb.d/02-migrations.sql:ro
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ravi"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
-
   gateway:
     build:
       context: .
@@ -117,6 +95,3 @@ services:
   reports_service:
     <<: *service_defaults
     build: { context: ., dockerfile: services/reports_service/Dockerfile }
-
-volumes:
-  schoolers_pgdata:

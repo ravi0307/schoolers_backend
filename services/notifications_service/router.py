@@ -18,7 +18,7 @@ def list_for_school(
 ):
     if current_user.role == "admin" and current_user.school_id != school_id:
         return []
-    return repo.list_for_school(db, school_id)
+    return [NotificationRead.from_notification(n) for n in repo.list_for_school(db, school_id)]
 
 
 @router.post("/school/{school_id}", response_model=NotificationRead, status_code=201)
@@ -28,7 +28,8 @@ def send_notification(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("master")),
 ):
-    return repo.create(db, school_id, payload.model_dump())
+    notification = repo.create(db, school_id, payload.model_dump())
+    return NotificationRead.from_notification(notification)
 
 
 @router.patch("/{notification_id}/read", response_model=NotificationRead)
@@ -40,4 +41,4 @@ def mark_read(
     n = repo.mark_read(db, notification_id)
     if not n:
         raise NotFoundError("Notification not found")
-    return n
+    return NotificationRead.from_notification(n)

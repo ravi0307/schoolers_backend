@@ -97,6 +97,92 @@ def create_parent(db: Session, school_id: int, data: dict) -> Parent:
     return parent
 
 
+def _parent_for_student(db: Session, student_id: int) -> Parent | None:
+    return (
+        db.query(Parent)
+        .join(ParentStudent, ParentStudent.parent_id == Parent.parent_id)
+        .filter(
+            ParentStudent.student_id == student_id,
+            Parent.is_active.is_(True),
+        )
+        .order_by(Parent.parent_id)
+        .first()
+    )
+
+
+def student_response(db: Session, student: Student) -> dict:
+    parent = _parent_for_student(db, student.student_id)
+    return {
+        "student_id": student.student_id,
+        "school_id": student.school_id,
+        "class_id": student.class_id,
+        "admission_no": student.admission_no,
+        "name": student.name,
+        "date_of_birth": student.date_of_birth,
+        "gender": student.gender,
+        "present_today": student.present_today,
+        "parent_id": parent.parent_id if parent else None,
+        "parent_name": parent.name if parent else None,
+        "parent_phone": parent.phone if parent else None,
+        "parent_email": parent.email if parent else None,
+        "parent_address": parent.address if parent else None,
+        "parent_emergency_number": parent.emergency_number if parent else None,
+    }
+
+
+def student_responses(db: Session, students: list[Student]) -> list[dict]:
+    return [student_response(db, student) for student in students]
+
+
+def create_student_parent(
+    db: Session,
+    school_id: int,
+    student_id: int,
+    parent_data: dict,
+) -> Parent:
+    parent = Parent(school_id=school_id, **parent_data)
+    db.add(parent)
+    db.flush()
+    db.add(ParentStudent(parent_id=parent.parent_id, student_id=student_id, relationship_="Parent"))
+    db.commit()
+    db.refresh(parent)
+    return parent
+
+
+def update_student_parent(
+    db: Session,
+    school_id: int,
+    student_id: int,
+    parent_id: int | None,
+    parent_data: dict,
+) -> Parent | None:
+    parent = _parent_for_student(db, student_id)
+    if parent_id is not None:
+        parent = (
+            db.query(Parent)
+            .filter(
+                Parent.parent_id == parent_id,
+                Parent.school_id == school_id,
+                Parent.is_active.is_(True),
+            )
+            .first()
+        )
+        if parent is None:
+            return None
+        if not _parent_for_student(db, student_id):
+            db.add(ParentStudent(parent_id=parent_id, student_id=student_id, relationship_="Parent"))
+    elif parent is None and parent_data:
+        return create_student_parent(db, school_id, student_id, parent_data)
+
+    if parent is not None:
+        for key, value in parent_data.items():
+            if value is not None:
+                setattr(parent, key, value)
+        db.commit()
+        db.refresh(parent)
+    return parent
+
+
 def link_parent_student(db: Session, parent_id: int, student_id: int) -> None:
     db.add(ParentStudent(parent_id=parent_id, student_id=student_id, relationship_="Parent"))
     db.commit()

@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: list[str] = ["*"]
 
+    # Outbound email (notifications, etc.)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+
+    # File uploads — local disk in dev; swap UPLOAD_BACKEND to "s3" later.
+    UPLOAD_BACKEND: str = "local"
+    UPLOAD_LOCAL_PATH: str = "/Users/ravi/Desktop/schoolers/images"
+    UPLOAD_MAX_BYTES: int = 5 * 1024 * 1024
+
     # Gateway <-> service registry. The gateway is the single public entry
     # point (same host:port the frontend already points at); it forwards
     # each request to the right internal service based on path prefix.
