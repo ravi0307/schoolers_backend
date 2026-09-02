@@ -6,14 +6,44 @@ class TeacherCreate(BaseModel):
     name: str
     role_title: str
     phone: str
-    email: str | None = None
+    email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("email", "email_id"),
+    )
+    present_address: str | None = None
+    permanent_address: str | None = None
+    date_of_birth: date | None = None
+    emergency_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "emergency_number",
+            "emergency_contact_number",
+            "emergency_contact",
+        ),
+    )
+    gender: str | None = None
 
 
 class TeacherUpdate(BaseModel):
     name: str | None = None
     role_title: str | None = None
     phone: str | None = None
-    email: str | None = None
+    email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("email", "email_id"),
+    )
+    present_address: str | None = None
+    permanent_address: str | None = None
+    date_of_birth: date | None = None
+    emergency_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "emergency_number",
+            "emergency_contact_number",
+            "emergency_contact",
+        ),
+    )
+    gender: str | None = None
     attendance_status: str | None = None
 
 
@@ -24,6 +54,11 @@ class TeacherRead(BaseModel):
     role_title: str
     phone: str
     email: str | None
+    present_address: str | None
+    permanent_address: str | None
+    date_of_birth: date | None
+    emergency_number: str | None
+    gender: str | None
     attendance_status: str
 
     class Config:

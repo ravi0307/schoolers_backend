@@ -15,3 +15,13 @@ ALTER TABLE IF EXISTS schoolers.staff
 ALTER TABLE IF EXISTS schoolers.parents
     ADD COLUMN IF NOT EXISTS address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS emergency_number VARCHAR(30);
+
+ALTER TABLE IF EXISTS schoolers.teachers
+    ADD COLUMN IF NOT EXISTS present_address VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS permanent_address VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS date_of_birth DATE,
+    ADD COLUMN IF NOT EXISTS emergency_number VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+
+ALTER TABLE IF EXISTS schoolers.route_students
+    ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'pending';
