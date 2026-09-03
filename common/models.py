@@ -207,6 +207,20 @@ class Route(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+
+    vehicle_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    vehicle_number = Column(String(30), nullable=False)
+    vehicle_type = Column(String(40))
+    registration_number = Column(String(40), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (UniqueConstraint("school_id", "vehicle_number"),)
+
+
 class RouteStop(Base):
     __tablename__ = "route_stops"
 
@@ -421,3 +435,20 @@ class User(Base):
     last_login = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class Pilot(Base):
+    __tablename__ = "pilots"
+
+    pilot_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, unique=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    full_name = Column(String(100), nullable=False)
+    email = Column(String(120))
+    phone = Column(String(30), nullable=False)
+    present_address = Column(String(255))
+    permanent_address = Column(String(255))
+    aadhaar_number = Column(String(30))
+    dl_number = Column(String(40))
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime, server_default=func.now())

@@ -1,6 +1,74 @@
 from pydantic import BaseModel
 
 
+class VehicleCreate(BaseModel):
+    vehicle_number: str
+    vehicle_type: str | None = None
+    registration_number: str
+
+
+class VehicleUpdate(BaseModel):
+    vehicle_number: str | None = None
+    vehicle_type: str | None = None
+    registration_number: str | None = None
+
+
+class VehicleRead(BaseModel):
+    vehicle_id: int
+    school_id: int
+    vehicle_number: str
+    vehicle_type: str | None
+    registration_number: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class PilotCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    phone: str
+    email: str | None = None
+    present_address: str | None = None
+    permanent_address: str | None = None
+    aadhaar_number: str | None = None
+    dl_number: str | None = None
+
+
+class PilotUpdate(BaseModel):
+    username: str | None = None
+    password: str | None = None
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    present_address: str | None = None
+    permanent_address: str | None = None
+    aadhaar_number: str | None = None
+    dl_number: str | None = None
+    is_active: bool | None = None
+
+
+class PilotRead(BaseModel):
+    pilot_id: int
+    user_id: int
+    school_id: int
+    role: str
+    username: str
+    full_name: str
+    email: str | None
+    phone: str
+    present_address: str | None
+    permanent_address: str | None
+    aadhaar_number: str | None
+    dl_number: str | None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
 class RouteCreate(BaseModel):
     name: str
     vehicle: str

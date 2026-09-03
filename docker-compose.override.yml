@@ -1,0 +1,52 @@
+# Local override: use PostgreSQL running on the host instead of a db container.
+x-host-database: &host_database
+  environment:
+    DATABASE_URL: "postgresql://ravi:ravi@host.docker.internal:5432/schoolersdb?options=-csearch_path%3Dschoolers"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  auth_service:
+    <<: *host_database
+  schools_service:
+    <<: *host_database
+    volumes:
+      - /Users/ravi/Desktop/schoolers/images:/Users/ravi/Desktop/schoolers/images
+    environment:
+      DATABASE_URL: "postgresql://ravi:ravi@host.docker.internal:5432/schoolersdb?options=-csearch_path%3Dschoolers"
+      UPLOAD_LOCAL_PATH: /Users/ravi/Desktop/schoolers/images
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  academics_service:
+    <<: *host_database
+  people_service:
+    <<: *host_database
+  attendance_service:
+    <<: *host_database
+  marks_service:
+    <<: *host_database
+  timetable_service:
+    <<: *host_database
+  transport_service:
+    <<: *host_database
+  leave_service:
+    <<: *host_database
+  communication_service:
+    <<: *host_database
+  barter_service:
+    <<: *host_database
+  activities_service:
+    <<: *host_database
+  website_service:
+    <<: *host_database
+    volumes:
+      - /Users/ravi/Desktop/schoolers/images:/Users/ravi/Desktop/schoolers/images
+    environment:
+      DATABASE_URL: "postgresql://ravi:ravi@host.docker.internal:5432/schoolersdb?options=-csearch_path%3Dschoolers"
+      UPLOAD_LOCAL_PATH: /Users/ravi/Desktop/schoolers/images
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  notifications_service:
+    <<: *host_database
+  reports_service:
+    <<: *host_database

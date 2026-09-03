@@ -42,6 +42,8 @@ ROUTE_MAP = {
     "marks": "marks",
     "timetable": "timetable",
     "routes": "transport",
+    "vehicles": "transport",
+    "pilots": "transport",
     "leave": "leave",
     "broadcasts": "communication",
     "media": "communication",
@@ -95,7 +97,8 @@ async def proxy(full_path: str, request: Request):
         )
 
     target_base = settings.SERVICE_HOSTS[service_key]
-    target_url = f"{target_base}/api/v1/{full_path}"
+    upstream_path = f"routes/{full_path}" if first_segment in {"vehicles", "pilots"} else full_path
+    target_url = f"{target_base}/api/v1/{upstream_path}"
 
     body = await request.body()
     forward_headers = {
