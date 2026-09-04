@@ -240,7 +240,10 @@ class RouteStudent(Base):
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
     status = Column(String(10), nullable=False, default="pending")  # pending/picked/dropped (app-level, not in original DDL)
 
-    __table_args__ = (UniqueConstraint("route_id", "student_id"),)
+    __table_args__ = (
+        UniqueConstraint("route_id", "student_id"),
+        UniqueConstraint("student_id"),
+    )
 
 
 # ============================================================================

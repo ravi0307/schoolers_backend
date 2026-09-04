@@ -1,9 +1,17 @@
 import random
 
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import exists, or_
 
-from common.models import Teacher, Staff, Parent, Student, ParentStudent, TeacherClassSubject
+from common.models import (
+    Teacher,
+    Staff,
+    Parent,
+    Student,
+    ParentStudent,
+    TeacherClassSubject,
+    RouteStudent,
+)
 
 
 # ---- Teachers ----
@@ -198,10 +206,20 @@ def children_of_parent(db: Session, parent_id: int) -> list[Student]:
 
 
 # ---- Students ----
-def list_students(db: Session, school_id: int, search: str | None = None, class_id: int | None = None) -> list[Student]:
+def list_students(
+    db: Session,
+    school_id: int,
+    search: str | None = None,
+    class_id: int | None = None,
+    unassigned_only: bool = False,
+) -> list[Student]:
     q = db.query(Student).filter(Student.school_id == school_id, Student.is_active.is_(True))
     if class_id:
         q = q.filter(Student.class_id == class_id)
+    if unassigned_only:
+        q = q.filter(
+            ~exists().where(RouteStudent.student_id == Student.student_id)
+        )
     if search:
         like = f"%{search}%"
         q = q.filter(or_(Student.name.ilike(like), Student.admission_no.ilike(like)))

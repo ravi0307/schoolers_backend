@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class VehicleCreate(BaseModel):
@@ -96,32 +96,81 @@ class RouteRead(BaseModel):
 
 
 class StopCreate(BaseModel):
-    name: str
-    stop_time: str
-    stop_type: str  # 'pickup' | 'drop'
-    stop_order: int = 1
+    stop_name: str | None = None
+    pickup_time: str | None = None
+    pickup_order: int = 1
+    drop_time: str | None = None
+    drop_order: int = 1
+    # Legacy single-direction fields remain accepted during the API transition.
+    name: str | None = None
+    stop_time: str | None = None
+    stop_type: str | None = None
+    stop_order: int | None = None
+
+    @model_validator(mode="after")
+    def normalize_legacy_fields(self):
+        if self.stop_name is None:
+            self.stop_name = self.name
+        if self.stop_type == "pickup" and self.pickup_time is None:
+            self.pickup_time = self.stop_time
+            if self.stop_order is not None:
+                self.pickup_order = self.stop_order
+        if self.stop_type == "drop" and self.drop_time is None:
+            self.drop_time = self.stop_time
+            if self.stop_order is not None:
+                self.drop_order = self.stop_order
+        if not self.stop_name:
+            raise ValueError("stop_name is required")
+        if not self.pickup_time and not self.drop_time:
+            raise ValueError("pickup_time or drop_time is required")
+        return self
+
+
+class StopUpdate(BaseModel):
+    stop_name: str | None = None
+    pickup_time: str | None = None
+    pickup_order: int | None = None
+    drop_time: str | None = None
+    drop_order: int | None = None
+    # Legacy single-direction fields remain accepted during the API transition.
+    name: str | None = None
+    stop_time: str | None = None
+    stop_type: str | None = None
+    stop_order: int | None = None
+
+    @model_validator(mode="after")
+    def normalize_legacy_fields(self):
+        if self.stop_name is None:
+            self.stop_name = self.name
+        if self.stop_type == "pickup" and self.pickup_time is None:
+            self.pickup_time = self.stop_time
+            self.pickup_order = self.stop_order
+        if self.stop_type == "drop" and self.drop_time is None:
+            self.drop_time = self.stop_time
+            self.drop_order = self.stop_order
+        return self
 
 
 class StopRead(BaseModel):
     stop_id: int
     route_id: int
-    name: str
-    stop_time: str
-    stop_type: str
-    stop_order: int
+    stop_name: str
+    pickup_time: str | None
+    pickup_order: int | None
+    drop_time: str | None
+    drop_order: int | None
+    pickup_stop_id: int | None = None
+    drop_stop_id: int | None = None
 
-    class Config:
-        from_attributes = True
 
 
 class RouteStudentRead(BaseModel):
     id: int
     route_id: int
     student_id: int
+    student_name: str
+    admission_no: str
     status: str
-
-    class Config:
-        from_attributes = True
 
 
 class RouteStudentStatusUpdate(BaseModel):
