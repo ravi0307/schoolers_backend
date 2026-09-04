@@ -163,11 +163,15 @@ def children_of_parent(
 def list_students(
     search: str | None = Query(default=None),
     class_id: int | None = Query(default=None),
+    unassigned_only: bool = Query(default=False),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
-    return repo.student_responses(db, repo.list_students(db, school_id, search, class_id))
+    return repo.student_responses(
+        db,
+        repo.list_students(db, school_id, search, class_id, unassigned_only),
+    )
 
 
 @router.post("/students", response_model=StudentRead, status_code=201)

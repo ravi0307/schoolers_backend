@@ -8,7 +8,7 @@ import repository as repo
 from schemas import (
     VehicleCreate, VehicleUpdate, VehicleRead,
     PilotCreate, PilotUpdate, PilotRead,
-    RouteCreate, RouteUpdate, RouteRead, StopCreate, StopRead,
+    RouteCreate, RouteUpdate, RouteRead, StopCreate, StopUpdate, StopRead,
     RouteStudentRead, RouteStudentStatusUpdate,
 )
 
@@ -175,6 +175,19 @@ def list_stops(
     return repo.list_stops(db, route_id)
 
 
+@router.patch("/stops/{stop_id}", response_model=StopRead)
+def update_stop(
+    stop_id: int,
+    payload: StopUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    stop = repo.get_stop(db, stop_id)
+    if not stop:
+        raise NotFoundError("Stop not found")
+    return repo.update_stop(db, stop, payload.model_dump(exclude_unset=True))
+
+
 @router.delete("/stops/{stop_id}", status_code=204)
 def remove_stop(
     stop_id: int,
@@ -184,7 +197,7 @@ def remove_stop(
     repo.remove_stop(db, stop_id)
 
 
-@router.post("/{route_id}/students/{student_id}", status_code=201)
+@router.post("/{route_id}/students/{student_id}", response_model=RouteStudentRead, status_code=201)
 def add_student_to_route(
     route_id: int,
     student_id: int,

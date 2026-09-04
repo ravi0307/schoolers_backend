@@ -51,3 +51,12 @@ CREATE TABLE IF NOT EXISTS schoolers.pilots (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- A student may belong to only one transport route at a time.
+DELETE FROM schoolers.route_students older
+USING schoolers.route_students newer
+WHERE older.student_id = newer.student_id
+  AND older.id > newer.id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS route_students_student_id_key
+    ON schoolers.route_students (student_id);
