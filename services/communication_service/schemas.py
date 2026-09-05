@@ -1,11 +1,28 @@
-from pydantic import BaseModel
+from typing import Literal
+from datetime import datetime
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class BroadcastCreate(BaseModel):
-    scope: str  # 'school' | 'class' | 'pilot'
+    scope: Literal["school", "class", "pilot"]
     class_id: int | None = None
-    from_name: str
-    message: str
+    role_name: str = Field(min_length=1)
+    sender_name: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_scope_target(self):
+        if self.scope == "class" and self.class_id is None:
+            raise ValueError("class_id is required for class broadcasts")
+        if self.scope != "class" and self.class_id is not None:
+            raise ValueError("class_id is only supported for class broadcasts")
+        return self
+
+
+class BroadcastUpdate(BaseModel):
+    message: str = Field(min_length=1)
+    created_at: datetime | None = None
 
 
 class BroadcastRead(BaseModel):
@@ -13,8 +30,10 @@ class BroadcastRead(BaseModel):
     school_id: int
     class_id: int | None
     scope: str
-    from_name: str
+    role_name: str
+    sender_name: str
     message: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

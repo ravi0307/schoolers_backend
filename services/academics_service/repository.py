@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from common.models import SchoolClass, Subject, Period, Holiday, Teacher
+from common.models import SchoolClass, Subject, Period, Holiday, Teacher, TimetableEntry
 from common.exceptions import ConflictError, NotFoundError
 
 
@@ -74,12 +74,38 @@ def list_periods(db: Session) -> list[Period]:
     return db.query(Period).order_by(Period.period_no).all()
 
 
-def update_period(db: Session, period_id: int, period_time: str) -> Period | None:
+def update_period(
+    db: Session,
+    period_id: int,
+    school_id: int,
+    period_time: str | None,
+    period_start_time,
+    period_end_time,
+) -> Period | None:
     period = db.query(Period).filter(Period.period_id == period_id).first()
-    if period:
+    if not period:
+        return None
+
+    entries = db.query(TimetableEntry).filter(
+        TimetableEntry.period_id == period_id,
+        TimetableEntry.school_id == school_id,
+    ).all()
+    if not entries:
+        return None
+
+    if period_time is not None:
         period.period_time = period_time
-        db.commit()
-        db.refresh(period)
+    for entry in entries:
+        if period_start_time is not None:
+            entry.period_start_time = period_start_time
+        if period_end_time is not None:
+            entry.period_end_time = period_end_time
+
+    db.commit()
+    db.refresh(period)
+    first_entry = entries[0]
+    period.period_start_time = first_entry.period_start_time
+    period.period_end_time = first_entry.period_end_time
     return period
 
 

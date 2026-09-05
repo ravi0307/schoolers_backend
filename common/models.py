@@ -7,8 +7,8 @@ modules import only what they need from here.
 from datetime import date, datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Text, Date, DateTime, ForeignKey,
-    UniqueConstraint, CheckConstraint, func
+    Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
+    UniqueConstraint, CheckConstraint, func, text
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -84,7 +84,7 @@ class Period(Base):
 
     period_id = Column(Integer, primary_key=True)
     period_no = Column(Integer, nullable=False, unique=True)
-    period_time = Column(String(15), nullable=False)
+    period_time = Column(String(31), nullable=False)
 
 
 class Holiday(Base):
@@ -259,11 +259,16 @@ class TimetableEntry(Base):
     __tablename__ = "timetable_entries"
 
     entry_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"), nullable=False)
     day_of_week = Column(String(3), nullable=False)
     period_id = Column(Integer, ForeignKey("periods.period_id", ondelete="CASCADE"), nullable=False)
+    period_start_time = Column(Time)
+    period_end_time = Column(Time)
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="SET NULL"))
     teacher_id = Column(Integer, ForeignKey("teachers.teacher_id", ondelete="SET NULL"))
+    created_on = Column(DateTime, server_default=text("timezone('Asia/Kolkata', now())"))
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     is_holiday_override = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (UniqueConstraint("class_id", "day_of_week", "period_id"),)
@@ -333,9 +338,13 @@ class Broadcast(Base):
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"))
     scope = Column(String(10), nullable=False)
-    from_name = Column(String(100), nullable=False)
+    role_name = Column(String(100), nullable=False)
+    sender_name = Column(String(100), nullable=False, server_default="")
     message = Column(Text, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(
+        DateTime,
+        server_default=text("timezone('Asia/Kolkata', now())"),
+    )
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 

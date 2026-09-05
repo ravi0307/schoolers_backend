@@ -1,3 +1,5 @@
+from datetime import time
+
 from pydantic import BaseModel
 
 
@@ -35,13 +37,17 @@ class PeriodRead(BaseModel):
     period_id: int
     period_no: int
     period_time: str
+    period_start_time: time | None = None
+    period_end_time: time | None = None
 
     class Config:
         from_attributes = True
 
 
 class PeriodUpdate(BaseModel):
-    period_time: str
+    period_time: str | None = None
+    period_start_time: time | None = None
+    period_end_time: time | None = None
 
 
 class HolidayRead(BaseModel):
