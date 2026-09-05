@@ -48,7 +48,9 @@ class Settings(BaseSettings):
 
     # File uploads — local disk in dev; swap UPLOAD_BACKEND to "s3" later.
     UPLOAD_BACKEND: str = "local"
-    UPLOAD_LOCAL_PATH: str = "/Users/ravi/Desktop/schoolers/images"
+    # Keep local uploads inside the backend by default so development works
+    # consistently across Windows, macOS, and Linux.
+    UPLOAD_LOCAL_PATH: str = str(COMMON_DIR.parent / "uploads")
     UPLOAD_MAX_BYTES: int = 5 * 1024 * 1024
 
     # Gateway <-> service registry. The gateway is the single public entry

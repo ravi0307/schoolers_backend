@@ -106,6 +106,7 @@ class Teacher(Base):
     __tablename__ = "teachers"
 
     teacher_id = Column(Integer, primary_key=True)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"), unique=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
     role_title = Column(String(100), nullable=False)
@@ -142,10 +143,14 @@ class Staff(Base):
     role = Column(String(60), nullable=False)
     phone = Column(String(30))
     email = Column(String(120))
+    date_of_birth = Column(Date)
+    marital_status = Column(String(20))
+    gender = Column(String(20))
     present_address = Column(String(255))
     permanent_address = Column(String(255))
     aadhaar_card = Column(String(30))
     emergency_number = Column(String(30))
+    driving_license = Column(String(40))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
@@ -444,6 +449,7 @@ class Pilot(Base):
     __tablename__ = "pilots"
 
     pilot_id = Column(Integer, primary_key=True)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"), unique=True)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, unique=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     full_name = Column(String(100), nullable=False)

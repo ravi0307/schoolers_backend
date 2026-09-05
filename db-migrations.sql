@@ -7,16 +7,22 @@ ALTER TABLE IF EXISTS schoolers.schools
 
 ALTER TABLE IF EXISTS schoolers.staff
     ADD COLUMN IF NOT EXISTS email VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS date_of_birth DATE,
+    ADD COLUMN IF NOT EXISTS marital_status VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
     ADD COLUMN IF NOT EXISTS present_address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS permanent_address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS aadhaar_card VARCHAR(30),
-    ADD COLUMN IF NOT EXISTS emergency_number VARCHAR(30);
+    ADD COLUMN IF NOT EXISTS emergency_number VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS driving_license VARCHAR(40),
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 ALTER TABLE IF EXISTS schoolers.parents
     ADD COLUMN IF NOT EXISTS address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS emergency_number VARCHAR(30);
 
 ALTER TABLE IF EXISTS schoolers.teachers
+    ADD COLUMN IF NOT EXISTS staff_id INTEGER UNIQUE REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS present_address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS permanent_address VARCHAR(255),
     ADD COLUMN IF NOT EXISTS date_of_birth DATE,
@@ -51,6 +57,10 @@ CREATE TABLE IF NOT EXISTS schoolers.pilots (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE IF EXISTS schoolers.pilots
+    ADD COLUMN IF NOT EXISTS staff_id INTEGER UNIQUE
+    REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL;
 
 -- A student may belong to only one transport route at a time.
 DELETE FROM schoolers.route_students older

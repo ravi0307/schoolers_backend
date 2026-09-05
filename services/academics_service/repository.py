@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
-from common.models import SchoolClass, Subject, Period, Holiday
+from common.models import SchoolClass, Subject, Period, Holiday, Teacher
+from common.exceptions import ConflictError, NotFoundError
 
 
 def list_classes(db: Session, school_id: int) -> list[SchoolClass]:
@@ -14,6 +15,7 @@ def get_class(db: Session, school_id: int, class_id: int) -> SchoolClass | None:
 
 
 def create_class(db: Session, school_id: int, data: dict) -> SchoolClass:
+    validate_class_teacher(db, school_id, data.get("class_teacher_id"))
     cls = SchoolClass(school_id=school_id, **data)
     db.add(cls)
     db.commit()
@@ -22,12 +24,41 @@ def create_class(db: Session, school_id: int, data: dict) -> SchoolClass:
 
 
 def update_class(db: Session, cls: SchoolClass, data: dict) -> SchoolClass:
+    if "class_teacher_id" in data:
+        validate_class_teacher(db, cls.school_id, data["class_teacher_id"], cls.class_id)
     for k, v in data.items():
-        if v is not None:
+        if v is not None or k == "class_teacher_id":
             setattr(cls, k, v)
     db.commit()
     db.refresh(cls)
     return cls
+
+
+def validate_class_teacher(
+    db: Session,
+    school_id: int,
+    teacher_id: int | None,
+    class_id: int | None = None,
+) -> None:
+    if teacher_id is None:
+        return
+
+    teacher = db.query(Teacher).filter(
+        Teacher.teacher_id == teacher_id,
+        Teacher.school_id == school_id,
+        Teacher.is_active.is_(True),
+    ).first()
+    if not teacher:
+        raise NotFoundError("Teacher not found for this school")
+
+    assigned_class = db.query(SchoolClass).filter(
+        SchoolClass.school_id == school_id,
+        SchoolClass.class_teacher_id == teacher_id,
+        SchoolClass.is_active.is_(True),
+        SchoolClass.class_id != class_id if class_id is not None else True,
+    ).first()
+    if assigned_class:
+        raise ConflictError(f"Teacher is already assigned to class '{assigned_class.name}'")
 
 
 def delete_class(db: Session, cls: SchoolClass) -> None:

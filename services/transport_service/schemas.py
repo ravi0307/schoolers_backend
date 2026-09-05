@@ -52,6 +52,7 @@ class PilotUpdate(BaseModel):
 
 class PilotRead(BaseModel):
     pilot_id: int
+    staff_id: int | None = None
     user_id: int
     school_id: int
     role: str

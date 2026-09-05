@@ -70,3 +70,9 @@ class TestimonialRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PublicSiteRead(BaseModel):
+    settings: WebsiteSettingsRead
+    pages: dict[str, WebsitePageRead]
+    testimonials: list[TestimonialRead]
