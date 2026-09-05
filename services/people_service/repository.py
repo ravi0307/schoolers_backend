@@ -1,4 +1,5 @@
 import random
+import secrets
 
 from sqlalchemy.orm import Session
 from sqlalchemy import exists, or_
@@ -11,7 +12,10 @@ from common.models import (
     ParentStudent,
     TeacherClassSubject,
     RouteStudent,
+    Pilot,
+    User,
 )
+from common.security import hash_password
 
 
 # ---- Teachers ----
@@ -58,6 +62,140 @@ def teaching_load(db: Session, teacher_id: int) -> list[TeacherClassSubject]:
 
 
 # ---- Staff ----
+def _is_teacher_staff(staff: Staff) -> bool:
+    return staff.role.strip().casefold() == "teacher"
+
+
+def _linked_teacher(db: Session, staff: Staff) -> Teacher | None:
+    teacher = db.query(Teacher).filter(Teacher.staff_id == staff.staff_id).first()
+    if teacher:
+        return teacher
+    return (
+        db.query(Teacher)
+        .filter(
+            Teacher.staff_id.is_(None),
+            Teacher.school_id == staff.school_id,
+            Teacher.name == staff.name,
+            Teacher.phone == staff.phone,
+        )
+        .first()
+    )
+
+
+def _sync_teacher_from_staff(db: Session, staff: Staff) -> None:
+    teacher = _linked_teacher(db, staff)
+    if not _is_teacher_staff(staff) or not staff.is_active:
+        if teacher:
+            teacher.is_active = False
+        return
+
+    values = {
+        "staff_id": staff.staff_id,
+        "school_id": staff.school_id,
+        "name": staff.name,
+        "role_title": staff.role,
+        "phone": staff.phone or "",
+        "email": staff.email,
+        "date_of_birth": staff.date_of_birth,
+        "gender": staff.gender,
+        "present_address": staff.present_address,
+        "permanent_address": staff.permanent_address,
+        "emergency_number": staff.emergency_number,
+    }
+    if teacher is None:
+        teacher = Teacher(**values)
+        db.add(teacher)
+    else:
+        for key, value in values.items():
+            setattr(teacher, key, value)
+        teacher.is_active = True
+
+
+def _is_pilot_staff(staff: Staff) -> bool:
+    return staff.role.strip().casefold() == "pilot"
+
+
+def _linked_pilot(db: Session, staff: Staff) -> tuple[Pilot, User] | None:
+    linked = (
+        db.query(Pilot, User)
+        .join(User, User.user_id == Pilot.user_id)
+        .filter(Pilot.staff_id == staff.staff_id)
+        .first()
+    )
+    if linked:
+        return linked
+    return (
+        db.query(Pilot, User)
+        .join(User, User.user_id == Pilot.user_id)
+        .filter(
+            Pilot.staff_id.is_(None),
+            Pilot.school_id == staff.school_id,
+            Pilot.full_name == staff.name,
+            Pilot.phone == (staff.phone or ""),
+        )
+        .first()
+    )
+
+
+def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
+    linked = _linked_pilot(db, staff)
+    if not _is_pilot_staff(staff) or not staff.is_active:
+        if linked:
+            pilot, user = linked
+            pilot.is_active = False
+            user.is_active = False
+        return
+
+    pilot = linked[0] if linked else None
+    user = linked[1] if linked else None
+    if pilot is None or user is None:
+        user = User(
+            school_id=staff.school_id,
+            role="pilot",
+            username=f"pilot_{staff.school_id}_{staff.staff_id}",
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+        pilot = Pilot(
+            staff_id=staff.staff_id,
+            user_id=user.user_id,
+            school_id=staff.school_id,
+            full_name=staff.name,
+            email=staff.email,
+            phone=staff.phone or "",
+            present_address=staff.present_address,
+            permanent_address=staff.permanent_address,
+            aadhaar_number=staff.aadhaar_card,
+            dl_number=staff.driving_license,
+            is_active=True,
+        )
+        db.add(pilot)
+        db.flush()
+        user.linked_person_id = pilot.pilot_id
+        return
+
+    user.school_id = staff.school_id
+    user.role = "pilot"
+    user.is_active = True
+    pilot.staff_id = staff.staff_id
+    pilot.school_id = staff.school_id
+    pilot.full_name = staff.name
+    pilot.email = staff.email
+    pilot.phone = staff.phone or ""
+    pilot.present_address = staff.present_address
+    pilot.permanent_address = staff.permanent_address
+    pilot.aadhaar_number = staff.aadhaar_card
+    pilot.dl_number = staff.driving_license
+    pilot.is_active = True
+
+
+def _sync_person_from_staff(db: Session, staff: Staff) -> None:
+    _sync_teacher_from_staff(db, staff)
+    _sync_pilot_from_staff(db, staff)
+
+
 def list_staff(db: Session, school_id: int, search: str | None = None) -> list[Staff]:
     q = db.query(Staff).filter(Staff.school_id == school_id, Staff.is_active.is_(True))
     if search:
@@ -73,6 +211,8 @@ def get_staff(db: Session, school_id: int, staff_id: int) -> Staff | None:
 def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     staff = Staff(school_id=school_id, **data)
     db.add(staff)
+    db.flush()
+    _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
     return staff
@@ -82,6 +222,7 @@ def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
     for k, v in data.items():
         if v is not None:
             setattr(staff, k, v)
+    _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
     return staff
@@ -89,6 +230,7 @@ def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
 
 def delete_staff(db: Session, staff: Staff) -> None:
     staff.is_active = False
+    _sync_person_from_staff(db, staff)
     db.commit()
 
 

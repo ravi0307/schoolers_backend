@@ -15,7 +15,7 @@ import repository as repo
 from schemas import (
     WebsiteSettingsUpdate, WebsiteSettingsRead,
     WebsitePageUpsert, WebsitePageRead,
-    TestimonialCreate, TestimonialRead,
+    TestimonialCreate, TestimonialRead, PublicSiteRead,
 )
 
 router = APIRouter(prefix="/website", tags=["website"])
@@ -101,6 +101,18 @@ def delete_testimonial(
     repo.delete_testimonial(db, school_id, testimonial_id)
 
 
+@router.post("/go-live", response_model=PublicSiteRead)
+def go_live(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    site = repo.publish_site(db, school_id)
+    if not site:
+        raise NotFoundError("Website settings not yet created for this school")
+    return site
+
+
 @router.post("/uploads")
 async def upload_image(
     file: UploadFile = File(...),
@@ -135,10 +147,15 @@ def public_site(school_id: int, db: Session = Depends(get_db)):
     settings = repo.get_settings(db, school_id)
     if not settings:
         raise NotFoundError("This school has not published a website yet")
-    pages = {p.slug: p for p in repo.list_pages(db, school_id)}
-    testimonials = repo.list_testimonials(db, school_id)
+    site = repo.site_payload(db, school_id, settings)
     return {
-        "settings": WebsiteSettingsRead.model_validate(settings),
-        "pages": {slug: WebsitePageRead.model_validate(p) for slug, p in pages.items()},
-        "testimonials": [TestimonialRead.model_validate(t) for t in testimonials],
+        "settings": WebsiteSettingsRead.model_validate(site["settings"]),
+        "pages": {
+            slug: WebsitePageRead.model_validate(page)
+            for slug, page in site["pages"].items()
+        },
+        "testimonials": [
+            TestimonialRead.model_validate(testimonial)
+            for testimonial in site["testimonials"]
+        ],
     }

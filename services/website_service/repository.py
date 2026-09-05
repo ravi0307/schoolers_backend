@@ -8,6 +8,10 @@ def get_settings(db: Session, school_id: int) -> WebsiteSettings | None:
     return db.query(WebsiteSettings).filter(WebsiteSettings.school_id == school_id, WebsiteSettings.is_active.is_(True)).first()
 
 
+def get_settings_any(db: Session, school_id: int) -> WebsiteSettings | None:
+    return db.query(WebsiteSettings).filter(WebsiteSettings.school_id == school_id).first()
+
+
 def upsert_settings(db: Session, school_id: int, data: dict, default_name: str) -> WebsiteSettings:
     settings = get_settings(db, school_id)
     if settings:
@@ -67,3 +71,26 @@ def delete_testimonial(db: Session, school_id: int, testimonial_id: int) -> None
     if testimonial:
         testimonial.is_active = False
     db.commit()
+
+
+def site_payload(db: Session, school_id: int, settings: WebsiteSettings) -> dict:
+    pages = {page.slug: page for page in list_pages(db, school_id)}
+    testimonials = list_testimonials(db, school_id)
+    return {
+        "settings": settings,
+        "pages": pages,
+        "testimonials": testimonials,
+    }
+
+
+def publish_site(db: Session, school_id: int) -> dict | None:
+    settings = get_settings_any(db, school_id)
+    if not settings:
+        return None
+
+    if not settings.is_active:
+        settings.is_active = True
+        db.commit()
+        db.refresh(settings)
+
+    return site_payload(db, school_id, settings)

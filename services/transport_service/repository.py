@@ -46,6 +46,7 @@ def update_vehicle(db: Session, vehicle: Vehicle, data: dict) -> Vehicle:
 def _pilot_response(pilot: Pilot, user: User) -> dict:
     return {
         "pilot_id": pilot.pilot_id,
+        "staff_id": pilot.staff_id,
         "user_id": user.user_id,
         "school_id": pilot.school_id,
         "role": user.role,
