@@ -97,6 +97,22 @@ Check what's up:
 curl http://localhost:8000/health/services
 ```
 
+## Run backend checks
+
+The repository includes dependency-free contract tests covering all 15
+microservices, gateway routing, database migration requirements, timetable
+entry fields, broadcast fields, Python compilation, and merge-marker
+detection:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+python -m compileall -q common gateway services
+```
+
+The GitHub Actions workflow runs both commands on every push and pull
+request. A failing test or compilation error makes the check fail and
+reports the failing application/file in the build logs.
+
 ## Run it with Docker Compose
 
 ```bash

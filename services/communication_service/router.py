@@ -5,7 +5,7 @@ from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
 import repository as repo
 from schemas import (
-    BroadcastCreate, BroadcastRead, MediaCreate, MediaRead,
+    BroadcastCreate, BroadcastRead, BroadcastUpdate, MediaCreate, MediaRead,
 )
 
 router = APIRouter(tags=["communication"])
@@ -30,6 +30,23 @@ def list_broadcasts(
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "pilot")),
 ):
     return repo.list_broadcasts(db, school_id, scope, class_id)
+
+
+@router.patch("/broadcasts/{broadcast_id}", response_model=BroadcastRead)
+def update_broadcast(
+    broadcast_id: int,
+    payload: BroadcastUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "pilot")),
+):
+    return repo.update_broadcast_message(
+        db,
+        school_id,
+        broadcast_id,
+        payload.message,
+        payload.created_at,
+    )
 
 
 @router.post("/media", response_model=MediaRead, status_code=201)

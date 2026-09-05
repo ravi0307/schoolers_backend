@@ -5,6 +5,97 @@ ALTER TABLE IF EXISTS schoolers.website_settings
 ALTER TABLE IF EXISTS schoolers.schools
     ADD COLUMN IF NOT EXISTS logo_url VARCHAR(255);
 
+ALTER TABLE IF EXISTS schoolers.periods
+    ALTER COLUMN period_time TYPE VARCHAR(31);
+
+ALTER TABLE IF EXISTS schoolers.timetable_entries
+    ADD COLUMN IF NOT EXISTS school_id INTEGER,
+    ADD COLUMN IF NOT EXISTS period_start_time TIME,
+    ADD COLUMN IF NOT EXISTS period_end_time TIME,
+    ADD COLUMN IF NOT EXISTS created_on TIMESTAMP DEFAULT timezone('Asia/Kolkata', now()),
+    ADD COLUMN IF NOT EXISTS created_by INTEGER;
+
+UPDATE schoolers.timetable_entries te
+SET school_id = c.school_id
+FROM schoolers.classes c
+WHERE te.class_id = c.class_id
+  AND te.school_id IS NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'timetable_entries_school_id_fkey'
+          AND conrelid = 'schoolers.timetable_entries'::regclass
+    ) THEN
+        ALTER TABLE schoolers.timetable_entries
+            ADD CONSTRAINT timetable_entries_school_id_fkey
+            FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'timetable_entries_created_by_fkey'
+          AND conrelid = 'schoolers.timetable_entries'::regclass
+    ) THEN
+        ALTER TABLE schoolers.timetable_entries
+            ADD CONSTRAINT timetable_entries_created_by_fkey
+            FOREIGN KEY (created_by) REFERENCES schoolers.users(user_id)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+ALTER TABLE IF EXISTS schoolers.timetable_entries
+    ALTER COLUMN school_id SET NOT NULL;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'broadcasts'
+          AND column_name = 'from_name'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'broadcasts'
+          AND column_name = 'role_name'
+    ) THEN
+        ALTER TABLE schoolers.broadcasts RENAME COLUMN from_name TO role_name;
+    END IF;
+END $$;
+
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    ADD COLUMN IF NOT EXISTS sender_name VARCHAR(100) NOT NULL DEFAULT '';
+
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    ALTER COLUMN created_at SET DEFAULT timezone('Asia/Kolkata', now());
+
+CREATE OR REPLACE FUNCTION schoolers.set_broadcast_created_at_ist()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    NEW.created_at := timezone('Asia/Kolkata', now());
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS broadcasts_set_created_at_ist ON schoolers.broadcasts;
+
+CREATE TRIGGER broadcasts_set_created_at_ist
+BEFORE UPDATE ON schoolers.broadcasts
+FOR EACH ROW
+EXECUTE FUNCTION schoolers.set_broadcast_created_at_ist();
+
 ALTER TABLE IF EXISTS schoolers.staff
     ADD COLUMN IF NOT EXISTS email VARCHAR(120),
     ADD COLUMN IF NOT EXISTS date_of_birth DATE,

@@ -81,9 +81,17 @@ def update_period(
     period_id: int,
     payload: PeriodUpdate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin", "teacher")),
 ):
-    period = repo.update_period(db, period_id, payload.period_time)
+    period = repo.update_period(
+        db,
+        period_id,
+        school_id,
+        payload.period_time,
+        payload.period_start_time,
+        payload.period_end_time,
+    )
     if not period:
         raise NotFoundError("Period not found")
     return period
