@@ -112,3 +112,9 @@ def clear_override(db: Session, entry: TimetableEntry) -> TimetableEntry:
     db.commit()
     db.refresh(entry)
     return entry
+
+
+def delete_entry(db: Session, entry: TimetableEntry) -> None:
+    """Hard-delete a timetable entry. Returns the entry id for confirmation."""
+    db.delete(entry)
+    db.commit()

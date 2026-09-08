@@ -8,8 +8,8 @@ import re
 import shutil
 from pathlib import Path
 
-MONOLITH_MODULES = Path("/home/claude/proto/backend/schoolers/app/modules")
-SERVICES_ROOT = Path("/home/claude/proto/microservices/schoolers/services")
+MONOLITH_MODULES = Path("/home/schoolers/proto/backend/schoolers/app/modules")
+SERVICES_ROOT = Path("/home/schoolers/proto/microservices/schoolers/services")
 
 SERVICES = {
     "auth": ("auth_service", 8001),
