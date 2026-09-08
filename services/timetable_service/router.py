@@ -91,3 +91,17 @@ def clear_override(
     if not entry:
         raise NotFoundError("Timetable entry not found")
     return repo.clear_override(db, entry)
+
+
+@router.delete("/entry/{entry_id}")
+def delete_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    entry = repo.get_entry(db, entry_id, school_id)
+    if not entry:
+        raise NotFoundError("Timetable entry not found")
+    repo.delete_entry(db, entry)
+    return {"entry_id": entry_id, "deleted": True}
