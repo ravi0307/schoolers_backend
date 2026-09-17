@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -10,6 +12,9 @@ from common.security import (
     hash_password,
 )
 from common.models import User, Teacher, Staff, Parent, Pilot
+
+RESET_TOKEN_TTL_MINUTES = 30
+_GENERIC_INVALID_RESET_MESSAGE = "Invalid or expired reset token."
 
 
 def authenticate(db: Session, username: str, password: str) -> User:
@@ -98,27 +103,70 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     )
 
 
-def forgot_password_request(db: Session, identifier: str) -> tuple[User | None, str]:
+def _reset_token_digest(raw_token: str) -> str:
+    """One-way digest so a leaked users row cannot be used to reset logins."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _utcnow_naive() -> datetime:
+    """`users.password_reset_token_expires_at` is a timezone-naive column, so
+    compare against naive UTC consistently (Postgres and SQLite both return
+    naive datetimes for it)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _issue_reset_token(db: Session, user: User) -> tuple[str, datetime]:
+    """Issue a fresh one-time reset token and return (raw_token, expires_at)."""
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = _utcnow_naive() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+    user.password_reset_token = _reset_token_digest(raw_token)
+    user.password_reset_token_expires_at = expires_at
+    db.add(user)
+    db.commit()
+    return raw_token, expires_at
+
+
+def forgot_password_request(db: Session, identifier: str) -> tuple[str | None, datetime | None]:
     """
     Step 1: Verify that *identifier* is a username or email in the system.
-    Returns (user, message).
+
+    An anonymous caller can never tell registered accounts apart: the message
+    is identical either way. When the account exists a one-time, short-lived
+    reset token is issued and returned so the caller can set a new password.
+    In a real deployment the raw token would be emailed instead.
     """
     user = find_user_by_identifier(db, identifier)
     if user is None:
-        # Don't reveal whether the email exists — return a generic message.
-        return None, "If the username or email is registered, you can reset the password."
-    # In a real deployment you would email a one-time token here.
-    return user, f"Account '{user.username}' was found. You can now set a new password."
+        return None, None
+    return _issue_reset_token(db, user)
 
 
-def forgot_password_reset(db: Session, identifier: str, new_password: str) -> User:
+def _consume_reset_token(db: Session, user: User, raw_token: str) -> None:
+    """Validate the supplied raw token against the stored digest and expiry."""
+    if (
+        not user.password_reset_token
+        or not user.password_reset_token_expires_at
+        or user.password_reset_token_expires_at < _utcnow_naive()
+    ):
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+    expected = _reset_token_digest(raw_token)
+    if not secrets.compare_digest(expected, user.password_reset_token):
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+
+
+def forgot_password_reset(db: Session, identifier: str, reset_token: str, new_password: str) -> User:
     """
-    Step 2: Reset the password for the account matching *identifier*.
+    Step 3: Reset the password for the account matching *identifier*, but only
+    when the caller also holds the one-time token issued at step 1. The failure
+    and blank responses are identical whether the identifier is known or not.
     """
     user = find_user_by_identifier(db, identifier)
     if user is None:
-        raise UnauthorizedError("No user found with that username or email address.")
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+    _consume_reset_token(db, user, reset_token)
     user.password_hash = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
     db.add(user)
     db.commit()
     db.refresh(user)

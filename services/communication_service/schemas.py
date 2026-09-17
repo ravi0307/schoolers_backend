@@ -8,8 +8,10 @@ class BroadcastCreate(BaseModel):
     scope: Literal["school", "class", "route", "pilot"]
     class_id: int | None = None
     route_id: int | None = None
-    role_name: str = Field(min_length=1)
-    sender_name: str = Field(min_length=1)
+    # Accepted for backwards compatibility but ignored: the server derives the
+    # broadcaster's role and name from the authenticated user.
+    role_name: str | None = Field(default=None, min_length=1)
+    sender_name: str | None = Field(default=None, min_length=1)
     message: str = Field(min_length=1)
 
     @model_validator(mode="after")

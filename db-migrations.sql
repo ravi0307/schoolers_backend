@@ -252,3 +252,28 @@ BEGIN
             FOREIGN KEY (updated_by_user) REFERENCES schoolers.users(user_id);
     END IF;
 END $$;
+
+-- Password reset: one-time token (stored hashed) plus its expiry on the
+-- users row, so resetting a password requires the token, not just the
+-- identifier.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'users'
+          AND column_name = 'password_reset_token'
+    ) THEN
+        ALTER TABLE schoolers.users ADD COLUMN password_reset_token VARCHAR(255);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'users'
+          AND column_name = 'password_reset_token_expires_at'
+    ) THEN
+        ALTER TABLE schoolers.users ADD COLUMN password_reset_token_expires_at TIMESTAMP;
+    END IF;
+END $$;

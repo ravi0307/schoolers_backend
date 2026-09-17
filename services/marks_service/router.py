@@ -44,6 +44,12 @@ def get_class_marks(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    # The class must belong to the caller's school before any marks are read.
+    if current_user.school_id is not None and not repo.class_in_school(
+        db, class_id, current_user.school_id
+    ):
+        raise NotFoundError("Class not found")
+
     # A teacher only sees (and can therefore only edit) marks for the
     # subjects they're actually assigned to teach in this class.
     subject_ids = None
@@ -70,12 +76,17 @@ def upsert_mark(
     if not repo.subject_exists(db, subject_id):
         raise NotFoundError("Subject not found")
 
-    # Admin can grade anything; a Teacher only what they're assigned to teach.
+    # Admin can grade anything in their own school; a teacher only what
+    # they're assigned to teach.
     if current_user.role == "teacher":
         if not current_user.linked_person_id:
             raise ForbiddenError("This teacher account isn't linked to a teacher record")
         if not repo.teacher_can_grade(db, current_user.linked_person_id, student_id, subject_id):
             raise ForbiddenError("You don't teach this subject in this student's class")
+    elif current_user.school_id is not None and not repo.student_in_school(
+        db, student_id, current_user.school_id
+    ):
+        raise ForbiddenError("This student is not in your school")
     updated_by = current_user.linked_person_id if current_user.role == "teacher" else None
     return repo.upsert_mark(
         db, student_id, subject_id, payload.term, payload.score,

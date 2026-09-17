@@ -3,9 +3,20 @@ from datetime import datetime
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from common.models import Broadcast, Media, ParentStudent, Route, RouteStudent, SchoolClass, Student
-from common.exceptions import NotFoundError
+from common.models import (
+    Broadcast, Media, ParentStudent, Pilot, Route, RouteStudent, SchoolClass,
+    Staff, Student, Teacher,
+)
+from common.exceptions import NotFoundError, ForbiddenError
 from common.dependencies import CurrentUser
+
+# Which broadcast audiences each role may address. Identity (role_name and
+# sender_name) is always derived server-side, never accepted from the client.
+ALLOWED_BROADCAST_SCOPES = {
+    "admin": {"school", "class", "route", "pilot"},
+    "teacher": {"school", "class"},
+    "pilot": {"school", "route"},
+}
 
 
 def create_broadcast(db: Session, school_id: int, data: dict) -> Broadcast:
@@ -65,6 +76,48 @@ def _parent_visible_filter(db: Session, parent_id: int):
     )
 
 
+def resolve_sender_identity(db: Session, current_user: CurrentUser) -> tuple[str, str]:
+    """Derive the broadcast's (role_name, sender_name) from the authenticated
+    user rather than trusting client-supplied values, so a teacher or pilot
+    cannot impersonate an admin."""
+    role = current_user.role
+    if role == "teacher":
+        if not current_user.linked_person_id:
+            raise ForbiddenError("This teacher account isn't linked to a teacher record")
+        teacher = (
+            db.query(Teacher)
+            .filter(
+                Teacher.teacher_id == current_user.linked_person_id,
+                Teacher.is_active.is_(True),
+            )
+            .first()
+        )
+        if not teacher:
+            raise ForbiddenError("Teacher record not found")
+        return "Teacher", teacher.name
+    if role == "pilot":
+        pilot = (
+            db.query(Pilot)
+            .filter(Pilot.user_id == current_user.user_id)
+            .first()
+        )
+        if not pilot:
+            raise ForbiddenError("Pilot record not found")
+        return "Pilot", pilot.full_name
+    if current_user.linked_person_id:
+        staff = (
+            db.query(Staff)
+            .filter(
+                Staff.staff_id == current_user.linked_person_id,
+                Staff.is_active.is_(True),
+            )
+            .first()
+        )
+        if staff:
+            return "Admin", staff.name
+    return "Admin", "Admin"
+
+
 def list_broadcasts(
     db: Session,
     school_id: int,
@@ -82,8 +135,13 @@ def list_broadcasts(
         q = q.filter(Broadcast.scope.in_(["school", "class", "route"]))
     elif role == "pilot":
         q = q.filter(Broadcast.scope.in_(["school", "route", "pilot"]))
-    elif role == "parent" and current_user.linked_person_id is not None:
-        q = q.filter(_parent_visible_filter(db, current_user.linked_person_id))
+    elif role == "parent":
+        if current_user.linked_person_id is not None:
+            q = q.filter(_parent_visible_filter(db, current_user.linked_person_id))
+        else:
+            # An unlinked parent has no children to scope by — only school-wide
+            # announcements are safe to show, never class/route/pilot feeds.
+            q = q.filter(Broadcast.scope == "school")
 
     if scope:
         q = q.filter(Broadcast.scope == scope)

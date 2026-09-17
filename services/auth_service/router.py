@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -12,15 +14,22 @@ from schemas import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Identical for every caller so the responses can never be used to learn
+# whether a username or email is registered.
+REQUEST_MESSAGE = "If the username or email is registered, a one-time reset token has been issued."
+RESET_MESSAGE = "Your password has been reset. You can now log in."
 
-def _forgot_password_response(user, message: str, identifier: str) -> dict:
-    """Build a consistent response without exposing account details on misses."""
-    found_identifier = identifier if user else None
+
+def _forgot_password_response(raw_token: str | None, expires_at: datetime | None, message: str) -> dict:
+    """Build a uniform response that never reveals whether an identifier is
+    registered: the account fields stay blank whether or not a user exists."""
     return {
         "message": message,
-        "user_id": user.user_id if user else None,
-        "identifier": found_identifier,
-        "email": found_identifier if found_identifier and "@" in found_identifier else None,
+        "reset_token": raw_token,
+        "reset_expires_at": expires_at.isoformat() if expires_at else None,
+        "user_id": None,
+        "identifier": None,
+        "email": None,
     }
 
 
@@ -41,34 +50,34 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     """
     Step 1 — submit a username or email address.
 
-    Verifies that *identifier* belongs to a registered user. In production this
-    would also send a one-time reset link; here it simply confirms the
-    email exists so the client can proceed to step 2.
+    The response is identical whether the identifier is registered or not.
+    When it is, a short-lived one-time reset token is issued (returned here
+    as the stand-in for an emailed reset link) that step 3 requires.
     """
-    user, message = service.forgot_password_request(db, payload.identifier)
-    return _forgot_password_response(user, message, payload.identifier)
+    raw_token, expires_at = service.forgot_password_request(db, payload.identifier)
+    return _forgot_password_response(raw_token, expires_at, REQUEST_MESSAGE)
 
 
 @router.post("/forgot-password/verify", response_model=ForgotPasswordResponse)
 def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = Depends(get_db)):
     """
     Step 2 — re-confirm the username or email before allowing a reset.
+    Re-issues a fresh token for the account, with the same uniform response.
     """
-    user, message = service.forgot_password_request(db, payload.identifier)
-    return _forgot_password_response(user, message, payload.identifier)
+    raw_token, expires_at = service.forgot_password_request(db, payload.identifier)
+    return _forgot_password_response(raw_token, expires_at, REQUEST_MESSAGE)
 
 
 @router.post("/forgot-password/reset", response_model=ForgotPasswordResponse)
 def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
     """
-    Step 3 — set a new password for the account matching *identifier*.
+    Step 3 — set a new password using the token issued at step 1.
+
+    Requires the one-time reset token; simply knowing a username or email is
+    no longer enough to take over an account.
     """
-    user = service.forgot_password_reset(db, payload.identifier, payload.new_password)
-    return _forgot_password_response(
-        user,
-        f"Password for user '{user.username}' has been reset.",
-        payload.identifier,
-    )
+    service.forgot_password_reset(db, payload.identifier, payload.reset_token, payload.new_password)
+    return _forgot_password_response(None, None, RESET_MESSAGE)
 
 
 @router.get("/me")

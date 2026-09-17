@@ -9,12 +9,23 @@ import bcrypt
 
 from common.config import settings
 
+BCRYPT_MAX_BYTES = 72
+
+
+def validate_password_byte_length(plain: str) -> None:
+    """Raise ValueError when *plain* exceeds bcrypt's 72-byte limit.
+
+    Measuring UTF-8 bytes (not characters) keeps multi-byte passwords from
+    passing schema-level character limits and then crashing `hash_password`.
+    """
+    if len(plain.encode("utf-8")) > BCRYPT_MAX_BYTES:
+        raise ValueError("Password must be 72 bytes or fewer.")
+
+
 def hash_password(plain: str) -> str:
     """Create a bcrypt password hash using the installed bcrypt library."""
-    password = plain.encode("utf-8")
-    if len(password) > 72:
-        raise ValueError("Password must be 72 bytes or fewer.")
-    return bcrypt.hashpw(password, bcrypt.gensalt()).decode("utf-8")
+    validate_password_byte_length(plain)
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:

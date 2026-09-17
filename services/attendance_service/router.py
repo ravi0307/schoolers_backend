@@ -20,6 +20,24 @@ def mark_attendance(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    # The class must belong to the caller's school; a teacher must additionally
+    # be assigned to the class. Never trust the class/student ids in the body.
+    if current_user.role == "admin":
+        if current_user.school_id is not None and not repo.class_in_school(
+            db, payload.class_id, current_user.school_id
+        ):
+            raise ForbiddenError("This class is not in your school")
+    else:
+        if not current_user.linked_person_id:
+            raise ForbiddenError("This teacher account isn't linked to a teacher record")
+        if not repo.teacher_teaches_class(db, current_user.linked_person_id, payload.class_id):
+            raise ForbiddenError("You can only mark attendance for classes you teach")
+
+    # Every student on the sheet must actually be enrolled in that class.
+    for entry in payload.entries:
+        if not repo.student_in_class(db, entry.student_id, payload.class_id):
+            raise NotFoundError(f"Student {entry.student_id} is not in this class")
+
     marked_by = current_user.linked_person_id if current_user.role == "teacher" else None
     return repo.mark_bulk(
         db, payload.class_id, payload.date,

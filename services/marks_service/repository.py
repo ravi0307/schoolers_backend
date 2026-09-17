@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from common.models import Mark, Student, Subject, TeacherClassSubject, ParentStudent
+from common.models import Mark, SchoolClass, Student, Subject, TeacherClassSubject, ParentStudent
 
 
 def get_for_student(db: Session, student_id: int) -> list[Mark]:
@@ -28,6 +28,12 @@ def subject_exists(db: Session, subject_id: int) -> bool:
 def student_in_school(db: Session, student_id: int, school_id: int) -> bool:
     return db.query(Student.student_id).filter(
         Student.student_id == student_id, Student.school_id == school_id
+    ).first() is not None
+
+
+def class_in_school(db: Session, class_id: int, school_id: int) -> bool:
+    return db.query(SchoolClass.class_id).filter(
+        SchoolClass.class_id == class_id, SchoolClass.school_id == school_id
     ).first() is not None
 
 

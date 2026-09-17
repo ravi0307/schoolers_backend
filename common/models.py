@@ -451,6 +451,8 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     linked_person_id = Column(Integer)
+    password_reset_token = Column(String(255))
+    password_reset_token_expires_at = Column(DateTime)
     last_login = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
