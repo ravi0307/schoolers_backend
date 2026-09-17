@@ -300,6 +300,7 @@ class Mark(Base):
     term = Column(String(20), nullable=False, default="Term 1")
     score = Column(Integer, nullable=False)
     updated_by = Column(Integer, ForeignKey("teachers.teacher_id"))
+    updated_by_user = Column(Integer, ForeignKey("users.user_id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
@@ -337,6 +338,7 @@ class Broadcast(Base):
     broadcast_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"))
+    route_id = Column(Integer, ForeignKey("routes.route_id", ondelete="CASCADE"))
     scope = Column(String(10), nullable=False)
     role_name = Column(String(100), nullable=False)
     sender_name = Column(String(100), nullable=False, server_default="")

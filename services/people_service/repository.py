@@ -247,6 +247,14 @@ def create_parent(db: Session, school_id: int, data: dict) -> Parent:
     return parent
 
 
+def get_parent(db: Session, school_id: int, parent_id: int) -> Parent | None:
+    return db.query(Parent).filter(
+        Parent.parent_id == parent_id,
+        Parent.school_id == school_id,
+        Parent.is_active.is_(True),
+    ).first()
+
+
 def _parent_for_student(db: Session, student_id: int) -> Parent | None:
     return (
         db.query(Parent)

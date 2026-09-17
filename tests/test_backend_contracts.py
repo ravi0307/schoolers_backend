@@ -163,6 +163,128 @@ class BackendContractTests(unittest.TestCase):
             self.assertIn(field, schema)
         self.assertIn("class BroadcastUpdate", schema)
 
+    def test_broadcast_contract_supports_route_scope(self):
+        model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
+        enums = (ROOT / "common" / "enums.py").read_text(encoding="utf-8")
+        schema = (
+            ROOT / "services" / "communication_service" / "schemas.py"
+        ).read_text(encoding="utf-8")
+        repository = (
+            ROOT / "services" / "communication_service" / "repository.py"
+        ).read_text(encoding="utf-8")
+        migrations = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")
+        for source in (model, schema, repository):
+            self.assertIn("route_id", source)
+        for source in (enums, schema, repository):
+            self.assertIn('"route"', source)
+        self.assertIn("broadcasts_route_id_fkey", migrations)
+        self.assertIn("route_id INTEGER", migrations)
+        self.assertIn("'route'", migrations)
+
+    def test_marks_service_contract_supports_class_grade_and_teacher_scope(self):
+        router_path = ROOT / "services" / "marks_service" / "router.py"
+        repository_path = ROOT / "services" / "marks_service" / "repository.py"
+        schema_path = ROOT / "services" / "marks_service" / "schemas.py"
+        model_path = ROOT / "common" / "models.py"
+        router = router_path.read_text(encoding="utf-8")
+        repository = repository_path.read_text(encoding="utf-8")
+        schema = schema_path.read_text(encoding="utf-8")
+        model = model_path.read_text(encoding="utf-8")
+
+        # Reading surface: teacher-scoped class marks plus per-student marks.
+        self.assertIn('"/class/{class_id}"', router)
+        self.assertIn('"/student/{student_id}"', router)
+        self.assertIn("get_subject_ids_for_class", repository)
+        self.assertIn("get_for_class", repository)
+        self.assertIn('require_role("teacher", "admin")', router)
+
+        # Writing surface: upsert that only a teacher of the subject may use.
+        self.assertIn('"/{student_id}/{subject_id}"', router)
+        self.assertIn("@router.put(", router)
+        self.assertIn("teacher_can_grade", repository)
+        self.assertIn("upsert_mark", repository)
+
+        # Shared schema guarantees: term default "Term 1" and score 0..100,
+        # riding on the (student_id, subject_id, term) unique upsert target.
+        self.assertIn('term: str = "Term 1"', schema)
+        self.assertIn("ge=0, le=100", schema)
+        self.assertIn('UniqueConstraint("student_id", "subject_id", "term")', model)
+
+    def test_parent_reads_are_scoped_to_own_children(self):
+        """Parents must not read other families' marks/attendance/children."""
+        marks_router = (ROOT / "services" / "marks_service" / "router.py").read_text(encoding="utf-8")
+        attendance_router = (ROOT / "services" / "attendance_service" / "router.py").read_text(encoding="utf-8")
+        people_router = (ROOT / "services" / "people_service" / "router.py").read_text(encoding="utf-8")
+
+        for name, router in (("marks", marks_router), ("attendance", attendance_router)):
+            self.assertIn("is_parent_of", router, f"{name} router lacks parent scoping")
+            self.assertIn('current_user.role == "parent"', router, f"{name} router lacks parent branch")
+
+        # Parent-facing children listing must bind the id to the caller.
+        self.assertIn("parent_id = current_user.linked_person_id", people_router)
+
+    def test_marks_audit_columns_and_scope_helpers_contract(self):
+        """Admin edits must be auditable and reads scoped per role."""
+        model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
+        schema = (ROOT / "services" / "marks_service" / "schemas.py").read_text(encoding="utf-8")
+        router = (ROOT / "services" / "marks_service" / "router.py").read_text(encoding="utf-8")
+        repository = (ROOT / "services" / "marks_service" / "repository.py").read_text(encoding="utf-8")
+
+        # Admins have no teacher row, so the acting user id is stored separately.
+        for source in (model, schema, repository, router):
+            self.assertIn("updated_by_user", source)
+        self.assertIn("updated_by_user=current_user.user_id", router)
+
+        # Existence + per-role scope helpers used by the read/write guards.
+        for helper in ("student_exists", "subject_exists", "student_in_school", "teacher_teaches_student"):
+            self.assertIn(helper, repository)
+            self.assertIn(helper, router)
+        self.assertIn("NotFoundError", router)
+        self.assertIn('current_user.role == "teacher"', router)
+
+    def test_attendance_status_and_teacher_scope_contract(self):
+        schema = (ROOT / "services" / "attendance_service" / "schemas.py").read_text(encoding="utf-8")
+        router = (ROOT / "services" / "attendance_service" / "router.py").read_text(encoding="utf-8")
+        repository = (ROOT / "services" / "attendance_service" / "repository.py").read_text(encoding="utf-8")
+
+        # Only the two canonical statuses may be persisted.
+        self.assertIn('Literal["Present", "Absent"]', schema)
+
+        for helper in ("student_exists", "student_in_school", "teacher_teaches_student"):
+            self.assertIn(helper, repository)
+            self.assertIn(helper, router)
+        self.assertIn("NotFoundError", router)
+        self.assertIn('current_user.role == "teacher"', router)
+
+    def test_parent_children_endpoints_contract(self):
+        router = (ROOT / "services" / "people_service" / "router.py").read_text(encoding="utf-8")
+        repository = (ROOT / "services" / "people_service" / "repository.py").read_text(encoding="utf-8")
+
+        # Self-service route for the logged-in parent...
+        self.assertIn('"/parents/me/children"', router)
+        self.assertIn('require_role("parent")', router)
+        # ...plus the school-scoped lookup used by admins.
+        self.assertIn("get_parent", repository)
+        self.assertIn("children_of_parent", repository)
+        self.assertIn("get_parent(db, school_id, parent_id)", router)
+
+    def test_timetable_writes_are_admin_only(self):
+        router_path = ROOT / "services" / "timetable_service" / "router.py"
+        router = router_path.read_text(encoding="utf-8")
+        writes = (
+            'router.post("/class/{class_id}/period"',
+            'router.api_route(',
+            'router.patch("/entry/{entry_id}/clear-override"',
+            'router.delete("/entry/{entry_id}"',
+        )
+        for marker in writes:
+            self.assertIn(marker, router)
+        # Every write endpoint must be admin-only — no teacher-grade writes.
+        self.assertEqual(router.count('require_role("admin")'), 4)
+        self.assertNotIn('require_role("teacher", "admin")', router)
+        # Reads stay open to parents, teachers, and admins.
+        self.assertEqual(router.count('require_role("parent", "teacher", "admin")'), 2)
+
     def test_migrations_cover_current_schema_changes(self):
         migrations = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")
         required_fragments = (
@@ -174,6 +296,7 @@ class BackendContractTests(unittest.TestCase):
             "created_by INTEGER",
             "broadcasts_set_created_at_ist",
             "period_time TYPE VARCHAR(31)",
+            "updated_by_user",
         )
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):

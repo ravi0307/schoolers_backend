@@ -25,11 +25,12 @@ def create_broadcast(
 def list_broadcasts(
     scope: str | None = Query(default=None),
     class_id: int | None = Query(default=None),
+    route_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "pilot")),
 ):
-    return repo.list_broadcasts(db, school_id, scope, class_id)
+    return repo.list_broadcasts(db, school_id, current_user, scope, class_id, route_id)
 
 
 @router.patch("/broadcasts/{broadcast_id}", response_model=BroadcastRead)

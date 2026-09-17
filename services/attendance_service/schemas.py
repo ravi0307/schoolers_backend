@@ -1,10 +1,12 @@
 from datetime import date
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class AttendanceMarkOne(BaseModel):
     student_id: int
-    status: str  # 'Present' | 'Absent'
+    status: Literal["Present", "Absent"]
 
 
 class AttendanceMarkBulk(BaseModel):
