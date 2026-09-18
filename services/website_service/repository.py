@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func
 
 from common.models import WebsiteSettings, WebsitePage, WebsiteTestimonial
 
@@ -12,8 +13,22 @@ def get_settings_any(db: Session, school_id: int) -> WebsiteSettings | None:
     return db.query(WebsiteSettings).filter(WebsiteSettings.school_id == school_id).first()
 
 
+# URL-safe slug derived from a school's website name, e.g. "Sunrise Public
+# School" -> "sunrise-public-school". Must stay in sync with the frontend slug
+# helper (lowercase alphanumerics joined by single hyphens).
+def _normalized_slug(column):
+    return func.lower(func.btrim(func.regexp_replace(column, "[^a-zA-Z0-9]+", "-", "g"), "-"))
+
+
+def find_settings_by_slug(db: Session, slug: str) -> WebsiteSettings | None:
+    return db.query(WebsiteSettings).filter(
+        _normalized_slug(WebsiteSettings.school_name) == (slug or "").lower(),
+        WebsiteSettings.is_active.is_(True),
+    ).first()
+
+
 def upsert_settings(db: Session, school_id: int, data: dict, default_name: str) -> WebsiteSettings:
-    settings = get_settings(db, school_id)
+    settings = get_settings_any(db, school_id)
     if settings:
         for k, v in data.items():
             if v is not None:

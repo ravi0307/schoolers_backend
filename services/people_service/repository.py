@@ -13,7 +13,13 @@ from common.models import (
     TeacherClassSubject,
     RouteStudent,
     Pilot,
+    School,
     User,
+)
+from common.email import (
+    send_staff_added_email,
+    send_staff_removed_email,
+    send_student_removed_email,
 )
 from common.security import hash_password
 
@@ -215,6 +221,8 @@ def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
+    if staff.email:
+        send_staff_added_email(school_name(db, school_id), staff.name, [staff.email])
     return staff
 
 
@@ -229,9 +237,94 @@ def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
 
 
 def delete_staff(db: Session, staff: Staff) -> None:
+    email = staff.email
+    name = staff.name
+    school = school_name(db, staff.school_id)
     staff.is_active = False
     _sync_person_from_staff(db, staff)
     db.commit()
+    if email:
+        send_staff_removed_email(school, name, [email])
+
+
+def school_name(db: Session, school_id: int) -> str:
+    row = db.query(School.name).filter(School.school_id == school_id).first()
+    return row[0] if row else "your school"
+
+
+def parent_email_for_student(db: Session, student_id: int) -> str | None:
+    """The email of the first linked, active parent — used to notify about
+    student lifecycle events (students themselves carry no email column)."""
+    parent = _parent_for_student(db, student_id)
+    return parent.email if parent and parent.email else None
+
+
+def deactivate_school_staff(db: Session, school_id: int) -> int:
+    """Mark every active staff member of a school inactive.
+
+    Used when the school (i.e. its admin account) is removed by a master.
+    Keeps each deactivated staff member's linked teacher/pilot/user records in
+    sync so their login credentials are also blocked.
+    """
+    staff_rows = (
+        db.query(Staff)
+        .filter(Staff.school_id == school_id, Staff.is_active.is_(True))
+        .all()
+    )
+    for staff in staff_rows:
+        staff.is_active = False
+        _sync_person_from_staff(db, staff)
+    db.flush()
+    return len(staff_rows)
+
+
+def deactivate_school_students(db: Session, school_id: int) -> int:
+    """Mark every active student of a school inactive."""
+    result = (
+        db.query(Student)
+        .filter(Student.school_id == school_id, Student.is_active.is_(True))
+        .update({Student.is_active: False}, synchronize_session=False)
+    )
+    db.flush()
+    return int(result)
+
+
+def deactivate_school_teachers(db: Session, school_id: int) -> int:
+    """Mark every active teacher of a school inactive."""
+    result = (
+        db.query(Teacher)
+        .filter(Teacher.school_id == school_id, Teacher.is_active.is_(True))
+        .update({Teacher.is_active: False}, synchronize_session=False)
+    )
+    db.flush()
+    return int(result)
+
+
+def deactivate_school_parents(db: Session, school_id: int) -> int:
+    """Mark every active parent of a school inactive."""
+    result = (
+        db.query(Parent)
+        .filter(Parent.school_id == school_id, Parent.is_active.is_(True))
+        .update({Parent.is_active: False}, synchronize_session=False)
+    )
+    db.flush()
+    return int(result)
+
+
+def deactivate_school_users(db: Session, school_id: int) -> int:
+    """Block every login account that belongs to a school.
+
+    Covers the school's admin, staff, teacher and parent accounts (and also the
+    pilot users synced from staff rows) so nobody from a removed school can
+    authenticate anymore.
+    """
+    result = (
+        db.query(User)
+        .filter(User.school_id == school_id, User.is_active.is_(True))
+        .update({User.is_active: False}, synchronize_session=False)
+    )
+    db.flush()
+    return int(result)
 
 
 # ---- Parents ----
@@ -400,5 +493,9 @@ def update_student(db: Session, student: Student, data: dict) -> Student:
 
 
 def delete_student(db: Session, student: Student) -> None:
+    parent_email = parent_email_for_student(db, student.student_id)
+    school = school_name(db, student.school_id)
     student.is_active = False
     db.commit()
+    if parent_email:
+        send_student_removed_email(school, student.name, [parent_email])

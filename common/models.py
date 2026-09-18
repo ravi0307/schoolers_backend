@@ -407,7 +407,7 @@ class WebsiteSettings(Base):
     footer_phone = Column(String(30))
     footer_email = Column(String(120))
     footer_copyright = Column(String(150))
-    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    is_active = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class WebsitePage(Base):

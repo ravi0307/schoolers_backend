@@ -28,6 +28,7 @@ class WebsiteSettingsRead(BaseModel):
     footer_phone: str | None
     footer_email: str | None
     footer_copyright: str | None
+    is_active: bool
 
     class Config:
         from_attributes = True

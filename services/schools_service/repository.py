@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 
+from common.email import school_recipients, send_school_removed_email, send_school_registered_email
 from common.models import School, Teacher, Staff, Student, Parent
+from services.people_service import repository as people_repo
 
 
 def list_schools(db: Session) -> list[School]:
@@ -17,6 +19,7 @@ def create_school(db: Session, data: dict) -> School:
     db.add(school)
     db.commit()
     db.refresh(school)
+    send_school_registered_email(school.name, school_recipients(school))
     return school
 
 
@@ -30,8 +33,19 @@ def update_school(db: Session, school: School, data: dict) -> School:
 
 
 def delete_school(db: Session, school: School) -> None:
+    # Removing a school must take its whole people tree offline: staff (and the
+    # teacher/pilot/login records synced from them), students, teachers and
+    # parents, plus every login account that belongs to the school (admin,
+    # staff, teacher, parent) so nobody can authenticate anymore.
     school.is_active = False
+    db.flush()
+    people_repo.deactivate_school_staff(db, school.school_id)
+    people_repo.deactivate_school_students(db, school.school_id)
+    people_repo.deactivate_school_teachers(db, school.school_id)
+    people_repo.deactivate_school_parents(db, school.school_id)
+    people_repo.deactivate_school_users(db, school.school_id)
     db.commit()
+    send_school_removed_email(school.name, school_recipients(school))
 
 
 def compute_stats(db: Session, school_id: int) -> dict:

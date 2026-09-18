@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.email import send_student_added_email
 from common.exceptions import AppError, NotFoundError, ForbiddenError
 import repository as repo
 from schemas import (
@@ -217,6 +218,9 @@ def create_student(
         repo.link_parent_student(db, parent_id, student.student_id)
     elif parent_data:
         repo.create_student_parent(db, school_id, student.student_id, parent_data)
+    parent_email = repo.parent_email_for_student(db, student.student_id)
+    if parent_email:
+        send_student_added_email(repo.school_name(db, school_id), student.name, [parent_email])
     return repo.student_response(db, student)
 
 
