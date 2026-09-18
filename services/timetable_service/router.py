@@ -25,7 +25,7 @@ def create_week_period(
     payload: TimetableWeekCreate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("admin")),
 ):
     entries = repo.create_week_period(
         db,
@@ -65,7 +65,7 @@ def update_entry(
     payload: TimetableEntryUpdate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("admin")),
 ):
     entry = repo.get_entry(db, entry_id, school_id)
     if not entry:
@@ -85,7 +85,7 @@ def update_entry(
 def clear_override(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("admin")),
 ):
     entry = repo.get_entry(db, entry_id, current_user.school_id)
     if not entry:
@@ -98,7 +98,7 @@ def delete_entry(
     entry_id: int,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("admin")),
 ):
     entry = repo.get_entry(db, entry_id, school_id)
     if not entry:

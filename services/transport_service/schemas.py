@@ -1,4 +1,11 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
+
+from common.security import validate_password_byte_length
+
+
+def _password_within_bcrypt_limit(value: str) -> str:
+    validate_password_byte_length(value)
+    return value
 
 
 class VehicleCreate(BaseModel):
@@ -36,6 +43,12 @@ class PilotCreate(BaseModel):
     aadhaar_number: str | None = None
     dl_number: str | None = None
 
+    @field_validator("password")
+    @classmethod
+    def password_within_bcrypt_limit(cls, value: str) -> str:
+        _password_within_bcrypt_limit(value)
+        return value
+
 
 class PilotUpdate(BaseModel):
     username: str | None = None
@@ -48,6 +61,13 @@ class PilotUpdate(BaseModel):
     aadhaar_number: str | None = None
     dl_number: str | None = None
     is_active: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_within_bcrypt_limit(cls, value: str | None) -> str | None:
+        if value is not None:
+            _password_within_bcrypt_limit(value)
+        return value
 
 
 class PilotRead(BaseModel):

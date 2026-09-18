@@ -35,6 +35,7 @@ class LeaveRequesterType(str, Enum):
 class BroadcastScope(str, Enum):
     school = "school"
     class_ = "class"
+    route = "route"
     pilot = "pilot"
 
 

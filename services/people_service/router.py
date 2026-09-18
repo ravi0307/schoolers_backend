@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
-from common.exceptions import AppError, NotFoundError
+from common.exceptions import AppError, NotFoundError, ForbiddenError
 import repository as repo
 from schemas import (
     TeacherCreate, TeacherUpdate, TeacherRead,
@@ -149,12 +149,31 @@ def create_parent(
     return repo.create_parent(db, school_id, payload.model_dump())
 
 
+@router.get("/parents/me/children", response_model=list[StudentRead])
+def my_children(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("parent")),
+):
+    if not current_user.linked_person_id:
+        raise ForbiddenError("This parent account isn't linked to a parent record")
+    return repo.student_responses(db, repo.children_of_parent(db, current_user.linked_person_id))
+
+
 @router.get("/parents/{parent_id}/children", response_model=list[StudentRead])
 def children_of_parent(
     parent_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "admin")),
 ):
+    # A parent may only list their own children; admins may look up any parent
+    # inside their own school.
+    if current_user.role == "parent":
+        if not current_user.linked_person_id:
+            raise ForbiddenError("This parent account isn't linked to a parent record")
+        parent_id = current_user.linked_person_id
+    elif not repo.get_parent(db, school_id, parent_id):
+        raise NotFoundError("Parent not found")
     return repo.student_responses(db, repo.children_of_parent(db, parent_id))
 
 

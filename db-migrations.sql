@@ -161,3 +161,119 @@ WHERE older.student_id = newer.student_id
 
 CREATE UNIQUE INDEX IF NOT EXISTS route_students_student_id_key
     ON schoolers.route_students (student_id);
+
+-- Route-scoped broadcasts: a pilot can broadcast to the admins, teachers, and
+-- the parents of the students riding a specific route.
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    ADD COLUMN IF NOT EXISTS route_id INTEGER;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'broadcasts_route_id_fkey'
+          AND conrelid = 'schoolers.broadcasts'::regclass
+    ) THEN
+        ALTER TABLE schoolers.broadcasts
+            ADD CONSTRAINT broadcasts_route_id_fkey
+            FOREIGN KEY (route_id) REFERENCES schoolers.routes(route_id)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    DROP CONSTRAINT IF EXISTS broadcasts_scope_check,
+    ADD CONSTRAINT broadcasts_scope_check
+    CHECK (scope IN ('school', 'class', 'route', 'pilot'));
+
+-- Attendance must be one row per (student, day): the bulk /attendance/mark
+-- endpoint upserts with ON CONFLICT (student_id, date), which requires a
+-- matching unique constraint. Tables created before this migration may also
+-- lack a primary key on attendance_id, so backfill both idempotently.
+DELETE FROM schoolers.attendance a
+USING schoolers.attendance b
+WHERE a.student_id = b.student_id
+  AND a.date = b.date
+  AND (a.attendance_id < b.attendance_id
+       OR (a.attendance_id = b.attendance_id AND a.ctid < b.ctid));
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'attendance_pkey'
+          AND conrelid = 'schoolers.attendance'::regclass
+    ) THEN
+        ALTER TABLE schoolers.attendance
+            ADD PRIMARY KEY (attendance_id);
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'attendance_student_date_key'
+          AND conrelid = 'schoolers.attendance'::regclass
+    ) THEN
+        ALTER TABLE schoolers.attendance
+            ADD CONSTRAINT attendance_student_date_key UNIQUE (student_id, date);
+    END IF;
+END $$;
+
+-- Audit: record which user account last changed a mark (teacher edits also
+-- keep updated_by = teachers.teacher_id; admins have no teacher row).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'marks'
+          AND column_name = 'updated_by_user'
+    ) THEN
+        ALTER TABLE schoolers.marks ADD COLUMN updated_by_user INTEGER;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'marks_updated_by_user_fkey'
+          AND conrelid = 'schoolers.marks'::regclass
+    ) THEN
+        ALTER TABLE schoolers.marks
+            ADD CONSTRAINT marks_updated_by_user_fkey
+            FOREIGN KEY (updated_by_user) REFERENCES schoolers.users(user_id);
+    END IF;
+END $$;
+
+-- Password reset: one-time token (stored hashed) plus its expiry on the
+-- users row, so resetting a password requires the token, not just the
+-- identifier.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'users'
+          AND column_name = 'password_reset_token'
+    ) THEN
+        ALTER TABLE schoolers.users ADD COLUMN password_reset_token VARCHAR(255);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'schoolers'
+          AND table_name = 'users'
+          AND column_name = 'password_reset_token_expires_at'
+    ) THEN
+        ALTER TABLE schoolers.users ADD COLUMN password_reset_token_expires_at TIMESTAMP;
+    END IF;
+END $$;

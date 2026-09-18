@@ -12,6 +12,8 @@ class MarkRead(BaseModel):
     subject_id: int
     term: str
     score: int
+    updated_by: int | None = None
+    updated_by_user: int | None = None
 
     class Config:
         from_attributes = True
