@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -6,12 +7,15 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+import common.email
 from common.exceptions import UnauthorizedError
 from common.security import (
     verify_password, create_access_token, create_refresh_token, decode_token,
     hash_password,
 )
-from common.models import User, Teacher, Staff, Parent, Pilot
+from common.models import User, Teacher, Staff, Parent, Pilot, School
+
+logger = logging.getLogger(__name__)
 
 RESET_TOKEN_TTL_MINUTES = 30
 _GENERIC_INVALID_RESET_MESSAGE = "Invalid or expired reset token."
@@ -104,6 +108,49 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     )
 
 
+def user_email_address(db: Session, user: User) -> str | None:
+    """Resolve a deliverable email address for an account, or None.
+
+    Students have no account/email of their own; master accounts are global and
+    have none either.
+    """
+    if user.role == "admin":
+        school = db.query(School).filter(School.school_id == user.school_id).first()
+        return school.primary_email if school else None
+    if user.role == "teacher":
+        person = db.query(Teacher).filter(Teacher.teacher_id == user.linked_person_id).first()
+        return person.email if person else None
+    if user.role == "staff":
+        person = db.query(Staff).filter(Staff.staff_id == user.linked_person_id).first()
+        return person.email if person else None
+    if user.role == "parent":
+        person = db.query(Parent).filter(Parent.parent_id == user.linked_person_id).first()
+        return person.email if person else None
+    if user.role == "pilot":
+        pilot = db.query(Pilot).filter(Pilot.user_id == user.user_id).first()
+        return pilot.email if pilot else None
+    return None
+
+
+def _deliver_reset_token(email: str, raw_token: str, expires_minutes: int = RESET_TOKEN_TTL_MINUTES) -> None:
+    """Email the one-time reset token out of band. Best-effort: a delivery
+    failure is logged and swallowed so it can never reveal whether the
+    identifier is registered."""
+    subject = "Schoolers — Password reset"
+    body = (
+        "Hello,\n\n"
+        "A password reset was requested for your Schoolers account.\n\n"
+        f"Your one-time reset token is: {raw_token}\n"
+        f"It expires in {expires_minutes} minutes and can only be used once.\n\n"
+        "If you did not request this, you can ignore this email.\n\n"
+        "— Schoolers Platform"
+    )
+    try:
+        common.email.send_email([email], subject, body)
+    except Exception as exc:  # noqa: BLE001 — delivery must never leak account state
+        logger.warning("Could not email password reset token to %s: %s", email, exc)
+
+
 def _reset_token_digest(raw_token: str) -> str:
     """One-way digest so a leaked users row cannot be used to reset logins."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
@@ -133,13 +180,18 @@ def forgot_password_request(db: Session, identifier: str) -> tuple[str | None, d
 
     An anonymous caller can never tell registered accounts apart: the message
     is identical either way. When the account exists a one-time, short-lived
-    reset token is issued and returned so the caller can set a new password.
-    In a real deployment the raw token would be emailed instead.
+    reset token is issued and emailed to the account's address on file. The raw
+    token is never returned in an API response — it is delivered out of band so
+    merely knowing the identifier is not enough to take over the account.
     """
     user = find_user_by_identifier(db, identifier)
     if user is None:
         return None, None
-    return _issue_reset_token(db, user)
+    raw_token, expires_at = _issue_reset_token(db, user)
+    email = user_email_address(db, user)
+    if email:
+        _deliver_reset_token(email, raw_token)
+    return raw_token, expires_at
 
 
 def _consume_reset_token(db: Session, user: User, raw_token: str) -> None:

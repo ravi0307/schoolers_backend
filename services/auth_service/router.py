@@ -1,5 +1,4 @@
 from collections import defaultdict
-from datetime import datetime
 import time
 
 from fastapi import APIRouter, Depends
@@ -18,8 +17,9 @@ from schemas import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Identical for every caller so the responses can never be used to learn
-# whether a username or email is registered.
-REQUEST_MESSAGE = "If the username or email is registered, a one-time reset token has been issued."
+# whether a username or email is registered. The reset code is delivered by
+# email, never returned in the response.
+REQUEST_MESSAGE = "If the username or email is registered, a one-time reset code has been emailed to it."
 RESET_MESSAGE = "Your password has been reset. You can now log in."
 
 # Best-effort in-memory throttling of the anonymous reset endpoints so a caller
@@ -52,13 +52,14 @@ def _record_issue(identifier: str) -> None:
     _last_issue[identifier] = time.monotonic()
 
 
-def _forgot_password_response(raw_token: str | None, expires_at: datetime | None, message: str) -> dict:
+def _forgot_password_response(message: str) -> dict:
     """Build a uniform response that never reveals whether an identifier is
-    registered: the account fields stay blank whether or not a user exists."""
+    registered: the account fields and the reset code stay blank whether or not
+    a user exists (the code is emailed out of band)."""
     return {
         "message": message,
-        "reset_token": raw_token,
-        "reset_expires_at": expires_at.isoformat() if expires_at else None,
+        "reset_token": None,
+        "reset_expires_at": None,
         "user_id": None,
         "identifier": None,
         "email": None,
@@ -83,39 +84,40 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     Step 1 — submit a username or email address.
 
     The response is identical whether the identifier is registered or not.
-    When it is, a short-lived one-time reset token is issued (returned here
-    as the stand-in for an emailed reset link) that step 3 requires.
+    When it is, a short-lived one-time reset token is issued and emailed to
+    the account's address on file; it is never returned in this response.
     """
     if _rate_limited(payload.identifier.lower()):
         raise AppError("Too many reset requests. Try again later.", 429)
     if _cooldown_active(payload.identifier.lower()):
-        return _forgot_password_response(None, None, REQUEST_MESSAGE)
-    raw_token, expires_at = service.forgot_password_request(db, payload.identifier)
+        return _forgot_password_response(REQUEST_MESSAGE)
+    raw_token, _ = service.forgot_password_request(db, payload.identifier)
     if raw_token is not None:
         _record_issue(payload.identifier.lower())
-    return _forgot_password_response(raw_token, expires_at, REQUEST_MESSAGE)
+    return _forgot_password_response(REQUEST_MESSAGE)
 
 
 @router.post("/forgot-password/verify", response_model=ForgotPasswordResponse)
 def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = Depends(get_db)):
     """
     Step 2 — re-confirm the username or email before allowing a reset.
-    Re-issues a fresh token for the account, with the same uniform response.
+    Re-issues a fresh token (emailed out of band) for the account, with the
+    same uniform response.
     """
     if _rate_limited(payload.identifier.lower()):
         raise AppError("Too many reset requests. Try again later.", 429)
     if _cooldown_active(payload.identifier.lower()):
-        return _forgot_password_response(None, None, REQUEST_MESSAGE)
-    raw_token, expires_at = service.forgot_password_request(db, payload.identifier)
+        return _forgot_password_response(REQUEST_MESSAGE)
+    raw_token, _ = service.forgot_password_request(db, payload.identifier)
     if raw_token is not None:
         _record_issue(payload.identifier.lower())
-    return _forgot_password_response(raw_token, expires_at, REQUEST_MESSAGE)
+    return _forgot_password_response(REQUEST_MESSAGE)
 
 
 @router.post("/forgot-password/reset", response_model=ForgotPasswordResponse)
 def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
     """
-    Step 3 — set a new password using the token issued at step 1.
+    Step 3 — set a new password using the token emailed at step 1.
 
     Requires the one-time reset token; simply knowing a username or email is
     no longer enough to take over an account.
@@ -123,7 +125,7 @@ def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Dep
     if _rate_limited(payload.identifier.lower(), limit=10):
         raise AppError("Too many reset attempts. Try again later.", 429)
     service.forgot_password_reset(db, payload.identifier, payload.reset_token, payload.new_password)
-    return _forgot_password_response(None, None, RESET_MESSAGE)
+    return _forgot_password_response(RESET_MESSAGE)
 
 
 @router.get("/me")

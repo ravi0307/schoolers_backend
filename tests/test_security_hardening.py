@@ -13,6 +13,7 @@ Regression tests for the security fixes raised on the PR review:
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 from pydantic import ValidationError
 from sqlalchemy import create_engine
@@ -20,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
 from common.exceptions import ForbiddenError, UnauthorizedError
-from common.models import Base, Broadcast, Parent, SchoolClass, Staff, Teacher, User, Pilot
+from common.models import Base, Broadcast, Parent, School, SchoolClass, Staff, Teacher, User, Pilot
 from common.security import hash_password, validate_password_byte_length, verify_password
 from services.auth_service.schemas import ForgotPasswordResetRequest
 from services.transport_service.schemas import PilotCreate, PilotUpdate
@@ -97,7 +98,7 @@ class PasswordByteLengthTests(unittest.TestCase):
 class PasswordResetTokenTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.Session = make_session(["users", "teachers", "staff", "parents", "pilots"])
+        cls.Session = make_session(["users", "schools", "teachers", "staff", "parents", "pilots"])
 
     def setUp(self):
         self.db: Session = self.Session()
@@ -174,6 +175,28 @@ class PasswordResetTokenTests(unittest.TestCase):
         ))
         self.db.commit()
         self.assertEqual(auth_service.forgot_password_request(self.db, "seven@school.org"), (None, None))
+
+    def test_token_issued_for_known_account_is_emailed_out_of_band(self):
+        self.db.add(School(
+            school_id=9, name="Sunrise High", address="1 Main Rd", pincode="110001",
+            city="New Delhi", state="Delhi", primary_contact="9999999999",
+            primary_email="office@sunrise.edu",
+        ))
+        self.db.add(Staff(staff_id=21, school_id=9, name="Admin Five", role="Admin", email="boss@sunrise.edu"))
+        self.db.add(User(
+            user_id=5, school_id=9, role="admin", username="admin5",
+            password_hash=hash_password("x"), linked_person_id=21,
+        ))
+        self.db.commit()
+        with mock.patch("common.email.send_email") as mock_send:
+            raw, expires_at = auth_service.forgot_password_request(self.db, "boss@sunrise.edu")
+            self.assertTrue(raw)
+            self.assertGreater(expires_at, utcnow_naive())
+            mock_send.assert_called_once()
+            to_addrs, subject, body = mock_send.call_args[0]
+            self.assertEqual(to_addrs, ["office@sunrise.edu"])
+            self.assertIn("reset", subject.lower())
+            self.assertIn(raw, body)
 
 
 class BroadcastAuthorizationTests(unittest.TestCase):
@@ -320,6 +343,91 @@ class ResetThrottlingTests(unittest.TestCase):
         router._record_issue("cool@example.com")
         self.assertTrue(router._cooldown_active("cool@example.com"))
         self.assertFalse(router._cooldown_active("fresh@example.com"))
+
+
+class ResetResponseUniformityTests(unittest.TestCase):
+    """Forgot-password responses never carry the reset code — it is delivered
+    by email out of band — and known vs unknown identifiers get byte-identical
+    bodies so the endpoint cannot be used to enumerate accounts."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.Session = make_session(["users", "schools", "staff", "teachers", "parents", "pilots"])
+        sys.path.insert(0, "services/auth_service")
+        cls._saved = {name: sys.modules.pop(name, None) for name in ("schemas", "service", "router")}
+        try:
+            import router as auth_router
+            cls.router = auth_router
+        except Exception:
+            for name, mod in cls._saved.items():
+                if mod is not None:
+                    sys.modules[name] = mod
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        for name, mod in cls._saved.items():
+            if mod is not None:
+                sys.modules[name] = mod
+        sys.path.pop(0)
+
+    def setUp(self):
+        self.db: Session = self.Session()
+        self.db.query(User).delete()
+        self.db.query(Staff).delete()
+        self.db.query(School).delete()
+        self.db.add(School(
+            school_id=1, name="Sunrise High", address="1 Main Rd", pincode="110001",
+            city="New Delhi", state="Delhi", primary_contact="9999999999",
+            primary_email="boss@school.org",
+        ))
+        self.db.add(User(
+            user_id=1, school_id=1, role="admin", username="admin1",
+            password_hash=hash_password("x"),
+        ))
+        self.db.commit()
+        self.router._attempts.clear()
+        self.router._last_issue.clear()
+
+    def tearDown(self):
+        self.db.rollback()
+        self.db.close()
+
+    @mock.patch("common.email.send_email")
+    def test_known_identifier_emails_token_out_of_band(self, mock_send):
+        payload = self.router.ForgotPasswordRequest(identifier="admin1")
+        response = self.router.forgot_password(payload, db=self.db)
+        self.assertIsNone(response["reset_token"])
+        self.assertIsNone(response["reset_expires_at"])
+        self.assertIsNone(response["email"])
+        self.assertIsNone(response["identifier"])
+        mock_send.assert_called_once()
+        to_addrs, subject, body = mock_send.call_args[0]
+        self.assertEqual(to_addrs, ["boss@school.org"])
+        self.assertIn("reset", subject.lower())
+        self.assertIn("token", body.lower())
+
+    @mock.patch("common.email.send_email")
+    def test_known_and_unknown_responses_are_identical(self, mock_send):
+        known_response = self.router.forgot_password(
+            self.router.ForgotPasswordRequest(identifier="admin1"), db=self.db,
+        )
+        self.assertEqual(mock_send.call_count, 1)
+        mock_send.reset_mock()
+        unknown_response = self.router.forgot_password(
+            self.router.ForgotPasswordRequest(identifier="nobody@nowhere.org"), db=self.db,
+        )
+        self.assertEqual(known_response, unknown_response)
+        mock_send.assert_not_called()
+
+    @mock.patch("common.email.send_email")
+    def test_response_model_keeps_token_fields_null(self, mock_send):
+        response = self.router.forgot_password(
+            self.router.ForgotPasswordRequest(identifier="admin1"), db=self.db,
+        )
+        validated = self.router.ForgotPasswordResponse(**response)
+        self.assertIsNone(validated.reset_token)
+        self.assertIsNone(validated.reset_expires_at)
 
 
 if __name__ == "__main__":
