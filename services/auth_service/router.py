@@ -6,8 +6,7 @@ from common.dependencies import get_current_user, CurrentUser
 import service
 from schemas import (
     LoginRequest, TokenResponse, RefreshRequest, RefreshResponse,
-    ForgotPasswordRequest, ForgotPasswordVerifyRequest,
-    ForgotPasswordResetRequest, ForgotPasswordResponse,
+    ForgotPasswordRequest, ForgotPasswordResetRequest, ForgotPasswordResponse,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -41,18 +40,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     """
     Step 1 — submit a username or email address.
 
-    Verifies that *identifier* belongs to a registered user. In production this
-    would also send a one-time reset link; here it simply confirms the
-    email exists so the client can proceed to step 2.
-    """
-    user, message = service.forgot_password_request(db, payload.identifier)
-    return _forgot_password_response(user, message, payload.identifier)
-
-
-@router.post("/forgot-password/verify", response_model=ForgotPasswordResponse)
-def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = Depends(get_db)):
-    """
-    Step 2 — re-confirm the username or email before allowing a reset.
+    Verifies that *identifier* belongs to a registered user and emails a
+    6-digit one-time password (OTP) to the account's address on file.
     """
     user, message = service.forgot_password_request(db, payload.identifier)
     return _forgot_password_response(user, message, payload.identifier)
@@ -61,9 +50,9 @@ def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = D
 @router.post("/forgot-password/reset", response_model=ForgotPasswordResponse)
 def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
     """
-    Step 3 — set a new password for the account matching *identifier*.
+    Step 2 — verify the 6-digit OTP and set a new password for the account.
     """
-    user = service.forgot_password_reset(db, payload.identifier, payload.new_password)
+    user = service.forgot_password_reset(db, payload.identifier, payload.otp, payload.new_password)
     return _forgot_password_response(
         user,
         f"Password for user '{user.username}' has been reset.",

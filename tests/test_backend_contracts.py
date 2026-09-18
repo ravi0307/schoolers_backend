@@ -135,6 +135,61 @@ class BackendContractTests(unittest.TestCase):
         }
         self.assertTrue(expected_keys.issubset(route_map))
 
+    def test_public_website_lookup_supports_school_name_slug(self):
+        router = (
+            ROOT / "services" / "website_service" / "router.py"
+        ).read_text(encoding="utf-8")
+        repository = (
+            ROOT / "services" / "website_service" / "repository.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"/by-name/{school_name}"', router)
+        self.assertIn("find_settings_by_slug", router)
+        self.assertIn("def find_settings_by_slug", repository)
+        self.assertIn("regexp_replace", repository)
+        self.assertIn("is_active.is_(True)", repository)
+
+    def test_website_settings_start_unpublished_until_go_live(self):
+        model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
+        settings_block = model.split("class WebsiteSettings(Base):", 1)[1].split("\nclass ", 1)[0]
+        self.assertIn('default=False, server_default="false"', settings_block)
+
+    def test_website_read_schema_exposes_live_state_and_admin_can_edit_pre_live(self):
+        schema = (
+            ROOT / "services" / "website_service" / "schemas.py"
+        ).read_text(encoding="utf-8")
+        router = (
+            ROOT / "services" / "website_service" / "router.py"
+        ).read_text(encoding="utf-8")
+        repository = (
+            ROOT / "services" / "website_service" / "repository.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("is_active: bool", schema)
+        self.assertIn("repo.get_settings_any(db, school_id)", router)
+        upsert_block = repository.split("def upsert_settings(", 1)[1].split("def ", 1)[0]
+        self.assertIn("get_settings_any(db, school_id)", upsert_block)
+
+    def test_forgot_password_flow_emails_and_verifies_a_six_digit_otp(self):
+        schema = (
+            ROOT / "services" / "auth_service" / "schemas.py"
+        ).read_text(encoding="utf-8")
+        router = (
+            ROOT / "services" / "auth_service" / "router.py"
+        ).read_text(encoding="utf-8")
+        service = (
+            ROOT / "services" / "auth_service" / "service.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("otp: str", schema)
+        self.assertNotIn("ForgotPasswordVerifyRequest", schema)
+        self.assertNotIn('"/forgot-password/verify"', router)
+        self.assertIn('"/forgot-password/reset"', router)
+        self.assertIn(
+            "forgot_password_reset(db, payload.identifier, payload.otp, payload.new_password)",
+            router,
+        )
+        self.assertIn("_store_otp", service)
+        self.assertIn("send_email", service)
+        self.assertIn("OTP_EXPIRE_SECONDS", service)
+
     def test_timetable_entry_contract_contains_school_and_audit_fields(self):
         model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
         schema = (

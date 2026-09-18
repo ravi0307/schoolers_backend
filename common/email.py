@@ -65,3 +65,110 @@ def send_school_notification_email(
         f"— Schoolers Platform"
     )
     send_email(recipients, subject, body)
+
+
+# ---------------------------------------------------------------------------
+# Account-lifecycle notifications (best-effort)
+# ---------------------------------------------------------------------------
+
+def _dedupe_recipients(recipients: list[str]) -> list[str]:
+    return list(dict.fromkeys(addr.strip() for addr in recipients if addr and addr.strip()))
+
+
+def try_send_email(recipients: list[str], subject: str, body: str) -> bool:
+    """Dispatch an email without ever raising.
+
+    Account-lifecycle notifications are side effects of a more important
+    operation (creating a school, adding a student...) and must not break it
+    when SMTP is unconfigured or down, so failures are logged and swallowed.
+    """
+    to_addrs = _dedupe_recipients(recipients)
+    if not to_addrs:
+        logger.warning("Skipping email %r: no recipients", subject)
+        return False
+    try:
+        send_email(to_addrs, subject, body)
+        return True
+    except Exception as exc:  # noqa: BLE001 - lifecycle mail must never raise
+        logger.warning("Could not send %r to %s: %s", subject, to_addrs, exc)
+        return False
+
+
+def send_school_registered_email(school_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — Welcome, {school_name}!",
+        body=(
+            f"Hello,\n\n"
+            f"Your school, {school_name}, and its administrator account have been "
+            f"created on the Schoolers platform.\n\n"
+            f"Sign in to the Schoolers portal with your administrator credentials "
+            f"to set up students, staff, classes, and more.\n\n"
+            f"— Schoolers Platform"
+        ),
+    )
+
+
+def send_school_removed_email(school_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — {school_name} has been removed",
+        body=(
+            f"Hello,\n\n"
+            f"Your school, {school_name}, and its administrator account have been "
+            f"removed from the Schoolers platform. If this was unexpected, please "
+            f"contact support.\n\n"
+            f"— Schoolers Platform"
+        ),
+    )
+
+
+def send_staff_added_email(school_name: str, staff_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — Staff account added for {staff_name}",
+        body=(
+            f"Hello {staff_name},\n\n"
+            f"You have been added as staff member at {school_name} on the Schoolers "
+            f"platform.\n\n— Schoolers Platform"
+        ),
+    )
+
+
+def send_staff_removed_email(school_name: str, staff_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — Staff access removed for {staff_name}",
+        body=(
+            f"Hello {staff_name},\n\n"
+            f"Your staff access for {school_name} on the Schoolers platform has been "
+            f"removed. If this was unexpected, please contact your school administrator.\n\n"
+            f"— Schoolers Platform"
+        ),
+    )
+
+
+def send_student_added_email(school_name: str, student_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — {student_name} has been enrolled",
+        body=(
+            f"Hello,\n\n"
+            f"{student_name} has been enrolled at {school_name} on the Schoolers "
+            f"platform. You can now follow their attendance, marks, and timetable.\n\n"
+            f"— Schoolers Platform"
+        ),
+    )
+
+
+def send_student_removed_email(school_name: str, student_name: str, recipients: list[str]) -> bool:
+    return try_send_email(
+        recipients,
+        subject=f"Schoolers — {student_name} has been withdrawn",
+        body=(
+            f"Hello,\n\n"
+            f"{student_name} has been withdrawn from {school_name} on the Schoolers "
+            f"platform. If this was unexpected, please contact the school.\n\n"
+            f"— Schoolers Platform"
+        ),
+    )

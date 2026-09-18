@@ -41,15 +41,12 @@ class ForgotPasswordIdentifierRequest(BaseModel):
 
 
 class ForgotPasswordRequest(ForgotPasswordIdentifierRequest):
-    """Step 1: Look up an account by email address or username."""
-
-
-class ForgotPasswordVerifyRequest(ForgotPasswordIdentifierRequest):
-    """Step 2: Verify an email address or username before reset."""
+    """Step 1: Look up an account by email address or username and send an OTP."""
 
 
 class ForgotPasswordResetRequest(ForgotPasswordIdentifierRequest):
-    """Step 3: Submit a new password for the verified account."""
+    """Step 2: Submit the 6-digit OTP received by email plus a new password."""
+    otp: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
     new_password: str = Field(min_length=8, max_length=72)
 
 

@@ -30,7 +30,7 @@ def get_settings(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    settings = repo.get_settings(db, school_id)
+    settings = repo.get_settings_any(db, school_id)
     if not settings:
         raise NotFoundError("Website settings not yet created for this school")
     return settings
@@ -142,12 +142,8 @@ def serve_upload(filename: str):
 public_router = APIRouter(prefix="/public/sites", tags=["public-website"])
 
 
-@public_router.get("/{school_id}")
-def public_site(school_id: int, db: Session = Depends(get_db)):
-    settings = repo.get_settings(db, school_id)
-    if not settings:
-        raise NotFoundError("This school has not published a website yet")
-    site = repo.site_payload(db, school_id, settings)
+def _site_response(db: Session, settings) -> dict:
+    site = repo.site_payload(db, settings.school_id, settings)
     return {
         "settings": WebsiteSettingsRead.model_validate(site["settings"]),
         "pages": {
@@ -159,3 +155,19 @@ def public_site(school_id: int, db: Session = Depends(get_db)):
             for testimonial in site["testimonials"]
         ],
     }
+
+
+@public_router.get("/by-name/{school_name}")
+def public_site_by_name(school_name: str, db: Session = Depends(get_db)):
+    settings = repo.find_settings_by_slug(db, school_name)
+    if not settings:
+        raise NotFoundError("This school has not published a website yet")
+    return _site_response(db, settings)
+
+
+@public_router.get("/{school_id}")
+def public_site(school_id: int, db: Session = Depends(get_db)):
+    settings = repo.get_settings(db, school_id)
+    if not settings:
+        raise NotFoundError("This school has not published a website yet")
+    return _site_response(db, settings)
