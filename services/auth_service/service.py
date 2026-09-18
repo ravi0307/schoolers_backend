@@ -1,24 +1,24 @@
+import hashlib
+import logging
 import secrets
-import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from jose import JWTError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from common.exceptions import UnauthorizedError, AppError
+import common.email
+from common.exceptions import UnauthorizedError
 from common.security import (
     verify_password, create_access_token, create_refresh_token, decode_token,
     hash_password,
 )
 from common.models import User, Teacher, Staff, Parent, Pilot, School
-from common.email import send_email
 
-# One-time password store for the forgot-password flow. In-memory is fine for a
-# single auth-service process; a multi-instance deployment should back this
-# with Redis or a database table instead.
-OTP_EXPIRE_SECONDS = 15 * 60
-_otp_store: dict[int, dict] = {}  # user_id -> {"otp": str, "expires_at": float}
+logger = logging.getLogger(__name__)
+
+RESET_TOKEN_TTL_MINUTES = 30
+_GENERIC_INVALID_RESET_MESSAGE = "Invalid or expired reset token."
 
 
 def authenticate(db: Session, username: str, password: str) -> User:
@@ -77,6 +77,7 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     lookups = (
         ("teacher", Teacher, Teacher.teacher_id),
         ("staff", Staff, Staff.staff_id),
+        ("admin", Staff, Staff.staff_id),
         ("parent", Parent, Parent.parent_id),
     )
     for role, person_model, person_id in lookups:
@@ -107,12 +108,12 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Forgot-password flow (email a 6-digit OTP, verify it, then reset)
-# ---------------------------------------------------------------------------
-
 def user_email_address(db: Session, user: User) -> str | None:
-    """Resolve a deliverable email address for an account, or None."""
+    """Resolve a deliverable email address for an account, or None.
+
+    Students have no account/email of their own; master accounts are global and
+    have none either.
+    """
     if user.role == "admin":
         school = db.query(School).filter(School.school_id == user.school_id).first()
         return school.primary_email if school else None
@@ -131,72 +132,94 @@ def user_email_address(db: Session, user: User) -> str | None:
     return None
 
 
-def _store_otp(user_id: int) -> str:
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    _otp_store[user_id] = {"otp": otp, "expires_at": time.monotonic() + OTP_EXPIRE_SECONDS}
-    return otp
-
-
-def _consume_otp(user_id: int, otp: str) -> bool:
-    entry = _otp_store.get(user_id)
-    if not entry:
-        return False
-    if time.monotonic() > entry["expires_at"] or entry["otp"] != otp:
-        _otp_store.pop(user_id, None)
-        return False
-    _otp_store.pop(user_id, None)
-    return True
-
-
-def forgot_password_request(db: Session, identifier: str) -> tuple[User | None, str]:
-    """
-    Step 1: Look up *identifier* (username or email), generate a 6-digit OTP,
-    and email it to the account's registered address.
-    """
-    user = find_user_by_identifier(db, identifier)
-    if user is None:
-        # Don't reveal whether the account exists — return a generic message.
-        return None, "If the username or email is registered, an OTP has been sent."
-
-    email = user_email_address(db, user)
-    if not email:
-        raise AppError(
-            "No email address is on file for this account. "
-            "Contact your school administrator."
-        )
-
-    otp = _store_otp(user.user_id)
+def _deliver_reset_token(email: str, raw_token: str, expires_minutes: int = RESET_TOKEN_TTL_MINUTES) -> None:
+    """Email the one-time reset token out of band. Best-effort: a delivery
+    failure is logged and swallowed so it can never reveal whether the
+    identifier is registered."""
+    subject = "Schoolers — Password reset"
+    body = (
+        "Hello,\n\n"
+        "A password reset was requested for your Schoolers account.\n\n"
+        f"Your one-time reset token is: {raw_token}\n"
+        f"It expires in {expires_minutes} minutes and can only be used once.\n\n"
+        "If you did not request this, you can ignore this email.\n\n"
+        "— Schoolers Platform"
+    )
     try:
-        send_email(
-            [email],
-            "Schoolers — Password Reset OTP",
-            (
-                f"Hello {user.username},\n\n"
-                f"Your Schoolers account password reset one-time password (OTP) is:\n\n"
-                f"   {otp}\n\n"
-                f"Enter it on the reset screen to choose a new password. "
-                f"This code expires in 15 minutes.\n\n"
-                f"If you did not request a password reset, you can ignore this email.\n\n"
-                f"— Schoolers Platform"
-            ),
-        )
-    except Exception as exc:  # noqa: BLE001 - surface the send failure to the user
-        _otp_store.pop(user.user_id, None)
-        raise AppError(f"Could not send the reset OTP email: {exc}") from exc
-
-    return user, f"An OTP has been sent to the email on file for '{user.username}'."
+        common.email.send_email([email], subject, body)
+    except Exception as exc:  # noqa: BLE001 — delivery must never leak account state
+        logger.warning("Could not email password reset token to %s: %s", email, exc)
 
 
-def forgot_password_reset(db: Session, identifier: str, otp: str, new_password: str) -> User:
+def _reset_token_digest(raw_token: str) -> str:
+    """One-way digest so a leaked users row cannot be used to reset logins."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _utcnow_naive() -> datetime:
+    """`users.password_reset_token_expires_at` is a timezone-naive column, so
+    compare against naive UTC consistently (Postgres and SQLite both return
+    naive datetimes for it)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _issue_reset_token(db: Session, user: User) -> tuple[str, datetime]:
+    """Issue a fresh one-time reset token and return (raw_token, expires_at)."""
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = _utcnow_naive() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+    user.password_reset_token = _reset_token_digest(raw_token)
+    user.password_reset_token_expires_at = expires_at
+    db.add(user)
+    db.commit()
+    return raw_token, expires_at
+
+
+def forgot_password_request(db: Session, identifier: str) -> tuple[str | None, datetime | None]:
     """
-    Step 2: Verify the OTP and set a new password for the matching account.
+    Step 1: Verify that *identifier* is a username or email in the system.
+
+    An anonymous caller can never tell registered accounts apart: the message
+    is identical either way. When the account exists a one-time, short-lived
+    reset token is issued and emailed to the account's address on file. The raw
+    token is never returned in an API response — it is delivered out of band so
+    merely knowing the identifier is not enough to take over the account.
     """
     user = find_user_by_identifier(db, identifier)
     if user is None:
-        raise UnauthorizedError("No user found with that username or email address.")
-    if not _consume_otp(user.user_id, otp):
-        raise UnauthorizedError("Invalid or expired OTP. Please request a new one.")
+        return None, None
+    raw_token, expires_at = _issue_reset_token(db, user)
+    email = user_email_address(db, user)
+    if email:
+        _deliver_reset_token(email, raw_token)
+    return raw_token, expires_at
+
+
+def _consume_reset_token(db: Session, user: User, raw_token: str) -> None:
+    """Validate the supplied raw token against the stored digest and expiry."""
+    if (
+        not user.password_reset_token
+        or not user.password_reset_token_expires_at
+        or user.password_reset_token_expires_at < _utcnow_naive()
+    ):
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+    expected = _reset_token_digest(raw_token)
+    if not secrets.compare_digest(expected, user.password_reset_token):
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+
+
+def forgot_password_reset(db: Session, identifier: str, reset_token: str, new_password: str) -> User:
+    """
+    Step 3: Reset the password for the account matching *identifier*, but only
+    when the caller also holds the one-time token issued at step 1. The failure
+    and blank responses are identical whether the identifier is known or not.
+    """
+    user = find_user_by_identifier(db, identifier)
+    if user is None:
+        raise UnauthorizedError(_GENERIC_INVALID_RESET_MESSAGE)
+    _consume_reset_token(db, user, reset_token)
     user.password_hash = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
     db.add(user)
     db.commit()
     db.refresh(user)
