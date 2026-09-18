@@ -81,16 +81,12 @@ def teacher_teaches_class(db: Session, teacher_id: int, class_id: int) -> bool:
 
 
 def teacher_teaches_student(db: Session, teacher_id: int, student_id: int) -> bool:
-    """A teacher may read attendance once they teach any subject in that
-    student's class."""
+    """A teacher may read attendance once they teach a subject in the
+    student's class or are the class teacher of that class."""
     student = db.query(Student).filter(Student.student_id == student_id).first()
     if not student:
         return False
-    exists = db.query(TeacherClassSubject).filter(
-        TeacherClassSubject.teacher_id == teacher_id,
-        TeacherClassSubject.class_id == student.class_id,
-    ).first()
-    return exists is not None
+    return teacher_teaches_class(db, teacher_id, student.class_id)
 
 
 def class_summary(db: Session, class_id: int, the_date: date) -> dict:

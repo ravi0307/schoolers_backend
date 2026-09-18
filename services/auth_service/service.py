@@ -73,6 +73,7 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     lookups = (
         ("teacher", Teacher, Teacher.teacher_id),
         ("staff", Staff, Staff.staff_id),
+        ("admin", Staff, Staff.staff_id),
         ("parent", Parent, Parent.parent_id),
     )
     for role, person_model, person_id in lookups:

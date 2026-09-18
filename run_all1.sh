@@ -52,9 +52,16 @@ ports=(
 )
 
 stop_services() {
-    echo "Stopping API gateway and all microservices..."
-    # Uses your preferred pattern to kill all running uvicorn service instances
-    pkill -f 'uvicorn main:app' || true
+    echo "Stopping Schoolers gateway and microservices on their ports (8000-8015)..."
+    # Kill only processes actually listening on this stack's ports so unrelated
+    # uvicorn apps started by the user in other projects are left alone.
+    for port in 8000 "${ports[@]}"; do
+        pids=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            kill $pids 2>/dev/null || true
+            echo "  stopped pid(s) $pids on :$port"
+        fi
+    done
     sleep 1
     echo "Teardown complete."
 }

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from common.models import Mark, SchoolClass, Student, Subject, TeacherClassSubject, ParentStudent
@@ -96,7 +97,7 @@ def upsert_mark(
         score=score, updated_by=updated_by, updated_by_user=updated_by_user,
     ).on_conflict_do_update(
         index_elements=["student_id", "subject_id", "term"],
-        set_={"score": score, "updated_by": updated_by, "updated_by_user": updated_by_user},
+        set_={"score": score, "updated_by": updated_by, "updated_by_user": updated_by_user, "updated_at": func.now()},
     )
     db.execute(stmt)
     db.commit()

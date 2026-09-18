@@ -8,16 +8,19 @@ both the insert path and the re-mark (conflict) path, plus reads.
 """
 import unittest
 from datetime import date
+import sys
 
 from pydantic import ValidationError
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
-from common.models import Base, Attendance, Student, TeacherClassSubject
+from common.dependencies import CurrentUser
+from common.exceptions import ForbiddenError
+from common.models import Base, Attendance, SchoolClass, Student, TeacherClassSubject
 import services.attendance_service.repository as repo
 from services.attendance_service.schemas import AttendanceMarkOne
 
-TABLES = ["attendance", "students", "teacher_class_subjects"]
+TABLES = ["attendance", "classes", "students", "teacher_class_subjects"]
 
 
 def seed(db: Session):
@@ -26,6 +29,11 @@ def seed(db: Session):
             Student(student_id=1, school_id=1, class_id=1, admission_no="A1", name="Alice"),
             Student(student_id=2, school_id=1, class_id=1, admission_no="A2", name="Bob"),
             Student(student_id=3, school_id=1, class_id=2, admission_no="A3", name="Carol"),
+            SchoolClass(class_id=1, school_id=1, name="Class 1"),
+            SchoolClass(class_id=2, school_id=2, name="Class 2"),
+            SchoolClass(class_id=3, school_id=1, name="Class 3", class_teacher_id=99),
+            Student(student_id=5, school_id=1, class_id=3, admission_no="A5", name="Dana"),
+            Student(student_id=6, school_id=2, class_id=2, admission_no="A6", name="Eve"),
             TeacherClassSubject(teacher_id=7, class_id=1, subject_id=3, is_class_teacher=True),
         ]
     )
@@ -165,6 +173,36 @@ class AttendanceMarkingTests(unittest.TestCase):
         self.assertTrue(repo.teacher_teaches_student(self.db, teacher_id=7, student_id=1))
         self.assertFalse(repo.teacher_teaches_student(self.db, teacher_id=7, student_id=3))
         self.assertFalse(repo.teacher_teaches_student(self.db, teacher_id=7, student_id=4242))
+
+    def test_class_teacher_without_subject_assignment_can_read_attendance(self):
+        # Teacher 99 is the class teacher of class 3 but has no subject rows.
+        self.assertTrue(repo.teacher_teaches_class(self.db, teacher_id=99, class_id=3))
+        self.assertTrue(repo.teacher_teaches_student(self.db, teacher_id=99, student_id=5))
+        self.assertFalse(repo.teacher_teaches_class(self.db, teacher_id=99, class_id=2))
+
+    def test_class_summary_router_binds_teacher_and_admin_to_their_scope(self):
+        sys.path.insert(0, "services/attendance_service")
+        try:
+            from services.attendance_service.repository import class_summary as _summary
+            from services.attendance_service.router import class_summary
+        finally:
+            sys.path.pop(0)
+
+        # A class teacher may only read summaries for the classes they teach.
+        teacher = CurrentUser(user_id=1, role="teacher", school_id=1, linked_person_id=99)
+        self.assertEqual(class_summary(3, date(2026, 9, 16), self.db, teacher)["class_id"], 3)
+        with self.assertRaises(ForbiddenError):
+            class_summary(2, date(2026, 9, 16), self.db, teacher)
+
+        # An admin is bound to their own school.
+        admin = CurrentUser(user_id=2, role="admin", school_id=1, linked_person_id=None)
+        with self.assertRaises(ForbiddenError):
+            class_summary(2, date(2026, 9, 16), self.db, admin)
+
+        # An unlinked teacher account is rejected outright.
+        ghost = CurrentUser(user_id=3, role="teacher", school_id=1, linked_person_id=None)
+        with self.assertRaises(ForbiddenError):
+            class_summary(3, date(2026, 9, 16), self.db, ghost)
 
 
 if __name__ == "__main__":

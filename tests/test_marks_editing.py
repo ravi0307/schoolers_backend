@@ -148,6 +148,23 @@ class MarksEditingTests(unittest.TestCase):
         self.assertIsNone(mark.updated_by)
         self.assertEqual(mark.updated_by_user, 4)
 
+    def test_upsert_conflict_refreshes_updated_at(self):
+        from datetime import datetime, timedelta, timezone
+
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=60, updated_by=7)
+        first = self.db.query(Mark).filter(Mark.student_id == 1, Mark.subject_id == 3).one()
+        self.assertIsNotNone(first.updated_at)
+
+        # Simulate an older edit so the conflict path must advance the stamp.
+        before = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        first.updated_at = before
+        self.db.commit()
+
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=92, updated_by=8)
+        after = self.db.query(Mark).filter(Mark.student_id == 1, Mark.subject_id == 3).one()
+        self.assertEqual(after.score, 92)
+        self.assertGreater(after.updated_at, before)
+
     def test_student_exists_distinguishes_known_from_unknown(self):
         self.assertTrue(repo.student_exists(self.db, 1))
         self.assertFalse(repo.student_exists(self.db, 4242))

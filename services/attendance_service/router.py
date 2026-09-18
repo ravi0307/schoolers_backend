@@ -81,4 +81,15 @@ def class_summary(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    if current_user.role == "admin":
+        if current_user.school_id is not None and not repo.class_in_school(
+            db, class_id, current_user.school_id
+        ):
+            raise ForbiddenError("This class is not in your school")
+    else:
+        if not current_user.linked_person_id:
+            raise ForbiddenError("This teacher account isn't linked to a teacher record")
+        if not repo.teacher_teaches_class(db, current_user.linked_person_id, class_id):
+            raise ForbiddenError("You can only view summaries for classes you teach")
+
     return repo.class_summary(db, class_id, on_date)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from common.models import (
     Broadcast, Media, ParentStudent, Pilot, Route, RouteStudent, SchoolClass,
-    Staff, Student, Teacher,
+    Staff, Student, Teacher, TeacherClassSubject,
 )
 from common.exceptions import NotFoundError, ForbiddenError
 from common.dependencies import CurrentUser
@@ -76,6 +76,34 @@ def _parent_visible_filter(db: Session, parent_id: int):
     )
 
 
+def _teacher_visible_filter(db: Session, teacher_id: int):
+    """Broadcasts a teacher may see: school-wide, the classes they teach, and
+    the transport routes carrying students from those classes."""
+    taught_class_ids = (
+        db.query(TeacherClassSubject.class_id)
+        .filter(TeacherClassSubject.teacher_id == teacher_id)
+    )
+    scoped_classes = (
+        db.query(SchoolClass.class_id)
+        .filter(
+            or_(
+                SchoolClass.class_id.in_(taught_class_ids),
+                SchoolClass.class_teacher_id == teacher_id,
+            )
+        )
+    )
+    scoped_routes = (
+        db.query(RouteStudent.route_id)
+        .join(Student, Student.student_id == RouteStudent.student_id)
+        .filter(Student.class_id.in_(scoped_classes))
+    )
+    return or_(
+        Broadcast.scope == "school",
+        and_(Broadcast.scope == "class", Broadcast.class_id.in_(scoped_classes)),
+        and_(Broadcast.scope == "route", Broadcast.route_id.in_(scoped_routes)),
+    )
+
+
 def resolve_sender_identity(db: Session, current_user: CurrentUser) -> tuple[str, str]:
     """Derive the broadcast's (role_name, sender_name) from the authenticated
     user rather than trusting client-supplied values, so a teacher or pilot
@@ -132,7 +160,12 @@ def list_broadcasts(
     if role == "admin":
         pass  # school admins see every broadcast in their school.
     elif role == "teacher":
-        q = q.filter(Broadcast.scope.in_(["school", "class", "route"]))
+        if current_user.linked_person_id is not None:
+            q = q.filter(_teacher_visible_filter(db, current_user.linked_person_id))
+        else:
+            # An unlinked teacher has no assigned classes to scope by — only
+            # school-wide announcements are safe to show.
+            q = q.filter(Broadcast.scope == "school")
     elif role == "pilot":
         q = q.filter(Broadcast.scope.in_(["school", "route", "pilot"]))
     elif role == "parent":

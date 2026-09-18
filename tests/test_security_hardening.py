@@ -10,6 +10,7 @@ Regression tests for the security fixes raised on the PR review:
 - A parent without a linked person record only sees school-wide broadcasts.
 - Class-scoped reads/writes are bound to the caller's school.
 """
+import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -19,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
 from common.exceptions import ForbiddenError, UnauthorizedError
-from common.models import Base, Broadcast, SchoolClass, Staff, Teacher, User, Pilot
+from common.models import Base, Broadcast, Parent, SchoolClass, Staff, Teacher, User, Pilot
 from common.security import hash_password, validate_password_byte_length, verify_password
 from services.auth_service.schemas import ForgotPasswordResetRequest
 from services.transport_service.schemas import PilotCreate, PilotUpdate
@@ -148,6 +149,32 @@ class PasswordResetTokenTests(unittest.TestCase):
         with self.assertRaises(UnauthorizedError):
             auth_service.forgot_password_reset(self.db, "admin1", raw, "newpassword")
 
+    def test_admin_linked_staff_email_resolves_reset(self):
+        # An admin account links straight to a staff record (role "admin"),
+        # not a `staff`-role user, so the email lookup must match too.
+        self.db.add(Staff(staff_id=11, school_id=1, name="Admin Two", role="Admin", email="boss@school.org"))
+        self.db.add(User(
+            user_id=2, role="admin", username="admin2",
+            password_hash=hash_password("x"), linked_person_id=11,
+        ))
+        self.db.commit()
+        raw, expires_at = auth_service.forgot_password_request(self.db, "boss@school.org")
+        self.assertTrue(raw)
+        self.assertGreater(expires_at, utcnow_naive())
+
+    def test_admin_email_reset_does_not_cross_person_tables(self):
+        # Person ids only mean something within their own table: an admin whose
+        # linked_person_id collides with a *parent* row (not a staff row) must
+        # not be reset via that parent's email — the admin's staff lookup
+        # simply won't match it.
+        self.db.add(Parent(parent_id=7, school_id=1, name="Par Seven", phone="1", email="seven@school.org"))
+        self.db.add(User(
+            user_id=4, role="admin", username="admin4",
+            password_hash=hash_password("x"), linked_person_id=7,
+        ))
+        self.db.commit()
+        self.assertEqual(auth_service.forgot_password_request(self.db, "seven@school.org"), (None, None))
+
 
 class BroadcastAuthorizationTests(unittest.TestCase):
     POLICY = comm_repo.ALLOWED_BROADCAST_SCOPES
@@ -244,6 +271,55 @@ class ClassSchoolScopingTests(unittest.TestCase):
         self.assertTrue(attendance_repo.class_in_school(self.db, 1, 1))
         self.assertFalse(attendance_repo.class_in_school(self.db, 1, 2))
         self.assertFalse(attendance_repo.class_in_school(self.db, 999, 1))
+
+
+class ResetThrottlingTests(unittest.TestCase):
+    """The anonymous reset endpoints are rate-limited and tokens are never
+    re-issued back-to-back for the same identifier, so a caller can't flood
+    delivery or keep invalidating a user's legitimate token."""
+
+    @classmethod
+    def setUpClass(cls):
+        # The router imports its sibling via a bare `import service` /
+        # `from schemas import ...`, which collides with the top-level names
+        # left behind by other services' routers in this same test run. Save
+        # and evict those names so a fresh, auth-only import happens here.
+        sys.path.insert(0, "services/auth_service")
+        cls._saved = {name: sys.modules.pop(name, None) for name in ("schemas", "service", "router")}
+        try:
+            import router as auth_router
+            cls.router = auth_router
+        except Exception:
+            for name, mod in cls._saved.items():
+                if mod is not None:
+                    sys.modules[name] = mod
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        for name, mod in cls._saved.items():
+            if mod is not None:
+                sys.modules[name] = mod
+        sys.path.pop(0)
+
+    def setUp(self):
+        self.router._attempts.clear()
+        self.router._last_issue.clear()
+
+    def test_rate_limiter_allows_limit_then_blocks(self):
+        router = self.router
+        key = "victim@example.com"
+        for _ in range(router._RESET_ATTEMPT_LIMIT):
+            self.assertFalse(router._rate_limited(key))
+        self.assertTrue(router._rate_limited(key))
+        # A different identifier is unaffected.
+        self.assertFalse(router._rate_limited("other@example.com"))
+
+    def test_cooldown_blocks_immediate_reissue(self):
+        router = self.router
+        router._record_issue("cool@example.com")
+        self.assertTrue(router._cooldown_active("cool@example.com"))
+        self.assertFalse(router._cooldown_active("fresh@example.com"))
 
 
 if __name__ == "__main__":

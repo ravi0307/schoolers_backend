@@ -23,7 +23,9 @@ from common.models import (
     SchoolClass,
     Staff,
     Student,
+    Subject,
     Teacher,
+    TeacherClassSubject,
 )
 import services.communication_service.repository as repo
 from services.communication_service.schemas import BroadcastCreate
@@ -31,7 +33,9 @@ from services.communication_service.schemas import BroadcastCreate
 TABLES = [
     "staff",
     "teachers",
+    "subjects",
     "classes",
+    "teacher_class_subjects",
     "students",
     "parents",
     "parent_student",
@@ -66,9 +70,15 @@ class BroadcastDeliveryTests(unittest.TestCase):
         teacher = Teacher(teacher_id=1, school_id=school_1, name="T. Eacher", role_title="Teacher", staff_id=1, phone="000")
         self.db.add_all([staff, teacher])
 
+        self.subject_1 = Subject(subject_id=1, name="Maths")
+        self.db.add(self.subject_1)
+
         self.cls_1 = SchoolClass(class_id=1, school_id=school_1, name="Class 1")
         self.cls_75 = SchoolClass(class_id=75, school_id=school_1, name="Class 75")
         self.db.add_all([self.cls_1, self.cls_75])
+
+        # Teacher 1 teaches a subject in Class 1 only.
+        self.db.add(TeacherClassSubject(teacher_id=1, class_id=1, subject_id=1, is_class_teacher=True))
 
         student_7 = Student(student_id=7, school_id=school_1, class_id=1, admission_no="A7", name="Tara Dhaliwal")
         student_446 = Student(student_id=446, school_id=school_1, class_id=75, admission_no="A446", name="Other Kid")
@@ -124,12 +134,17 @@ class BroadcastDeliveryTests(unittest.TestCase):
         )
 
     def test_teacher_sees_school_class_and_route_broadcasts(self):
-        seen = self._list("teacher")
+        seen = self._list("teacher", linked_person_id=1)
         self.assertIn("School-wide", seen)
         self.assertIn("Class 1 note", seen)
         self.assertIn("Route 1 delay", seen)
-        self.assertIn("Route 51 delay", seen)
+        self.assertNotIn("Class 75 note", seen)  # teacher 1 does not teach class 75
+        self.assertNotIn("Route 51 delay", seen)  # no taught class rides route 51
         self.assertNotIn("Pilot notice", seen)
+
+    def test_unlinked_teacher_sees_only_school_wide(self):
+        seen = self._list("teacher")
+        self.assertEqual(seen, {"School-wide"})
 
     def test_pilot_sees_school_route_and_pilot_broadcasts(self):
         seen = self._list("pilot")
@@ -253,7 +268,7 @@ class BroadcastDeliveryTests(unittest.TestCase):
             },
         )
 
-        teacher_seen = self._list("teacher")
+        teacher_seen = self._list("teacher", linked_person_id=1)
         self.assertIn("Class 1 field trip reminder", teacher_seen)
 
         route_parent_seen = self._list("parent", user_id=3, linked_person_id=225)
@@ -280,7 +295,7 @@ class BroadcastDeliveryTests(unittest.TestCase):
 
         for role, user_id, linked_person_id in [
             ("admin", 1, None),
-            ("teacher", 1, None),
+            ("teacher", 1, 1),
             ("pilot", 1, None),
             ("parent", 3, 225),
             ("parent", 4, 168),
