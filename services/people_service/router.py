@@ -245,9 +245,7 @@ def update_student(
         "emergency_number": data.pop("parent_emergency_number", None),
     }
     parent_data = {key: value for key, value in parent_data.items() if value is not None}
-    repo.update_student(db, student, data)
-    if parent_id is not None or parent_data:
-        repo.update_student_parent(db, school_id, student_id, parent_id, parent_data)
+    repo.update_student_with_changes(db, school_id, student, data, parent_id, parent_data)
     return repo.student_response(db, student)
 
 

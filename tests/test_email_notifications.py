@@ -9,6 +9,7 @@ Email dispatch is best-effort: an SMTP failure must never break the primary
 operation, so these tests also cover the swallow-and-log path.
 """
 import unittest
+from datetime import date
 from unittest import mock
 
 from sqlalchemy import create_engine
@@ -304,6 +305,157 @@ class PeopleNotificationsTests(unittest.TestCase):
         args = mock_send.call_args[0]
         self.assertIn("Kid Two", args[1])
         self.assertIn("Sunrise High", args[2])
+
+
+class RecordUpdateNotificationTests(unittest.TestCase):
+    """Editing a student / staff / teacher / school-admin record must email the
+    affected person(s) a diff of what changed (field, old value, new value)."""
+
+    def setUp(self):
+        self.engine, self.Session = make_session()
+        self.db: Session = self.Session()
+        self.db.add(School(
+            name="Sunrise High",
+            address="1 Main Rd",
+            pincode="110001",
+            city="New Delhi",
+            state="Delhi",
+            primary_contact="9999999999",
+            primary_email="office@sunrise.edu",
+        ))
+        self.db.commit()
+
+    def tearDown(self):
+        self.db.close()
+        self.engine.dispose()
+
+    def _student_with_parent(self):
+        parent = Parent(parent_id=10, school_id=1, name="Parent One", phone="444",
+                        email="parent@sunrise.edu")
+        self.db.add(parent)
+        self.db.flush()
+        student = people_repo.create_student(self.db, 1, {
+            "name": "Kid One", "class_id": 1, "admission_no": "A10",
+        })
+        people_repo.link_parent_student(self.db, parent.parent_id, student.student_id)
+        return student
+
+    @mock.patch("common.email.send_email")
+    def test_student_email_update_notifies_old_and_new_parent(self, mock_send):
+        student = self._student_with_parent()
+        mock_send.reset_mock()
+        people_repo.update_student_with_changes(
+            self.db, 1, student, {}, None, {"email": "new.parent@sunrise.edu"},
+        )
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(sorted(args[0]), ["new.parent@sunrise.edu", "parent@sunrise.edu"])
+        self.assertIn("Kid One", args[1])
+        self.assertIn("Email", args[2])
+        self.assertIn("parent@sunrise.edu", args[2])
+        self.assertIn("new.parent@sunrise.edu", args[2])
+        self.assertIn("→", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_student_field_update_emails_linked_parent(self, mock_send):
+        student = self._student_with_parent()
+        mock_send.reset_mock()
+        people_repo.update_student_with_changes(
+            self.db, 1, student, {"date_of_birth": date(2014, 5, 20)}, None, {},
+        )
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(args[0], ["parent@sunrise.edu"])
+        self.assertIn("Date of birth", args[2])
+        self.assertIn("2014-05-20", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_student_update_without_changes_sends_nothing(self, mock_send):
+        student = self._student_with_parent()
+        mock_send.reset_mock()
+        people_repo.update_student_with_changes(
+            self.db, 1, student, {"name": "Kid One"}, None, {"email": "parent@sunrise.edu"},
+        )
+        mock_send.assert_not_called()
+
+    @mock.patch("common.email.send_email")
+    def test_staff_update_emails_staff_member_with_diff(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Priya Sharma", "role": "Admin", "phone": "111", "email": "priya@sunrise.edu",
+        })
+        mock_send.reset_mock()
+        people_repo.update_staff(self.db, staff, {"phone": "9991112222"})
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(args[0], ["priya@sunrise.edu"])
+        self.assertIn("Priya Sharma", args[1])
+        self.assertIn("Phone", args[2])
+        self.assertIn("9991112222", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_staff_email_update_notifies_old_and_new(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Priya Sharma", "role": "Admin", "phone": "111", "email": "priya@sunrise.edu",
+        })
+        mock_send.reset_mock()
+        people_repo.update_staff(self.db, staff, {"email": "priya.new@sunrise.edu"})
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(sorted(args[0]), ["priya.new@sunrise.edu", "priya@sunrise.edu"])
+        self.assertIn("priya@sunrise.edu → priya.new@sunrise.edu", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_teacher_update_emails_teacher(self, mock_send):
+        teacher = Teacher(school_id=1, name="Meera Nair", role_title="Math",
+                          phone="123", email="meera@sunrise.edu")
+        self.db.add(teacher)
+        self.db.flush()
+        mock_send.reset_mock()
+        people_repo.update_teacher(self.db, teacher, {"phone": "5550001111"})
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(args[0], ["meera@sunrise.edu"])
+        self.assertIn("Meera Nair", args[1])
+        self.assertIn("Phone", args[2])
+        self.assertIn("5550001111", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_school_admin_email_update_notifies_old_and_new(self, mock_send):
+        school = self.db.query(School).one()
+        mock_send.reset_mock()
+        schools_repo.update_school(self.db, school, {"primary_email": "office.new@sunrise.edu"})
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(sorted(args[0]), ["office.new@sunrise.edu", "office@sunrise.edu"])
+        self.assertIn("Primary email", args[2])
+        self.assertIn("office@sunrise.edu → office.new@sunrise.edu", args[2])
+
+    @mock.patch("common.email.send_email")
+    def test_school_update_without_email_change_sends_nothing(self, mock_send):
+        school = self.db.query(School).one()
+        mock_send.reset_mock()
+        schools_repo.update_school(self.db, school, {"address": "99 Green Lane"})
+        mock_send.assert_not_called()
+
+    @mock.patch("common.email.send_email")
+    def test_send_failure_is_swallowed_for_update_email(self, mock_send):
+        mock_send.side_effect = RuntimeError("SMTP down")
+        sent = email_helpers.send_record_updated_email(
+            "Student", "Kid One", "Sunrise High",
+            [("Email", "a@x.org", "b@x.org")], ["a@x.org", "b@x.org"],
+        )
+        self.assertFalse(sent)
+        mock_send.assert_called_once()
+
+    @mock.patch("common.email.send_email")
+    def test_update_email_dedupes_recipients(self, mock_send):
+        email_helpers.send_record_updated_email(
+            "Student", "Kid One", "Sunrise High",
+            [("Email", "a@x.org", "b@x.org")], [" b@x.org ", "b@x.org"],
+        )
+        mock_send.assert_called_once()
+        args = mock_send.call_args[0]
+        self.assertEqual(args[0], ["b@x.org"])
 
 
 if __name__ == "__main__":

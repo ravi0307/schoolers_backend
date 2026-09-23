@@ -13,6 +13,15 @@ ALLOWED_IMAGE_TYPES = {
     "image/svg+xml": ".svg",
 }
 
+ALLOWED_DOCUMENT_TYPES = {
+    "application/pdf": ".pdf",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "application/octet-stream": ".bin",
+}
+
 EXTENSION_TO_MEDIA_TYPE = {ext: mime for mime, ext in ALLOWED_IMAGE_TYPES.items()}
 
 
@@ -47,6 +56,25 @@ def save_image(
     else:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         filename = f"image_{timestamp}{extension}"
+    (get_upload_dir() / filename).write_bytes(file_bytes)
+    return filename
+
+
+def save_document(
+    file_bytes: bytes,
+    content_type: str,
+    original_filename: str | None = None,
+) -> str:
+    if content_type not in ALLOWED_DOCUMENT_TYPES:
+        raise ValueError(
+            "Only PDF, DOC/DOCX, and JPEG/PNG documents are allowed"
+        )
+    if len(file_bytes) > settings.UPLOAD_MAX_BYTES:
+        raise ValueError("Document must be 5 MB or smaller")
+
+    extension = ALLOWED_DOCUMENT_TYPES[content_type]
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"doc_{timestamp}{extension}"
     (get_upload_dir() / filename).write_bytes(file_bytes)
     return filename
 

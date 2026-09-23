@@ -13,10 +13,14 @@ from common.models import (
     TeacherClassSubject,
     RouteStudent,
     Pilot,
+    SchoolClass,
     School,
     User,
 )
+from common.audit import bulk_modified_columns
 from common.email import (
+    FIELD_LABELS,
+    send_record_updated_email,
     send_staff_added_email,
     send_staff_removed_email,
     send_student_removed_email,
@@ -27,6 +31,52 @@ from common.security import hash_password
 # ---- Teachers ----
 def list_teachers(db: Session, school_id: int) -> list[Teacher]:
     return db.query(Teacher).filter(Teacher.school_id == school_id, Teacher.is_active.is_(True)).order_by(Teacher.name).all()
+
+
+def _fmt_value(db: Session, field: str, value) -> str:
+    if field == "class_id":
+        row = db.query(SchoolClass.name).filter(
+            SchoolClass.class_id == int(value), SchoolClass.is_active.is_(True)
+        ).first()
+        return row[0] if row else str(value)
+    if field == "documents":
+        docs = value or []
+        return f"{len(docs)} document(s)" if docs else "(none)"
+    if field == "photo_url":
+        return "photo set" if value else "(none)"
+    if value is None:
+        return "(not set)"
+    return str(value)
+
+
+def _changed_fields(db: Session, obj, data: dict) -> list[tuple[str, object, object]]:
+    changes = []
+    for k, v in data.items():
+        if v is None:
+            continue
+        old = getattr(obj, k, None)
+        if str(old) != str(v):
+            changes.append((k, old, v))
+    return changes
+
+
+def _notify_record_update(
+    db: Session,
+    record_type: str,
+    record_name: str,
+    school_id: int,
+    changes: list[tuple[str, object, object]],
+    recipients: list[str],
+) -> None:
+    to_addrs = list(dict.fromkeys(addr.strip() for addr in recipients if addr and addr.strip()))
+    if not changes or not to_addrs:
+        return
+    labeled = [
+        (FIELD_LABELS.get(k, k.replace("_", " ").title()), _fmt_value(db, k, old), _fmt_value(db, k, new))
+        for k, old, new in changes
+    ]
+    school = school_name(db, school_id)
+    send_record_updated_email(record_type, record_name, school, labeled, to_addrs)
 
 
 def get_teacher(db: Session, school_id: int, teacher_id: int) -> Teacher | None:
@@ -42,11 +92,15 @@ def create_teacher(db: Session, school_id: int, data: dict) -> Teacher:
 
 
 def update_teacher(db: Session, teacher: Teacher, data: dict) -> Teacher:
+    changes = _changed_fields(db, teacher, data)
+    old_email = teacher.email
     for k, v in data.items():
         if v is not None:
             setattr(teacher, k, v)
     db.commit()
     db.refresh(teacher)
+    if changes:
+        _notify_record_update(db, "Teacher", teacher.name, teacher.school_id, changes, [old_email, teacher.email])
     return teacher
 
 
@@ -227,12 +281,16 @@ def create_staff(db: Session, school_id: int, data: dict) -> Staff:
 
 
 def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
+    changes = _changed_fields(db, staff, data)
+    old_email = staff.email
     for k, v in data.items():
         if v is not None:
             setattr(staff, k, v)
     _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
+    if changes:
+        _notify_record_update(db, "Staff member", staff.name, staff.school_id, changes, [old_email, staff.email])
     return staff
 
 
@@ -283,7 +341,7 @@ def deactivate_school_students(db: Session, school_id: int) -> int:
     result = (
         db.query(Student)
         .filter(Student.school_id == school_id, Student.is_active.is_(True))
-        .update({Student.is_active: False}, synchronize_session=False)
+        .update({Student.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     )
     db.flush()
     return int(result)
@@ -294,7 +352,7 @@ def deactivate_school_teachers(db: Session, school_id: int) -> int:
     result = (
         db.query(Teacher)
         .filter(Teacher.school_id == school_id, Teacher.is_active.is_(True))
-        .update({Teacher.is_active: False}, synchronize_session=False)
+        .update({Teacher.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     )
     db.flush()
     return int(result)
@@ -305,7 +363,7 @@ def deactivate_school_parents(db: Session, school_id: int) -> int:
     result = (
         db.query(Parent)
         .filter(Parent.school_id == school_id, Parent.is_active.is_(True))
-        .update({Parent.is_active: False}, synchronize_session=False)
+        .update({Parent.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     )
     db.flush()
     return int(result)
@@ -321,7 +379,7 @@ def deactivate_school_users(db: Session, school_id: int) -> int:
     result = (
         db.query(User)
         .filter(User.school_id == school_id, User.is_active.is_(True))
-        .update({User.is_active: False}, synchronize_session=False)
+        .update({User.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     )
     db.flush()
     return int(result)
@@ -371,6 +429,10 @@ def student_response(db: Session, student: Student) -> dict:
         "name": student.name,
         "date_of_birth": student.date_of_birth,
         "gender": student.gender,
+        "photo_url": student.photo_url,
+        "aadhaar_number": student.aadhaar_number,
+        "birth_certificate_number": student.birth_certificate_number,
+        "documents": student.documents or [],
         "present_today": student.present_today,
         "parent_id": parent.parent_id if parent else None,
         "parent_name": parent.name if parent else None,
@@ -489,6 +551,38 @@ def update_student(db: Session, student: Student, data: dict) -> Student:
             setattr(student, k, v)
     db.commit()
     db.refresh(student)
+    return student
+
+
+def update_student_with_changes(
+    db: Session,
+    school_id: int,
+    student: Student,
+    data: dict,
+    parent_id: int | None,
+    parent_data: dict,
+) -> Student:
+    """Apply the student (and optional parent) edits done through the admin
+    portal and email the parent(s) with the changed fields."""
+    old_parent = _parent_for_student(db, student.student_id)
+    old_email = old_parent.email if old_parent else None
+
+    changes = _changed_fields(db, student, data)
+
+    for key, value in parent_data.items():
+        if value is None:
+            continue
+        old = getattr(old_parent, key, None) if old_parent else None
+        if str(old) != str(value):
+            changes.append((key, old, value))
+
+    update_student(db, student, data)
+    update_student_parent(db, school_id, student.student_id, parent_id, parent_data)
+
+    new_parent = _parent_for_student(db, student.student_id)
+    new_email = new_parent.email if new_parent else None
+    if changes:
+        _notify_record_update(db, "Student", student.name, school_id, changes, [old_email, new_email])
     return student
 
 

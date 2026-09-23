@@ -9,6 +9,7 @@ from common.storage import (
     ALLOWED_IMAGE_TYPES,
     media_type_for_filename,
     resolve_upload_path,
+    save_document,
     save_image,
 )
 import repository as repo
@@ -81,6 +82,27 @@ async def upload_school_logo_legacy(
     if school_id is None:
         raise ForbiddenError("school_id is required for users without a school")
     return await _save_school_logo(school_id, file, db, current_user)
+
+
+@router.api_route("/{school_id}/documents/upload", methods=["POST", "PUT", "PATCH"])
+async def upload_student_document(
+    school_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("master", "admin")),
+):
+    """Upload a student document (PDF, DOC/DOCX, or JPEG/PNG) to file storage."""
+    _guard_school_access(current_user, school_id)
+    _get_or_404(db, school_id)
+
+    content_type = file.content_type or ""
+    data = await file.read()
+    try:
+        filename = save_document(data, content_type)
+    except ValueError as exc:
+        raise AppError(str(exc)) from exc
+
+    return {"url": f"/api/v1/schools/uploads/{filename}", "filename": filename}
 
 
 @router.get("/uploads/{filename}")

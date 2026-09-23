@@ -150,7 +150,7 @@ class BackendContractTests(unittest.TestCase):
 
     def test_website_settings_start_unpublished_until_go_live(self):
         model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
-        settings_block = model.split("class WebsiteSettings(Base):", 1)[1].split("\nclass ", 1)[0]
+        settings_block = model.split("class WebsiteSettings", 1)[1].split("\nclass ", 1)[0]
         self.assertIn('default=False, server_default="false"', settings_block)
 
     def test_website_read_schema_exposes_live_state_and_admin_can_edit_pre_live(self):
