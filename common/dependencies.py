@@ -10,6 +10,7 @@ from fastapi import Depends, Header
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from common.audit import set_current_actor
 from common.database import get_db
 from common.security import decode_token
 from common.exceptions import UnauthorizedError, ForbiddenError
@@ -36,8 +37,10 @@ def get_current_user(
         raise UnauthorizedError("Invalid or expired token")
     if payload.get("type") != "access":
         raise UnauthorizedError("Not an access token")
+    user_id = int(payload["sub"])
+    set_current_actor(user_id)
     return CurrentUser(
-        user_id=int(payload["sub"]),
+        user_id=user_id,
         role=payload["role"],
         school_id=payload.get("school_id"),
         linked_person_id=payload.get("linked_person_id"),

@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
-    UniqueConstraint, CheckConstraint, func, text
+    UniqueConstraint, CheckConstraint, func, text, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -16,10 +16,29 @@ from sqlalchemy.orm import relationship
 from common.database import Base
 
 # ============================================================================
+# AUDIT TRACKING
+# ============================================================================
+
+
+class AuditColumnsMixin:
+    """Track who last modified a row and when.
+
+    Every domain table carries `modified_by` (FK to users.user_id — NULL for
+    seed/system writes) and `modified_at` (server time on insert, bumped on
+    every update). The user id is filled automatically by common.audit's
+    before-flush listener from a request-scoped context; call sites that issue
+    bulk queries use common.audit.bulk_modified_columns() explicitly.
+    """
+
+    modified_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================================
 # 1. PLATFORM / MASTER ADMIN
 # ============================================================================
 
-class School(Base):
+class School(AuditColumnsMixin, Base):
     __tablename__ = "schools"
 
     school_id = Column(Integer, primary_key=True)
@@ -44,7 +63,7 @@ class School(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class SchoolNotification(Base):
+class SchoolNotification(AuditColumnsMixin, Base):
     __tablename__ = "school_notifications"
 
     notification_id = Column(Integer, primary_key=True)
@@ -59,14 +78,14 @@ class SchoolNotification(Base):
 # 2. ACADEMIC STRUCTURE
 # ============================================================================
 
-class Subject(Base):
+class Subject(AuditColumnsMixin, Base):
     __tablename__ = "subjects"
 
     subject_id = Column(Integer, primary_key=True)
     name = Column(String(40), unique=True, nullable=False)
 
 
-class SchoolClass(Base):
+class SchoolClass(AuditColumnsMixin, Base):
     __tablename__ = "classes"
 
     class_id = Column(Integer, primary_key=True)
@@ -79,7 +98,7 @@ class SchoolClass(Base):
     __table_args__ = (UniqueConstraint("school_id", "name"),)
 
 
-class Period(Base):
+class Period(AuditColumnsMixin, Base):
     __tablename__ = "periods"
 
     period_id = Column(Integer, primary_key=True)
@@ -87,7 +106,7 @@ class Period(Base):
     period_time = Column(String(31), nullable=False)
 
 
-class Holiday(Base):
+class Holiday(AuditColumnsMixin, Base):
     __tablename__ = "holidays"
 
     holiday_id = Column(Integer, primary_key=True)
@@ -102,7 +121,7 @@ class Holiday(Base):
 # 3. PEOPLE
 # ============================================================================
 
-class Teacher(Base):
+class Teacher(AuditColumnsMixin, Base):
     __tablename__ = "teachers"
 
     teacher_id = Column(Integer, primary_key=True)
@@ -122,7 +141,7 @@ class Teacher(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class TeacherClassSubject(Base):
+class TeacherClassSubject(AuditColumnsMixin, Base):
     __tablename__ = "teacher_class_subjects"
 
     id = Column(Integer, primary_key=True)
@@ -134,7 +153,7 @@ class TeacherClassSubject(Base):
     __table_args__ = (UniqueConstraint("teacher_id", "class_id", "subject_id"),)
 
 
-class Staff(Base):
+class Staff(AuditColumnsMixin, Base):
     __tablename__ = "staff"
 
     staff_id = Column(Integer, primary_key=True)
@@ -155,7 +174,7 @@ class Staff(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Parent(Base):
+class Parent(AuditColumnsMixin, Base):
     __tablename__ = "parents"
 
     parent_id = Column(Integer, primary_key=True)
@@ -169,7 +188,7 @@ class Parent(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Student(Base):
+class Student(AuditColumnsMixin, Base):
     __tablename__ = "students"
 
     student_id = Column(Integer, primary_key=True)
@@ -179,12 +198,16 @@ class Student(Base):
     name = Column(String(100), nullable=False)
     date_of_birth = Column(Date)
     gender = Column(String(10))
+    photo_url = Column(String(255))
+    aadhaar_number = Column(String(20))
+    birth_certificate_number = Column(String(40))
+    documents = Column(JSON)
     present_today = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class ParentStudent(Base):
+class ParentStudent(AuditColumnsMixin, Base):
     __tablename__ = "parent_student"
 
     id = Column(Integer, primary_key=True)
@@ -199,7 +222,7 @@ class ParentStudent(Base):
 # 4. TRANSPORT / ROUTES
 # ============================================================================
 
-class Route(Base):
+class Route(AuditColumnsMixin, Base):
     __tablename__ = "routes"
 
     route_id = Column(Integer, primary_key=True)
@@ -212,7 +235,7 @@ class Route(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Vehicle(Base):
+class Vehicle(AuditColumnsMixin, Base):
     __tablename__ = "vehicles"
 
     vehicle_id = Column(Integer, primary_key=True)
@@ -226,7 +249,7 @@ class Vehicle(Base):
     __table_args__ = (UniqueConstraint("school_id", "vehicle_number"),)
 
 
-class RouteStop(Base):
+class RouteStop(AuditColumnsMixin, Base):
     __tablename__ = "route_stops"
 
     stop_id = Column(Integer, primary_key=True)
@@ -237,7 +260,7 @@ class RouteStop(Base):
     stop_order = Column(Integer, nullable=False, default=1)
 
 
-class RouteStudent(Base):
+class RouteStudent(AuditColumnsMixin, Base):
     __tablename__ = "route_students"
 
     id = Column(Integer, primary_key=True)
@@ -255,7 +278,7 @@ class RouteStudent(Base):
 # 5. TIMETABLE
 # ============================================================================
 
-class TimetableEntry(Base):
+class TimetableEntry(AuditColumnsMixin, Base):
     __tablename__ = "timetable_entries"
 
     entry_id = Column(Integer, primary_key=True)
@@ -278,7 +301,7 @@ class TimetableEntry(Base):
 # 6. ATTENDANCE & MARKS
 # ============================================================================
 
-class Attendance(Base):
+class Attendance(AuditColumnsMixin, Base):
     __tablename__ = "attendance"
 
     attendance_id = Column(Integer, primary_key=True)
@@ -291,7 +314,7 @@ class Attendance(Base):
     __table_args__ = (UniqueConstraint("student_id", "date"),)
 
 
-class Mark(Base):
+class Mark(AuditColumnsMixin, Base):
     __tablename__ = "marks"
 
     mark_id = Column(Integer, primary_key=True)
@@ -313,7 +336,7 @@ class Mark(Base):
 # 7. LEAVE REQUESTS
 # ============================================================================
 
-class LeaveRequest(Base):
+class LeaveRequest(AuditColumnsMixin, Base):
     __tablename__ = "leave_requests"
 
     leave_id = Column(Integer, primary_key=True)
@@ -332,7 +355,7 @@ class LeaveRequest(Base):
 # 8. COMMUNICATION
 # ============================================================================
 
-class Broadcast(Base):
+class Broadcast(AuditColumnsMixin, Base):
     __tablename__ = "broadcasts"
 
     broadcast_id = Column(Integer, primary_key=True)
@@ -350,7 +373,7 @@ class Broadcast(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Media(Base):
+class Media(AuditColumnsMixin, Base):
     __tablename__ = "media"
 
     media_id = Column(Integer, primary_key=True)
@@ -363,7 +386,7 @@ class Media(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class BarterListing(Base):
+class BarterListing(AuditColumnsMixin, Base):
     __tablename__ = "barter_listings"
 
     listing_id = Column(Integer, primary_key=True)
@@ -376,7 +399,7 @@ class BarterListing(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Activity(Base):
+class Activity(AuditColumnsMixin, Base):
     __tablename__ = "activities"
 
     activity_id = Column(Integer, primary_key=True)
@@ -392,7 +415,7 @@ class Activity(Base):
 # 9. SCHOOL WEBSITE
 # ============================================================================
 
-class WebsiteSettings(Base):
+class WebsiteSettings(AuditColumnsMixin, Base):
     __tablename__ = "website_settings"
 
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), primary_key=True)
@@ -410,7 +433,7 @@ class WebsiteSettings(Base):
     is_active = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
-class WebsitePage(Base):
+class WebsitePage(AuditColumnsMixin, Base):
     __tablename__ = "website_pages"
 
     page_id = Column(Integer, primary_key=True)
@@ -426,7 +449,7 @@ class WebsitePage(Base):
     __table_args__ = (UniqueConstraint("school_id", "slug"),)
 
 
-class WebsiteTestimonial(Base):
+class WebsiteTestimonial(AuditColumnsMixin, Base):
     __tablename__ = "website_testimonials"
 
     testimonial_id = Column(Integer, primary_key=True)
@@ -442,7 +465,7 @@ class WebsiteTestimonial(Base):
 # 10. PLATFORM USERS / AUTH
 # ============================================================================
 
-class User(Base):
+class User(AuditColumnsMixin, Base):
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True)
@@ -458,7 +481,7 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
-class Pilot(Base):
+class Pilot(AuditColumnsMixin, Base):
     __tablename__ = "pilots"
 
     pilot_id = Column(Integer, primary_key=True)
@@ -474,3 +497,8 @@ class Pilot(Base):
     dl_number = Column(String(40))
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime, server_default=func.now())
+
+
+# Register the audit stamper so every process importing the models configures
+# the modified_by/modified_at listener before the first flush.
+import common.audit  # noqa: E402,F401

@@ -1,7 +1,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 
-from common.email import school_recipients, send_school_removed_email, send_school_registered_email
+from common.email import (
+    FIELD_LABELS,
+    school_recipients,
+    send_record_updated_email,
+    send_school_removed_email,
+    send_school_registered_email,
+)
 from common.models import School, Teacher, Staff, Student, Parent
 from services.people_service import repository as people_repo
 
@@ -24,11 +30,30 @@ def create_school(db: Session, data: dict) -> School:
 
 
 def update_school(db: Session, school: School, data: dict) -> School:
+    old_primary = school.primary_email
+    changes = []
+    for k in ("primary_email", "alternative_email"):
+        if k in data and data[k] is not None and str(getattr(school, k)) != str(data[k]):
+            changes.append((k, getattr(school, k), data[k]))
     for k, v in data.items():
         if v is not None:
             setattr(school, k, v)
     db.commit()
     db.refresh(school)
+    if changes:
+        labeled = [
+            (FIELD_LABELS.get(k, k.replace("_", " ").title()), str(old) if old else "(not set)", str(new))
+            for k, old, new in changes
+        ]
+        recipients = list(dict.fromkeys(addr.strip() for addr in (old_primary, school.primary_email) if addr and addr.strip()))
+        if recipients:
+            send_record_updated_email(
+                "School administrator contact",
+                school.name,
+                school.name,
+                labeled,
+                recipients,
+            )
     return school
 
 

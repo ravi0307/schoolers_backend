@@ -172,3 +172,68 @@ def send_student_removed_email(school_name: str, student_name: str, recipients: 
             f"— Schoolers Platform"
         ),
     )
+
+
+FIELD_LABELS: dict[str, str] = {
+    "name": "Name",
+    "admission_no": "Admission number",
+    "class_id": "Class",
+    "date_of_birth": "Date of birth",
+    "gender": "Gender",
+    "photo_url": "Photo",
+    "aadhaar_number": "Aadhaar number",
+    "birth_certificate_number": "Birth certificate number",
+    "documents": "Documents",
+    "parent_name": "Parent name",
+    "parent_phone": "Parent phone",
+    "parent_email": "Parent email",
+    "parent_address": "Parent address",
+    "parent_emergency_number": "Parent emergency number",
+    "email": "Email",
+    "email_id": "Email",
+    "phone": "Phone",
+    "mobile_number": "Mobile number",
+    "role": "Role",
+    "department": "Department",
+    "date_of_joining": "Date of joining",
+    "address": "Address",
+    "present_address": "Present address",
+    "permanent_address": "Permanent address",
+    "emergency_number": "Emergency number",
+    "marital_status": "Marital status",
+    "qualification": "Qualification",
+    "primary_email": "Primary email",
+    "alternative_email": "Alternative email",
+    "dob": "Date of birth",
+}
+
+
+def send_record_updated_email(
+    record_type: str,
+    record_name: str,
+    school_name: str,
+    changes: list[tuple[str, str, str]],
+    recipients: list[str],
+) -> bool:
+    """Notify the affected person(s) that a record was edited, listing the
+    fields that changed with their old and new values (best-effort)."""
+    where = f" at {school_name}" if school_name != record_name else ""
+    lines = [
+        "Hello,",
+        "",
+        f'Your {record_type.lower()} record "{record_name}"{where} has been updated.',
+        "",
+        "Changed details:",
+    ]
+    for label, old, new in changes:
+        lines.append(f"  • {label}: {old} → {new}")
+    lines.extend(
+        [
+            "",
+            "If this wasn't you, please contact your school administrator.",
+            "",
+            "— Schoolers Platform",
+        ]
+    )
+    subject = f"Schoolers — {record_type} record updated: {record_name}"
+    return try_send_email(recipients, subject, "\n".join(lines))

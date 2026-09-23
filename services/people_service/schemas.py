@@ -182,6 +182,10 @@ class StudentCreate(BaseModel):
     name: str
     date_of_birth: date | None = None
     gender: str | None = None
+    photo_url: str | None = None
+    aadhaar_number: str | None = None
+    birth_certificate_number: str | None = None
+    documents: list[str] | None = None
     parent_id: int | None = None  # optionally link on create
     parent_name: str | None = None
     parent_phone: str | None = None
@@ -196,6 +200,10 @@ class StudentUpdate(BaseModel):
     name: str | None = None
     date_of_birth: date | None = None
     gender: str | None = None
+    photo_url: str | None = None
+    aadhaar_number: str | None = None
+    birth_certificate_number: str | None = None
+    documents: list[str] | None = None
     present_today: bool | None = None
     parent_id: int | None = None
     parent_name: str | None = None
@@ -213,6 +221,10 @@ class StudentRead(BaseModel):
     name: str
     date_of_birth: date | None
     gender: str | None
+    photo_url: str | None = None
+    aadhaar_number: str | None = None
+    birth_certificate_number: str | None = None
+    documents: list[str] | None = None
     present_today: bool
     parent_id: int | None = None
     parent_name: str | None = None

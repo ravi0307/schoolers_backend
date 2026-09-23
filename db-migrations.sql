@@ -277,3 +277,123 @@ BEGIN
         ALTER TABLE schoolers.users ADD COLUMN password_reset_token_expires_at TIMESTAMP;
     END IF;
 END $$;
+
+-- Audit trail: record who modified each row and when. Applied uniformly to
+-- every domain table. modified_by references users.user_id and is left NULL
+-- for seed/system writes; the application stamps it via common.audit per
+-- request, and modified_at is bumped server-side on every update.
+ALTER TABLE IF EXISTS schoolers.schools
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.school_notifications
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.subjects
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.classes
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.periods
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.holidays
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.teachers
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.teacher_class_subjects
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.staff
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.parents
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.students
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.parent_student
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.routes
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.vehicles
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.route_stops
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.route_students
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.timetable_entries
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.attendance
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.marks
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.leave_requests
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.media
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.barter_listings
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.activities
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.website_settings
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.website_pages
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.website_testimonials
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.users
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+ALTER TABLE IF EXISTS schoolers.pilots
+    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
