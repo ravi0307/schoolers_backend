@@ -24,7 +24,10 @@ class CurrentUser:
     linked_person_id: int | None = None
 
 
-def get_current_user(
+# async on purpose: a sync dependency runs in a threadpool with a copied
+# context, which would discard set_current_actor() below — as async it runs in
+# the request's event-loop context so the audit listener sees the actor.
+async def get_current_user(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
