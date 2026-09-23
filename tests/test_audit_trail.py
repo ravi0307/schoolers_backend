@@ -295,9 +295,13 @@ class BulkHelperTests(unittest.TestCase):
 
 class AuditEndToEndHttpTests(unittest.TestCase):
     """The full path: JWT -> async get_current_user -> contextvar -> flush
-    listener -> row, exercised through a real FastAPI request. Catches the
-    contextvar/threadpool propagation bug that unit tests calling
-    set_current_actor() directly would never see."""
+    listener -> row, without relying on starlette's TestClient (its httpx2
+    dependency is missing in CI). It reproduces exactly what FastAPI does for a
+    sync route: the async dependency is awaited in the event loop (setting the
+    actor in the request context), then the endpoint runs in a threadpool
+    worker that inherits that context. Catches the contextvar/threadpool
+    propagation bug that unit tests calling set_current_actor() directly would
+    never see."""
 
     _BARE = ("main", "router", "repository", "schemas")
 
@@ -306,8 +310,10 @@ class AuditEndToEndHttpTests(unittest.TestCase):
         cls._saved = {name: sys.modules.pop(name, None) for name in cls._BARE}
         sys.path.insert(0, str(ROOT / "services" / "people_service"))
         import main as people_main  # noqa: E402  (bare import inside service)
+        import router as people_router  # noqa: E402
 
-        cls.app = people_main.app
+        cls.people_main = people_main
+        cls.people_router = people_router
         cls.engine = create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},
@@ -323,17 +329,6 @@ class AuditEndToEndHttpTests(unittest.TestCase):
         )
         cls.Session = sessionmaker(bind=cls.engine, autoflush=False, future=True)
 
-        def override_get_db():
-            db = cls.Session()
-            try:
-                yield db
-            finally:
-                db.close()
-
-        from common.database import get_db
-
-        cls.app.dependency_overrides[get_db] = override_get_db
-
         seed = cls.Session()
         seed.add(build_school())
         seed.add(build_teacher())
@@ -345,9 +340,6 @@ class AuditEndToEndHttpTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        from starlette.testclient import TestClient  # noqa: F401
-
-        cls.app.dependency_overrides.clear()
         sys.path.pop(0)
         for name in cls._BARE:
             sys.modules.pop(name, None)
@@ -356,59 +348,59 @@ class AuditEndToEndHttpTests(unittest.TestCase):
                 sys.modules[name] = mod
 
     def setUp(self):
-        from starlette.testclient import TestClient
         from common.security import create_access_token
 
-        self.client = TestClient(self.app)
         self.token = create_access_token(user_id=99, role="admin", school_id=1)
-        self.headers = {"Authorization": f"Bearer {self.token}"}
+        self.db = self.Session()
 
     def tearDown(self):
         audit.set_current_actor(None)
-        self.client.close()
+        self.db.close()
+
+    def _update_through_threadpool(self, token: str, role_title: str, teacher_id: int = 1) -> None:
+        """Serve one request the way FastAPI does, but borrowing this repo's
+        real route function and threadpool mechanism. The async dependency sets
+        the actor in the caller context; asyncio.to_thread copies that context
+        into the thread that performs the flush, matching run_in_threadpool."""
+
+        from common.dependencies import get_current_user
+
+        db = self.db
+
+        async def serve():
+            current_user = await get_current_user(
+                authorization=f"Bearer {token}", db=db
+            )
+            await asyncio.to_thread(
+                self.people_router.update_teacher,
+                teacher_id,
+                self.people_router.TeacherUpdate(role_title=role_title),
+                db,
+                1,
+                current_user,
+            )
+            db.commit()
+
+        asyncio.run(serve())
 
     def test_authenticated_update_stamps_modified_by_from_token(self):
-        response = self.client.patch(
-            "/api/v1/teachers/1",
-            json={"role_title": "Physics"},
-            headers=self.headers,
-        )
-        self.assertEqual(response.status_code, 200, response.text)
+        self._update_through_threadpool(self.token, "Physics")
 
-        db = self.Session()
-        try:
-            teacher = db.query(Teacher).first()
-            self.assertEqual(teacher.role_title, "Physics")
-            self.assertEqual(teacher.modified_by, 99)
-            self.assertIsNotNone(teacher.modified_at)
-        finally:
-            db.close()
+        teacher = self.db.query(Teacher).first()
+        self.assertEqual(teacher.role_title, "Physics")
+        self.assertEqual(teacher.modified_by, 99)
+        self.assertIsNotNone(teacher.modified_at)
 
     def test_second_request_from_other_user_restamps_actor(self):
         from common.security import create_access_token
 
-        first = self.client.patch(
-            "/api/v1/teachers/1",
-            json={"role_title": "Physics"},
-            headers=self.headers,
-        )
-        self.assertEqual(first.status_code, 200, first.text)
-
+        self._update_through_threadpool(self.token, "Physics")
         other_token = create_access_token(user_id=77, role="admin", school_id=1)
-        second = self.client.patch(
-            "/api/v1/teachers/1",
-            json={"role_title": "Chemistry"},
-            headers={"Authorization": f"Bearer {other_token}"},
-        )
-        self.assertEqual(second.status_code, 200, second.text)
+        self._update_through_threadpool(other_token, "Chemistry")
 
-        db = self.Session()
-        try:
-            teacher = db.query(Teacher).first()
-            self.assertEqual(teacher.role_title, "Chemistry")
-            self.assertEqual(teacher.modified_by, 77)
-        finally:
-            db.close()
+        teacher = self.db.query(Teacher).first()
+        self.assertEqual(teacher.role_title, "Chemistry")
+        self.assertEqual(teacher.modified_by, 77)
 
 
 if __name__ == "__main__":
