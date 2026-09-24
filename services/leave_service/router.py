@@ -30,6 +30,17 @@ def list_leave_requests(
     return repo.list_for_school(db, school_id, status)
 
 
+@router.get("/mine", response_model=list[LeaveRequestRead])
+def list_my_children_leave_requests(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent")),
+):
+    """Leave requests filed for the logged-in parent's children."""
+    names = repo.child_names_of_parent(db, school_id, current_user.linked_person_id)
+    return repo.list_for_child_names(db, school_id, names)
+
+
 @router.patch("/{leave_id}/approve", response_model=LeaveRequestRead)
 def approve(
     leave_id: int,
