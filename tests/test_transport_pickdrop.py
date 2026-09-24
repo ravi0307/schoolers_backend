@@ -161,6 +161,50 @@ class ParentPickdropRepositoryTests(unittest.TestCase):
 
         self.assertEqual(repo.list_children_pickdrop(self.session, 2, 20), [])
 
+    def test_status_change_tracks_the_pilot_update(self):
+        from services.transport_service import repository as repo
+
+        repo.update_student_status(self.session, 1, 101, "dropped")
+        snapshot = next(r for r in self._status() if r["student_id"] == 101)
+        self.assertEqual(snapshot["status"], "dropped")
+        repo.update_student_status(self.session, 1, 101, "pending")
+        snapshot = next(r for r in self._status() if r["student_id"] == 101)
+        self.assertEqual(snapshot["status"], "pending")
+
+    def test_shared_child_is_visible_to_each_parent(self):
+        from services.transport_service import repository as repo
+
+        self.session.add(ParentStudent(parent_id=11, student_id=102, relationship_="Father"))
+        self.session.commit()
+        for parent_id in (10, 11):
+            ids = {r["student_id"] for r in repo.list_children_pickdrop(self.session, 1, parent_id)}
+            self.assertIn(102, ids, f"shared child missing for parent {parent_id}")
+
+    def test_result_is_ordered_by_student_name(self):
+        names = [r["student_name"] for r in self._status()]
+        self.assertEqual(names, sorted(names))
+
+    def test_newly_assigned_child_reads_pending(self):
+        from services.transport_service import repository as repo
+
+        self.session.add(RouteStudent(route_id=1, student_id=102))
+        self.session.commit()
+        snapshot = next(r for r in repo.list_children_pickdrop(self.session, 1, 10) if r["student_id"] == 102)
+        self.assertEqual(snapshot["status"], "pending")
+        self.assertEqual(snapshot["route_name"], "Route A")
+
+    def test_snapshot_rows_validate_against_the_response_schema(self):
+        from services.transport_service.schemas import ParentPickDropRead
+
+        for row in self._status():
+            model = ParentPickDropRead(**row)
+            if row["student_id"] == 101:
+                self.assertEqual(model.status, "picked")
+                self.assertEqual(model.route_id, 1)
+            if row["student_id"] == 102:
+                self.assertIsNone(model.route_id)
+                self.assertEqual(model.status, "not_assigned")
+
 
 class ParentPickdropRouterTests(unittest.TestCase):
     """Execute the /routes/mine handler directly (media-test convention)."""
@@ -212,6 +256,17 @@ class ParentPickdropRouterTests(unittest.TestCase):
         user = CurrentUser(user_id=31, role="parent", school_id=1, linked_person_id=None)
         self.assertEqual(self.router.my_pickdrop_status(db=self.session, school_id=1, current_user=user), [])
 
+    def test_handler_rows_validate_against_the_response_model(self):
+        from schemas import ParentPickDropRead
+
+        user = CurrentUser(user_id=30, role="parent", school_id=1, linked_person_id=10)
+        rows = self.router.my_pickdrop_status(db=self.session, school_id=1, current_user=user)
+        models = [ParentPickDropRead(**row) for row in rows]
+        self.assertEqual(sorted(m.student_id for m in models), [101, 102, 103])
+        unassigned = next(m for m in models if m.student_id == 102)
+        self.assertIsNone(unassigned.route_id)
+        self.assertEqual(unassigned.status, "not_assigned")
+
 
 class ParentPickdropGuardTests(unittest.TestCase):
     def _route_by(self, method, path):
@@ -250,3 +305,22 @@ class ParentPickdropGuardTests(unittest.TestCase):
         src = ROUTER_SOURCE.read_text(encoding="utf-8")
         self.assertIn('@router.get("/mine", response_model=list[ParentPickDropRead])', src)
         self.assertIn("current_user.linked_person_id", src)
+
+    def test_status_update_remains_pilot_or_admin_only(self):
+        roles, _scope = self._roles_and_scope(self._route_by("patch", "/{route_id}/students/{student_id}/status"))
+        self.assertEqual(roles, {("pilot", "admin")})
+        for method in ("post", "delete"):
+            with self.assertRaises(AssertionError):
+                self._route_by(method, "/mine")
+
+    def test_mine_endpoint_is_a_read_only_view(self):
+        func = self._route_by("get", "/mine")
+        decorators = []
+        for dec in func.decorator_list:
+            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute) and getattr(dec.func.value, "id", None) == "router":
+                decorators.append(dec.func.attr)
+        self.assertEqual(decorators, ["get"], "parent snapshots must only be readable")
+
+    def test_gateway_forwards_routes_segment_to_transport_service(self):
+        gateway = (ROOT / "gateway" / "main.py").read_text(encoding="utf-8")
+        self.assertIn('"routes": "transport"', gateway)
