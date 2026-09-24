@@ -170,7 +170,8 @@ original router had no single path prefix:
 | `timetable` | timetable_service |
 | `routes` | transport_service |
 | `leave` | leave_service |
-| `broadcasts`, `media` | communication_service |
+| `broadcasts` | communication_service |
+| `media` (school photo/video gallery) | media_service |
 | `barter` | barter_service |
 | `activities` | activities_service |
 | `website`, `public` (public site pages) | website_service |

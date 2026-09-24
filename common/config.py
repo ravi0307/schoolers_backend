@@ -67,6 +67,7 @@ class Settings(BaseSettings):
         "timetable": "http://127.0.0.1:8007",
         "transport": "http://127.0.0.1:8008",
         "leave": "http://127.0.0.1:8009",
+        "media": "http://127.0.0.1:8016",
         "communication": "http://127.0.0.1:8010",
         "barter": "http://127.0.0.1:8011",
         "activities": "http://127.0.0.1:8012",

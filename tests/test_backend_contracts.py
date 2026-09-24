@@ -15,6 +15,7 @@ EXPECTED_SERVICES = {
     "communication_service",
     "leave_service",
     "marks_service",
+    "media_service",
     "notifications_service",
     "people_service",
     "reports_service",

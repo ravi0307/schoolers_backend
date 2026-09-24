@@ -33,6 +33,7 @@ services=(
     website_service
     notifications_service
     reports_service
+    media_service
 )
 ports=(
     8001
@@ -50,6 +51,7 @@ ports=(
     8013
     8014
     8015
+    8016
 )
 
 echo "Checking and starting microservices..."

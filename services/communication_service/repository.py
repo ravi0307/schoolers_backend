@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from common.models import (
-    Broadcast, Media, ParentStudent, Pilot, Route, RouteStudent, SchoolClass,
+    Broadcast, ParentStudent, Pilot, Route, RouteStudent, SchoolClass,
     Staff, Student, Teacher, TeacherClassSubject,
 )
 from common.exceptions import NotFoundError, ForbiddenError
@@ -209,18 +209,3 @@ def update_broadcast_message(
     db.commit()
     db.refresh(broadcast)
     return broadcast
-
-
-def create_media(db: Session, school_id: int, data: dict) -> Media:
-    m = Media(school_id=school_id, **data)
-    db.add(m)
-    db.commit()
-    db.refresh(m)
-    return m
-
-
-def list_media(db: Session, school_id: int, class_id: int | None) -> list[Media]:
-    q = db.query(Media).filter(Media.school_id == school_id, Media.is_active.is_(True))
-    if class_id:
-        q = q.filter(Media.class_id == class_id)
-    return q.order_by(Media.created_at.desc()).all()

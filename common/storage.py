@@ -22,7 +22,17 @@ ALLOWED_DOCUMENT_TYPES = {
     "application/octet-stream": ".bin",
 }
 
+ALLOWED_VIDEO_TYPES = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+}
+
+# Gallery media accepts both photographs and short videos.
+ALLOWED_MEDIA_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES
+
 EXTENSION_TO_MEDIA_TYPE = {ext: mime for mime, ext in ALLOWED_IMAGE_TYPES.items()}
+EXTENSION_TO_MEDIA_TYPE.update({ext: mime for mime, ext in ALLOWED_VIDEO_TYPES.items()})
 
 
 def get_upload_dir() -> Path:
@@ -75,6 +85,29 @@ def save_document(
     extension = ALLOWED_DOCUMENT_TYPES[content_type]
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     filename = f"doc_{timestamp}{extension}"
+    (get_upload_dir() / filename).write_bytes(file_bytes)
+    return filename
+
+
+def save_media(
+    file_bytes: bytes,
+    content_type: str,
+    filename_prefix: str | None = None,
+) -> str:
+    """Store a gallery photo or short video and return its stored filename."""
+    if content_type not in ALLOWED_MEDIA_TYPES:
+        raise ValueError("Only JPEG, PNG, GIF, WebP, SVG images and MP4, WebM, MOV videos are allowed")
+    if len(file_bytes) > settings.UPLOAD_MAX_BYTES:
+        raise ValueError("Media file must be 5 MB or smaller")
+
+    extension = ALLOWED_MEDIA_TYPES[content_type]
+    kind = "video" if content_type in ALLOWED_VIDEO_TYPES else "image"
+    if filename_prefix:
+        safe_prefix = re.sub(r"[^A-Za-z0-9]+", "_", filename_prefix).strip("_") or "gallery"
+    else:
+        safe_prefix = "gallery"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"{kind}_{safe_prefix}_{timestamp}{extension}"
     (get_upload_dir() / filename).write_bytes(file_bytes)
     return filename
 

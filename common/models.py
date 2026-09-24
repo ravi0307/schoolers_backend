@@ -382,6 +382,10 @@ class Media(AuditColumnsMixin, Base):
     title = Column(String(150), nullable=False)
     posted_by = Column(String(100), nullable=False)
     icon = Column(String(10))
+    # Gallery media file. file_url is the API path to the stored file; kind is
+    # either "image" or "video" (NULL for legacy text-only album rows).
+    file_url = Column(String(255))
+    media_kind = Column(String(10))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
