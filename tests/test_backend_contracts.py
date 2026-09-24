@@ -178,11 +178,11 @@ class BackendContractTests(unittest.TestCase):
         service = (
             ROOT / "services" / "auth_service" / "service.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("reset_token: str", schema)
+        self.assertIn("otp: str = Field(min_length=6, max_length=6)", schema)
         self.assertIn('"/forgot-password/verify"', router)
         self.assertIn('"/forgot-password/reset"', router)
         self.assertIn(
-            "forgot_password_reset(db, payload.identifier, payload.reset_token, payload.new_password)",
+            "forgot_password_reset(db, payload.identifier, payload.otp, payload.new_password)",
             router,
         )
         self.assertIn("_issue_reset_token", service)
