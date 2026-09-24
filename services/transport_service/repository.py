@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from common.models import Pilot, Route, RouteStop, RouteStudent, Student, User, Vehicle
+from common.models import Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent, Student, User, Vehicle
 from common.security import hash_password
 from common.exceptions import ConflictError
 
@@ -335,3 +335,73 @@ def update_student_status(db: Session, route_id: int, student_id: int, status: s
         student = db.query(Student).filter(Student.student_id == student_id).first()
         return route_student_response(rs, student) if student else None
     return None
+
+
+def list_children_pickdrop(db: Session, school_id: int, parent_id: int) -> list[dict]:
+    """Pick/drop snapshot for every active child of a parent at a school.
+
+    Students assigned to an active route get the route details plus their
+    current pick/drop status; unassigned children are included with
+    status "not_assigned" so the parent portal can show one row per child.
+    """
+    parent = db.query(Parent).filter(
+        Parent.parent_id == parent_id, Parent.school_id == school_id
+    ).first()
+    if not parent:
+        return []
+    student_ids = [
+        row[0]
+        for row in db.query(ParentStudent.student_id)
+        .filter(ParentStudent.parent_id == parent_id)
+        .all()
+    ]
+    if not student_ids:
+        return []
+    assigned = {
+        rs.student_id: {
+            "route_id": route.route_id,
+            "route_name": route.name,
+            "vehicle": route.vehicle,
+            "driver_name": route.driver_name,
+            "status": rs.status,
+        }
+        for rs, route, student in (
+            db.query(RouteStudent, Route, Student)
+            .join(Route, Route.route_id == RouteStudent.route_id)
+            .join(Student, Student.student_id == RouteStudent.student_id)
+            .filter(
+                RouteStudent.student_id.in_(student_ids),
+                Route.school_id == school_id,
+                Route.is_active.is_(True),
+                Student.school_id == school_id,
+                Student.is_active.is_(True),
+            )
+            .all()
+        )
+    }
+    students = (
+        db.query(Student)
+        .filter(
+            Student.student_id.in_(student_ids),
+            Student.school_id == school_id,
+            Student.is_active.is_(True),
+        )
+        .order_by(Student.name)
+        .all()
+    )
+    result = []
+    for student in students:
+        route = assigned.get(student.student_id)
+        result.append(
+            {
+                "student_id": student.student_id,
+                "student_name": student.name,
+                "admission_no": student.admission_no,
+                "route_id": route["route_id"] if route else None,
+                "route_name": route["route_name"] if route else None,
+                "vehicle": route["vehicle"] if route else None,
+                "driver_name": route["driver_name"] if route else None,
+                "status": route["status"] if route else "not_assigned",
+            }
+        )
+    return result

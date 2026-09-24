@@ -196,3 +196,16 @@ class RouteStudentRead(BaseModel):
 
 class RouteStudentStatusUpdate(BaseModel):
     status: str  # 'pending' | 'picked' | 'dropped'
+
+
+class ParentPickDropRead(BaseModel):
+    """Pick/drop snapshot for one of the logged-in parent's children."""
+
+    student_id: int
+    student_name: str
+    admission_no: str
+    route_id: int | None = None
+    route_name: str | None = None
+    vehicle: str | None = None
+    driver_name: str | None = None
+    status: str = "not_assigned"  # 'pending' | 'picked' | 'dropped' | 'not_assigned'
