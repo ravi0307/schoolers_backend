@@ -278,6 +278,30 @@ BEGIN
     END IF;
 END $$;
 
+-- Staff logins: the app creates a "staff" account for every staff member
+-- (auth_service matches that role to the staff table). Allow it in the
+-- users role check constraint.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'users_role_check'
+          AND conrelid = 'schoolers.users'::regclass
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'users_role_check'
+          AND conrelid = 'schoolers.users'::regclass
+          AND pg_get_constraintdef(oid) LIKE '%staff%'
+    ) THEN
+        ALTER TABLE schoolers.users DROP CONSTRAINT users_role_check;
+        ALTER TABLE schoolers.users
+            ADD CONSTRAINT users_role_check
+            CHECK (role IN ('parent', 'teacher', 'admin', 'pilot', 'master', 'staff'));
+    END IF;
+END $$;
+
 -- Audit trail: record who modified each row and when. Applied uniformly to
 -- every domain table. modified_by references users.user_id and is left NULL
 -- for seed/system writes; the application stamps it via common.audit per

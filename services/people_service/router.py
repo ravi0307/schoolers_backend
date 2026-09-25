@@ -8,7 +8,7 @@ from common.exceptions import AppError, NotFoundError, ForbiddenError
 import repository as repo
 from schemas import (
     TeacherCreate, TeacherUpdate, TeacherRead,
-    StaffCreate, StaffUpdate, StaffRead,
+    StaffCreate, StaffUpdate, StaffRead, StaffWithCredentials,
     ParentCreate, ParentRead,
     StudentCreate, StudentUpdate, StudentRead,
     TeacherClassSubjectCreate,
@@ -93,7 +93,7 @@ def list_staff(
     return repo.list_staff(db, school_id, search)
 
 
-@router.post("/staff", response_model=StaffRead, status_code=201)
+@router.post("/staff", response_model=StaffWithCredentials, status_code=201)
 def create_staff(
     payload: StaffCreate,
     db: Session = Depends(get_db),
@@ -103,7 +103,7 @@ def create_staff(
     return repo.create_staff(db, school_id, payload.model_dump())
 
 
-@router.patch("/staff/{staff_id}", response_model=StaffRead)
+@router.patch("/staff/{staff_id}", response_model=StaffWithCredentials)
 def update_staff(
     staff_id: int,
     payload: StaffUpdate,

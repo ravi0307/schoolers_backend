@@ -94,24 +94,28 @@ def try_send_email(recipients: list[str], subject: str, body: str) -> bool:
         return False
 
 
+def _credentials_and_reset_block(username: str | None, password: str | None) -> str:
+    """The sign-in details + password-reset steps section of lifecycle emails."""
+    if not (username and password):
+        return ""
+    return (
+        f"Sign-in details\n"
+        f"Username: {username}\n"
+        f"Temporary password: {password}\n\n"
+        f"After signing in, you can reset this password:\n"
+        f"1. Go to the Schoolers Sign-in page.\n"
+        f"2. Click Forgot password?.\n"
+        f"3. Enter your username or the email on file — we will email a 6-digit OTP.\n"
+        f"4. Enter the OTP and set a new password.\n\n"
+    )
+
+
 def send_school_registered_email(
     school_name: str,
     recipients: list[str],
     username: str | None = None,
     password: str | None = None,
 ) -> bool:
-    account_lines = ""
-    if username and password:
-        account_lines = (
-            f"Sign-in details\n"
-            f"Username: {username}\n"
-            f"Temporary password: {password}\n\n"
-            f"After signing in, you can reset this password:\n"
-            f"1. Go to the Schoolers Sign-in page.\n"
-            f"2. Click Forgot password?.\n"
-            f"3. Enter your username or the email on file — we will email a 6-digit OTP.\n"
-            f"4. Enter the OTP and set a new password.\n\n"
-        )
     return try_send_email(
         recipients,
         subject=f"Schoolers — Welcome, {school_name}!",
@@ -121,7 +125,7 @@ def send_school_registered_email(
             f"created on the Schoolers platform.\n\n"
             f"Sign in to the Schoolers portal with your administrator credentials "
             f"to set up students, staff, classes, and more.\n\n"
-            f"{account_lines}"
+            f"{_credentials_and_reset_block(username, password)}"
             f"— Schoolers Platform"
         ),
     )
@@ -141,14 +145,23 @@ def send_school_removed_email(school_name: str, recipients: list[str]) -> bool:
     )
 
 
-def send_staff_added_email(school_name: str, staff_name: str, recipients: list[str]) -> bool:
+def send_staff_added_email(
+    school_name: str,
+    staff_name: str,
+    recipients: list[str],
+    username: str | None = None,
+    password: str | None = None,
+) -> bool:
     return try_send_email(
         recipients,
         subject=f"Schoolers — Staff account added for {staff_name}",
         body=(
             f"Hello {staff_name},\n\n"
             f"You have been added as staff member at {school_name} on the Schoolers "
-            f"platform.\n\n— Schoolers Platform"
+            f"platform.\n\n"
+            f"Use the credentials below to sign in to the portal and manage your work.\n\n"
+            f"{_credentials_and_reset_block(username, password)}"
+            f"— Schoolers Platform"
         ),
     )
 

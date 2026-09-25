@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from common.database import Base
 from common.models import Parent, Pilot, School, Staff, Student, Teacher, User
+from common.security import verify_password
 import common.email as email_helpers
 import services.schools_service.repository as schools_repo
 import services.people_service.repository as people_repo
@@ -192,14 +193,10 @@ class SchoolsNotificationTests(unittest.TestCase):
             username="admin@northstar", password_hash="x",
         ))
 
-        # Plain staff member plus its (role "staff") login account.
+        # Plain staff member: create_staff now auto-provisions its "staff" login.
         admin_staff = people_repo.create_staff(self.db, school.school_id, {
             "name": "Staff Admin", "role": "Admin", "phone": "11",
         })
-        self.db.add(User(
-            school_id=school.school_id, role="staff", username="staff@northstar",
-            password_hash="x", linked_person_id=admin_staff.staff_id,
-        ))
 
         # Pilot staff: create_staff auto-creates the pilot + "pilot" user rows.
         pilot_staff = people_repo.create_staff(self.db, school.school_id, {
@@ -291,6 +288,56 @@ class PeopleNotificationsTests(unittest.TestCase):
         self.assertIn("Priya Sharma", args[1])
 
     @mock.patch("common.email.send_email")
+    def test_create_staff_provisions_login_with_credentials_in_email(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Priya Sharma", "role": "Admin", "phone": "111", "email": "priya@sunrise.edu",
+        })
+        user = self.db.query(User).filter(User.linked_person_id == staff.staff_id).one()
+        self.assertEqual(user.role, "staff")
+        self.assertEqual(user.username, "priya.sharma")
+        self.assertEqual(user.email, "priya@sunrise.edu")
+        self.assertTrue(user.is_active)
+        self.assertTrue(verify_password(staff.admin_password, user.password_hash))
+        body = mock_send.call_args[0][2]
+        self.assertIn("Sign-in details", body)
+        self.assertIn("Username: priya.sharma", body)
+        self.assertIn("Temporary password: ", body)
+        self.assertIn("Forgot password?", body)
+        self.assertIn("6-digit OTP", body)
+
+    @mock.patch("common.email.send_email")
+    def test_teacher_staff_login_uses_teacher_role(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Maya Iyer", "role": "Teacher", "phone": "555", "email": "maya@sunrise.edu",
+        })
+        user = self.db.query(User).filter(User.linked_person_id == staff.staff_id).one()
+        self.assertEqual(user.role, "teacher")
+        self.assertEqual(user.username, "maya.iyer")
+
+    @mock.patch("common.email.send_email")
+    def test_duplicate_staff_names_get_suffixed_usernames(self, mock_send):
+        people_repo.create_staff(self.db, 1, {"name": "Amit Kumar", "role": "Admin", "phone": "601", "email": "a1@sunrise.edu"})
+        second = people_repo.create_staff(self.db, 1, {"name": "Amit Kumar", "role": "Admin", "phone": "602", "email": "a2@sunrise.edu"})
+        users = self.db.query(User).filter(User.linked_person_id == second.staff_id).all()
+        self.assertEqual([u.username for u in users], ["amit.kumar2"])
+
+    @mock.patch("common.email.send_email")
+    def test_pilot_staff_gets_no_extra_login(self, mock_send):
+        people_repo.create_staff(self.db, 1, {"name": "Driver D", "role": "Pilot", "phone": "777", "email": "d@sunrise.edu"})
+        self.assertEqual(self.db.query(User).filter(User.role == "pilot").count(), 1)
+        self.assertEqual(self.db.query(User).filter(User.role == "staff").count(), 0)
+
+    @mock.patch("common.email.send_email")
+    def test_update_staff_renames_username_and_syncs_email(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Kiran Rao", "role": "Admin", "phone": "888", "email": "kiran@sunrise.edu",
+        })
+        staff = people_repo.update_staff(self.db, staff, {"name": "Kiran Verma", "email": "kiran.v@sunrise.edu"})
+        user = self.db.query(User).filter(User.linked_person_id == staff.staff_id).one()
+        self.assertEqual(user.username, "kiran.verma")
+        self.assertEqual(user.email, "kiran.v@sunrise.edu")
+
+    @mock.patch("common.email.send_email")
     def test_create_staff_without_email_sends_nothing(self, mock_send):
         people_repo.create_staff(self.db, 1, {"name": "No Mail", "role": "Admin", "phone": "222"})
         mock_send.assert_not_called()
@@ -307,6 +354,8 @@ class PeopleNotificationsTests(unittest.TestCase):
         self.assertEqual(args[0], ["ravi@sunrise.edu"])
         self.assertIn("Ravi Kumar", args[1])
         self.assertFalse(self.db.query(Staff).filter(Staff.staff_id == staff.staff_id).one().is_active)
+        self.assertFalse(self.db.query(User).filter(User.linked_person_id == staff.staff_id).one().is_active,
+                         "staff login must be deactivated when the staff member is removed")
 
     @mock.patch("common.email.send_email")
     def test_delete_student_emails_the_parent(self, mock_send):

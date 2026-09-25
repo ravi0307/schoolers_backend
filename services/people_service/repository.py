@@ -25,7 +25,7 @@ from common.email import (
     send_staff_removed_email,
     send_student_removed_email,
 )
-from common.security import hash_password
+from common.security import generate_temp_password, hash_password
 
 
 # ---- Teachers ----
@@ -124,6 +124,70 @@ def teaching_load(db: Session, teacher_id: int) -> list[TeacherClassSubject]:
 # ---- Staff ----
 def _is_teacher_staff(staff: Staff) -> bool:
     return staff.role.strip().casefold() == "teacher"
+
+
+def _username_base(name: str) -> str:
+    return ".".join(name.strip().split()).lower()
+
+
+def _unique_username(db: Session, name: str, exclude_user_id: int | None = None) -> str:
+    """Return a portal username from the staff name, suffixed (2, 3, …) until free."""
+    base = _username_base(name)
+    candidate = base
+    n = 2
+    while (
+        db.query(User.username)
+        .filter(User.username == candidate, User.user_id != exclude_user_id)
+        .first()
+    ):
+        candidate = f"{base}{n}"
+        n += 1
+    return candidate
+
+
+def _linked_staff_user(db: Session, staff: Staff) -> User | None:
+    return db.query(User).filter(User.linked_person_id == staff.staff_id).first()
+
+
+def _sync_staff_user(db: Session, staff: Staff) -> dict | None:
+    """Provision (or rename) the staff member's portal login account.
+
+    Every staff member gets a login so they can use the portal; pilots keep
+    their auto-generated pilot account instead. Returns fresh credentials only
+    when a new account is created. Deactivates the account when staff leave.
+    """
+    if _is_pilot_staff(staff):
+        return None
+    user = _linked_staff_user(db, staff)
+    if not staff.is_active:
+        if user:
+            user.is_active = False
+            db.flush()
+        return None
+    if user is None:
+        password = generate_temp_password()
+        user = User(
+            school_id=staff.school_id,
+            role="teacher" if _is_teacher_staff(staff) else "staff",
+            username=_unique_username(db, staff.name),
+            email=staff.email,
+            linked_person_id=staff.staff_id,
+            password_hash=hash_password(password),
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+        staff.admin_username = user.username
+        staff.admin_password = password
+        return {"admin_username": user.username, "admin_password": password}
+    username = _unique_username(db, staff.name, exclude_user_id=user.user_id)
+    if username != user.username:
+        user.username = username
+        db.flush()
+    if staff.email and user.email != staff.email:
+        user.email = staff.email
+        db.flush()
+    return None
 
 
 def _linked_teacher(db: Session, staff: Staff) -> Teacher | None:
@@ -275,8 +339,16 @@ def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
+    creds = _sync_staff_user(db, staff)
+    db.commit()
     if staff.email:
-        send_staff_added_email(school_name(db, school_id), staff.name, [staff.email])
+        send_staff_added_email(
+            school_name(db, school_id),
+            staff.name,
+            [staff.email],
+            username=creds["admin_username"] if creds else None,
+            password=creds["admin_password"] if creds else None,
+        )
     return staff
 
 
@@ -289,6 +361,8 @@ def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
     _sync_person_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
+    _sync_staff_user(db, staff)
+    db.commit()
     if changes:
         _notify_record_update(db, "Staff member", staff.name, staff.school_id, changes, [old_email, staff.email])
     return staff
@@ -300,6 +374,7 @@ def delete_staff(db: Session, staff: Staff) -> None:
     school = school_name(db, staff.school_id)
     staff.is_active = False
     _sync_person_from_staff(db, staff)
+    _sync_staff_user(db, staff)
     db.commit()
     if email:
         send_staff_removed_email(school, name, [email])
@@ -332,6 +407,7 @@ def deactivate_school_staff(db: Session, school_id: int) -> int:
     for staff in staff_rows:
         staff.is_active = False
         _sync_person_from_staff(db, staff)
+        _sync_staff_user(db, staff)
     db.flush()
     return len(staff_rows)
 

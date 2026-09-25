@@ -159,6 +159,13 @@ class StaffRead(BaseModel):
         from_attributes = True
 
 
+class StaffWithCredentials(StaffRead):
+    """StaffRead plus the freshly generated portal login, when one is created."""
+
+    admin_username: str | None = None
+    admin_password: str | None = None
+
+
 class ParentCreate(BaseModel):
     name: str
     phone: str
