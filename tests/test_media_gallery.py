@@ -458,6 +458,29 @@ class MediaRouterHandlerTests(unittest.TestCase):
                 media = asyncio.run(self._upload(b"\x00" * 8, "image/png", class_id=5))
                 self.assertEqual(media.class_id, 5)
 
+    def test_sequential_multi_upload_lands_every_file_in_one_gallery(self):
+        # The frontend uploads a multi-selection one file at a time against this
+        # same endpoint; a batch of sequential calls must each persist and all
+        # appear in the listing afterwards.
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("common.storage.get_upload_dir", return_value=Path(tmp)):
+                first = asyncio.run(self._upload(b"\x89PNG\r\n\x1a\n", "image/png", title="Family picnic"))
+                second = asyncio.run(self._upload(b"\x00" * 32, "video/mp4", title="Sports parade"))
+                self.assertNotEqual(first.media_id, second.media_id)
+                self.assertTrue(first.file_url.endswith(".png"))
+                self.assertTrue(second.file_url.endswith(".mp4"))
+                rows = self.router.list_media(
+                    class_id=None,
+                    db=self.session,
+                    school_id=1,
+                    current_user=CurrentUser(user_id=3, role="parent", school_id=1),
+                )
+                titles = [m.title for m in rows]
+                self.assertIn("Family picnic", titles)
+                self.assertIn("Sports parade", titles)
+                kinds = {m.media_kind for m in rows if m.title in ("Family picnic", "Sports parade")}
+                self.assertEqual(kinds, {"image", "video"})
+
     def test_upload_rejects_non_media_type(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch("common.storage.get_upload_dir", return_value=Path(tmp)):
