@@ -14,7 +14,7 @@ from common.storage import (
 )
 import repository as repo
 from schemas import (
-    SchoolCreate, SchoolUpdate, SchoolRead, FeatureFlags, SchoolStatusUpdate, SchoolStats,
+    SchoolCreate, SchoolUpdate, SchoolRead, SchoolWithCredentials, FeatureFlags, SchoolStatusUpdate, SchoolStats,
 )
 
 router = APIRouter(prefix="/schools", tags=["schools"])
@@ -122,7 +122,7 @@ def list_schools(
     return repo.list_schools(db)
 
 
-@router.post("", response_model=SchoolRead, status_code=201)
+@router.post("", response_model=SchoolWithCredentials, status_code=201)
 def create_school(
     payload: SchoolCreate,
     db: Session = Depends(get_db),
@@ -141,7 +141,7 @@ def get_school(
     return _get_or_404(db, school_id)
 
 
-@router.patch("/{school_id}", response_model=SchoolRead)
+@router.patch("/{school_id}", response_model=SchoolWithCredentials)
 def update_school(
     school_id: int,
     payload: SchoolUpdate,

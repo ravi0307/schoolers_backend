@@ -38,6 +38,18 @@ class NotificationHelperTests(unittest.TestCase):
         self.assertEqual(args[0], ["a@x.org", "b@x.org"])
         self.assertIn("Sunrise High", args[1])
 
+    def test_school_registered_email_includes_credentials_and_reset_steps(self, mock_send):
+        sent = email_helpers.send_school_registered_email(
+            "Sunrise High", ["a@x.org"], username="sunrise.admin", password="Temp!1234"
+        )
+        self.assertTrue(sent)
+        body = mock_send.call_args[0][2]
+        self.assertIn("Username: sunrise.admin", body)
+        self.assertIn("Temporary password: Temp!1234", body)
+        self.assertIn("Forgot password?", body)
+        self.assertIn("6-digit OTP", body)
+        self.assertIn("set a new password", body)
+
     def test_deduplicates_and_drops_empty_recipients(self, mock_send):
         sent = email_helpers.send_staff_added_email("S", "Ann", ["  ann@x.org ", "ann@x.org", ""])
         self.assertTrue(sent)
@@ -81,7 +93,32 @@ class SchoolsNotificationTests(unittest.TestCase):
         args = mock_send.call_args[0]
         self.assertEqual(sorted(args[0]), ["alt@sunrise.edu", "office@sunrise.edu"])
         self.assertIn("Sunrise High", args[1])
+        self.assertNotIn("Temporary password", args[2], "no credentials for a school without an admin account")
         self.assertTrue(self.db.query(School).filter(School.school_id == school.school_id).count() == 1)
+
+    @mock.patch("common.email.send_email")
+    def test_create_school_with_admin_names_emails_credentials(self, mock_send):
+        school = schools_repo.create_school(self.db, {
+            "name": "Northstar High",
+            "address": "3 Main Rd",
+            "pincode": "400001",
+            "city": "Mumbai",
+            "state": "Maharashtra",
+            "primary_contact": "7777777777",
+            "primary_email": "office@northstar.edu",
+            "first_name": "Ravi",
+            "last_name": "Kumar",
+        })
+        mock_send.assert_called_once()
+        _, subject, body = mock_send.call_args[0]
+        self.assertIn("Welcome, Northstar High!", subject)
+        self.assertIn("Sign-in details", body)
+        self.assertIn("Username: ravi.kumar", body)
+        self.assertIn("Temporary password: ", body)
+        self.assertIn("Forgot password?", body)
+        self.assertIn("6-digit OTP", body)
+        self.assertIn("set a new password", body)
+        self.assertTrue(self.db.query(User).filter(User.school_id == school.school_id, User.role == "admin").count() == 1)
 
     @mock.patch("common.email.send_email")
     def test_delete_school_emails_school_addresses(self, mock_send):
