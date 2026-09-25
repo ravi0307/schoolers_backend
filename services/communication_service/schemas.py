@@ -45,22 +45,3 @@ class BroadcastRead(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class MediaCreate(BaseModel):
-    class_id: int | None = None
-    title: str
-    posted_by: str
-    icon: str | None = None
-
-
-class MediaRead(BaseModel):
-    media_id: int
-    school_id: int
-    class_id: int | None
-    title: str
-    posted_by: str
-    icon: str | None
-
-    class Config:
-        from_attributes = True

@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Identical for every caller so the responses can never be used to learn
 # whether a username or email is registered. The reset code is delivered by
 # email, never returned in the response.
-REQUEST_MESSAGE = "If the username or email is registered, a one-time reset code has been emailed to it."
+REQUEST_MESSAGE = "If the username or email is registered, a one-time 6-digit reset code has been emailed to it."
 RESET_MESSAGE = "Your password has been reset. You can now log in."
 
 # Best-effort in-memory throttling of the anonymous reset endpoints so a caller
@@ -84,7 +84,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     Step 1 — submit a username or email address.
 
     The response is identical whether the identifier is registered or not.
-    When it is, a short-lived one-time reset token is issued and emailed to
+    When it is, a short-lived one-time 6-digit OTP is issued and emailed to
     the account's address on file; it is never returned in this response.
     """
     if _rate_limited(payload.identifier.lower()):
@@ -101,7 +101,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = Depends(get_db)):
     """
     Step 2 — re-confirm the username or email before allowing a reset.
-    Re-issues a fresh token (emailed out of band) for the account, with the
+    Re-issues a fresh OTP (emailed out of band) for the account, with the
     same uniform response.
     """
     if _rate_limited(payload.identifier.lower()):
@@ -117,14 +117,14 @@ def forgot_password_verify(payload: ForgotPasswordVerifyRequest, db: Session = D
 @router.post("/forgot-password/reset", response_model=ForgotPasswordResponse)
 def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
     """
-    Step 3 — set a new password using the token emailed at step 1.
+    Step 3 — set a new password using the OTP emailed at step 1.
 
-    Requires the one-time reset token; simply knowing a username or email is
+    Requires the one-time 6-digit OTP; simply knowing a username or email is
     no longer enough to take over an account.
     """
     if _rate_limited(payload.identifier.lower(), limit=10):
         raise AppError("Too many reset attempts. Try again later.", 429)
-    service.forgot_password_reset(db, payload.identifier, payload.reset_token, payload.new_password)
+    service.forgot_password_reset(db, payload.identifier, payload.otp, payload.new_password)
     return _forgot_password_response(RESET_MESSAGE)
 
 

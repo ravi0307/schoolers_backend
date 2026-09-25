@@ -6,7 +6,7 @@ from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import ForbiddenError
 import repository as repo
 from schemas import (
-    BroadcastCreate, BroadcastRead, BroadcastUpdate, MediaCreate, MediaRead,
+    BroadcastCreate, BroadcastRead, BroadcastUpdate,
 )
 
 router = APIRouter(tags=["communication"])
@@ -60,23 +60,3 @@ def update_broadcast(
         payload.message,
         payload.created_at,
     )
-
-
-@router.post("/media", response_model=MediaRead, status_code=201)
-def create_media(
-    payload: MediaCreate,
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
-):
-    return repo.create_media(db, school_id, payload.model_dump())
-
-
-@router.get("/media", response_model=list[MediaRead])
-def list_media(
-    class_id: int | None = Query(default=None),
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
-):
-    return repo.list_media(db, school_id, class_id)

@@ -54,8 +54,15 @@ class ForgotPasswordVerifyRequest(ForgotPasswordIdentifierRequest):
 
 class ForgotPasswordResetRequest(ForgotPasswordIdentifierRequest):
     """Step 3: Submit a new password for the verified account."""
-    reset_token: str = Field(min_length=8, max_length=128)
+    otp: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("otp")
+    @classmethod
+    def otp_must_be_six_digits(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("OTP must be a 6-digit code")
+        return value
 
     @field_validator("new_password")
     @classmethod

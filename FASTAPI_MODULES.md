@@ -39,7 +39,8 @@ app/
 │   ├── timetable/
 │   ├── transport/              # routes, stops, route_students, live pickup/drop
 │   ├── leave/                  # leave_requests (teacher/student/staff/pilot)
-│   ├── communication/          # broadcasts, media/insta class
+│   ├── communication/          # broadcasts
+│   ├── media/                  # school photo/video gallery
 │   ├── barter/                 # barter_listings
 │   ├── activities/             # daily activity content feed
 │   ├── website/                # school website builder (settings/pages/testimonials)
@@ -149,8 +150,7 @@ modules/attendance/
 
 ### `modules/communication`
 - Broadcasts: `POST /broadcasts` (scope: school/class/pilot), `GET /broadcasts?scope=&class_id=`
-- Media (Insta Class): `POST /media` (upload + metadata), `GET /media?class_id=`
-- Tables: `broadcasts`, `media`
+- This module has no file upload surface: `POST /media` was moved to the media service.
 - This module is the natural home for file upload handling (or delegate to
   a shared `shared/utils/storage.py` wrapping S3/GCS/local disk)
 
@@ -231,7 +231,7 @@ checks through route handlers.
 - **Live transport tracking**: WebSocket endpoint under `modules/transport`,
   or Server-Sent Events if you want to keep it simpler than full-duplex WS
 - **File storage**: abstract behind `shared/utils/storage.py` (local disk in
-  dev, S3-compatible in prod) — used by `communication` (media) and `website`
+  dev, S3-compatible in prod) — used by the `media` and `website` services
   (banner/icon images)
 - **Testing**: `pytest` + `httpx.AsyncClient` against a test DB (or
   transactional rollback per test) — one test module per feature module,

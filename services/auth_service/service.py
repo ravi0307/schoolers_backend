@@ -133,14 +133,14 @@ def user_email_address(db: Session, user: User) -> str | None:
 
 
 def _deliver_reset_token(email: str, raw_token: str, expires_minutes: int = RESET_TOKEN_TTL_MINUTES) -> None:
-    """Email the one-time reset token out of band. Best-effort: a delivery
-    failure is logged and swallowed so it can never reveal whether the
-    identifier is registered."""
+    """Email the one-time 6-digit reset OTP out of band. Best-effort: a
+    delivery failure is logged and swallowed so it can never reveal whether
+    the identifier is registered."""
     subject = "Schoolers — Password reset"
     body = (
         "Hello,\n\n"
         "A password reset was requested for your Schoolers account.\n\n"
-        f"Your one-time reset token is: {raw_token}\n"
+        f"Your one-time 6-digit code is: {raw_token}\n"
         f"It expires in {expires_minutes} minutes and can only be used once.\n\n"
         "If you did not request this, you can ignore this email.\n\n"
         "— Schoolers Platform"
@@ -148,7 +148,7 @@ def _deliver_reset_token(email: str, raw_token: str, expires_minutes: int = RESE
     try:
         common.email.send_email([email], subject, body)
     except Exception as exc:  # noqa: BLE001 — delivery must never leak account state
-        logger.warning("Could not email password reset token to %s: %s", email, exc)
+        logger.warning("Could not email password reset OTP to %s: %s", email, exc)
 
 
 def _reset_token_digest(raw_token: str) -> str:
@@ -164,8 +164,8 @@ def _utcnow_naive() -> datetime:
 
 
 def _issue_reset_token(db: Session, user: User) -> tuple[str, datetime]:
-    """Issue a fresh one-time reset token and return (raw_token, expires_at)."""
-    raw_token = secrets.token_urlsafe(32)
+    """Issue a fresh one-time 6-digit reset OTP and return (raw_otp, expires_at)."""
+    raw_token = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = _utcnow_naive() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
     user.password_reset_token = _reset_token_digest(raw_token)
     user.password_reset_token_expires_at = expires_at
@@ -180,9 +180,10 @@ def forgot_password_request(db: Session, identifier: str) -> tuple[str | None, d
 
     An anonymous caller can never tell registered accounts apart: the message
     is identical either way. When the account exists a one-time, short-lived
-    reset token is issued and emailed to the account's address on file. The raw
-    token is never returned in an API response — it is delivered out of band so
-    merely knowing the identifier is not enough to take over the account.
+    6-digit reset OTP is issued and emailed to the account's address on file.
+    The raw OTP is never returned in an API response — it is delivered out of
+    band so merely knowing the identifier is not enough to take over the
+    account.
     """
     user = find_user_by_identifier(db, identifier)
     if user is None:

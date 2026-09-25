@@ -397,3 +397,8 @@ ALTER TABLE IF EXISTS schoolers.users
 ALTER TABLE IF EXISTS schoolers.pilots
     ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
+
+-- Media/gallery: store the actual file behind each album entry.
+ALTER TABLE IF EXISTS schoolers.media
+    ADD COLUMN IF NOT EXISTS file_url VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS media_kind VARCHAR(10);
