@@ -73,15 +73,20 @@ class PasswordByteLengthTests(unittest.TestCase):
 
     def test_reset_schema_rejects_over_limit_multibyte_password(self):
         with self.assertRaises(ValidationError):
-            ForgotPasswordResetRequest(identifier="a", reset_token="tok-12345", new_password=EMOJI * 19)
+            ForgotPasswordResetRequest(identifier="a", otp="123456", new_password=EMOJI * 19)
 
-    def test_reset_schema_accepts_valid_password(self):
+    def test_reset_schema_accepts_valid_otp(self):
         payload = ForgotPasswordResetRequest(
-            identifier="a", reset_token="tok-12345", new_password="supersecret"
+            identifier="a", otp="123456", new_password="supersecret"
         )
         self.assertEqual(payload.new_password, "supersecret")
+        self.assertEqual(payload.otp, "123456")
 
-    def test_reset_schema_requires_reset_token(self):
+    def test_reset_schema_requires_six_digit_numeric_otp(self):
+        for bad in ("12345", "1234567", "abcdef", "12 456", ""):
+            with self.subTest(otp=bad):
+                with self.assertRaises(ValidationError):
+                    ForgotPasswordResetRequest(identifier="a", otp=bad, new_password="supersecret")
         with self.assertRaises(ValidationError):
             ForgotPasswordResetRequest(identifier="a", new_password="supersecret")
 
@@ -118,31 +123,32 @@ class PasswordResetTokenTests(unittest.TestCase):
     def test_unknown_identifier_returns_no_token(self):
         self.assertEqual(auth_service.forgot_password_request(self.db, "nobody"), (None, None))
 
-    def test_known_identifier_issues_token(self):
+    def test_known_identifier_issues_six_digit_otp(self):
         raw, expires_at = auth_service.forgot_password_request(self.db, "admin1")
-        self.assertTrue(raw)
+        self.assertRegex(raw, r"^\d{6}$")
         self.assertGreater(expires_at, utcnow_naive())
 
-    def test_reset_without_valid_token_is_rejected(self):
-        auth_service.forgot_password_request(self.db, "admin1")
+    def test_reset_without_valid_otp_is_rejected(self):
+        raw, _ = auth_service.forgot_password_request(self.db, "admin1")
+        wrong_otp = "000000" if raw != "000000" else "000001"
         with self.assertRaises(UnauthorizedError):
-            auth_service.forgot_password_reset(self.db, "admin1", "wrong-token", "newpassword")
+            auth_service.forgot_password_reset(self.db, "admin1", wrong_otp, "newpassword")
 
     def test_reset_with_unknown_identifier_is_rejected(self):
         with self.assertRaises(UnauthorizedError):
-            auth_service.forgot_password_reset(self.db, "nobody", "whatever-token", "newpassword")
+            auth_service.forgot_password_reset(self.db, "nobody", "000000", "newpassword")
 
-    def test_reset_with_valid_token_changes_password_and_consumes_token(self):
+    def test_reset_with_valid_otp_changes_password_and_consumes_token(self):
         raw, _ = auth_service.forgot_password_request(self.db, "admin1")
         auth_service.forgot_password_reset(self.db, "admin1", raw, "newpassword")
         self.user = self.db.query(User).filter(User.user_id == 1).one()
         self.assertTrue(verify_password("newpassword", self.user.password_hash))
         self.assertIsNone(self.user.password_reset_token)
-        # A consumed token cannot be replayed.
+        # A consumed OTP cannot be replayed.
         with self.assertRaises(UnauthorizedError):
             auth_service.forgot_password_reset(self.db, "admin1", raw, "anotherpassword")
 
-    def test_expired_token_is_rejected(self):
+    def test_expired_otp_is_rejected(self):
         raw, _ = auth_service.forgot_password_request(self.db, "admin1")
         self.user = self.db.query(User).filter(User.user_id == 1).one()
         self.user.password_reset_token_expires_at = utcnow_naive() - timedelta(minutes=1)
@@ -405,7 +411,7 @@ class ResetResponseUniformityTests(unittest.TestCase):
         to_addrs, subject, body = mock_send.call_args[0]
         self.assertEqual(to_addrs, ["boss@school.org"])
         self.assertIn("reset", subject.lower())
-        self.assertIn("token", body.lower())
+        self.assertIn("code", body.lower())
 
     @mock.patch("common.email.send_email")
     def test_known_and_unknown_responses_are_identical(self, mock_send):
