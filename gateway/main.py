@@ -46,7 +46,7 @@ ROUTE_MAP = {
     "pilots": "transport",
     "leave": "leave",
     "broadcasts": "communication",
-    "media": "communication",
+    "media": "media",
     "barter": "barter",
     "activities": "activities",
     "website": "website",

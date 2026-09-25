@@ -9,7 +9,7 @@ from schemas import (
     VehicleCreate, VehicleUpdate, VehicleRead,
     PilotCreate, PilotUpdate, PilotRead,
     RouteCreate, RouteUpdate, RouteRead, StopCreate, StopUpdate, StopRead,
-    RouteStudentRead, RouteStudentStatusUpdate,
+    RouteStudentRead, RouteStudentStatusUpdate, ParentPickDropRead,
 )
 
 router = APIRouter(prefix="/routes", tags=["transport"])
@@ -238,3 +238,16 @@ def update_pickup_drop_status(
     if not rs:
         raise NotFoundError("Student is not on this route")
     return rs
+
+
+@router.get("/mine", response_model=list[ParentPickDropRead])
+def my_pickdrop_status(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent")),
+):
+    """Pick/drop status for the logged-in parent's children."""
+    parent_id = current_user.linked_person_id
+    if parent_id is None:
+        return []
+    return repo.list_children_pickdrop(db, school_id, parent_id)
