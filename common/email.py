@@ -94,7 +94,24 @@ def try_send_email(recipients: list[str], subject: str, body: str) -> bool:
         return False
 
 
-def send_school_registered_email(school_name: str, recipients: list[str]) -> bool:
+def send_school_registered_email(
+    school_name: str,
+    recipients: list[str],
+    username: str | None = None,
+    password: str | None = None,
+) -> bool:
+    account_lines = ""
+    if username and password:
+        account_lines = (
+            f"Sign-in details\n"
+            f"Username: {username}\n"
+            f"Temporary password: {password}\n\n"
+            f"After signing in, you can reset this password:\n"
+            f"1. Go to the Schoolers Sign-in page.\n"
+            f"2. Click Forgot password?.\n"
+            f"3. Enter your username or the email on file — we will email a 6-digit OTP.\n"
+            f"4. Enter the OTP and set a new password.\n\n"
+        )
     return try_send_email(
         recipients,
         subject=f"Schoolers — Welcome, {school_name}!",
@@ -104,6 +121,7 @@ def send_school_registered_email(school_name: str, recipients: list[str]) -> boo
             f"created on the Schoolers platform.\n\n"
             f"Sign in to the Schoolers portal with your administrator credentials "
             f"to set up students, staff, classes, and more.\n\n"
+            f"{account_lines}"
             f"— Schoolers Platform"
         ),
     )

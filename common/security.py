@@ -1,6 +1,7 @@
 """
 Password hashing and JWT issuing/verification.
 """
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -10,6 +11,21 @@ import bcrypt
 from common.config import settings
 
 BCRYPT_MAX_BYTES = 72
+
+
+def generate_temp_password(length: int = 12) -> str:
+    """Return a random, human-typeable temporary password.
+
+    Pairs words and digits so masters can read the generated credential out
+    loud over the phone, while staying well past brute-force territory.
+    """
+    word = secrets.choice(
+        [
+            "Lotus", "Maple", "Willow", "Cedar", "Iris", "Venus", "Nova", "Atlas",
+            "Sable", "Cleo", "Remy", "Orin", "Mira", "Sage", "Zephyr", "Onyx",
+        ]
+    )
+    return f"{word}!{secrets.token_hex(max(2, length - len(word) - 1))}"
 
 
 def validate_password_byte_length(plain: str) -> None:

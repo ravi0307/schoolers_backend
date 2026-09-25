@@ -18,6 +18,8 @@ class SchoolBase(BaseModel):
         default=None,
         validation_alias=AliasChoices("alternative_email", "alternate_email"),
     )
+    first_name: str | None = None
+    last_name: str | None = None
     logo_url: str | None = None
 
 
@@ -42,6 +44,8 @@ class SchoolUpdate(BaseModel):
         default=None,
         validation_alias=AliasChoices("alternative_email", "alternate_email"),
     )
+    first_name: str | None = None
+    last_name: str | None = None
     logo_url: str | None = None
 
 
@@ -68,6 +72,17 @@ class SchoolRead(SchoolBase):
 
     class Config:
         from_attributes = True
+
+
+class SchoolWithCredentials(SchoolRead):
+    """SchoolRead plus the freshly-issued admin login credentials.
+
+    Returned only when a school admin account is provisioned/rotated by the
+    create/update endpoints; every other school endpoint stays on SchoolRead.
+    """
+
+    admin_username: str | None = None
+    admin_password: str | None = None
 
 
 class SchoolStats(BaseModel):

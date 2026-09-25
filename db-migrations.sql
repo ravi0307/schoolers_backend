@@ -402,3 +402,8 @@ ALTER TABLE IF EXISTS schoolers.pilots
 ALTER TABLE IF EXISTS schoolers.media
     ADD COLUMN IF NOT EXISTS file_url VARCHAR(255),
     ADD COLUMN IF NOT EXISTS media_kind VARCHAR(10);
+
+-- Master portal: school admin's name, used to generate the school login.
+ALTER TABLE IF EXISTS schoolers.schools
+    ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
