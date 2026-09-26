@@ -70,7 +70,7 @@ class BroadcastDeliveryTests(unittest.TestCase):
         teacher = Teacher(teacher_id=1, school_id=school_1, name="T. Eacher", role_title="Teacher", staff_id=1, phone="000")
         self.db.add_all([staff, teacher])
 
-        self.subject_1 = Subject(subject_id=1, name="Maths")
+        self.subject_1 = Subject(subject_id=1, school_id=school_1, name="Maths")
         self.db.add(self.subject_1)
 
         self.cls_1 = SchoolClass(class_id=1, school_id=school_1, name="Class 1")

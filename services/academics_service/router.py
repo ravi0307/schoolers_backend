@@ -60,21 +60,24 @@ def delete_class(
     repo.delete_class(db, cls)
 
 
-# ---- Subjects (global catalog, managed by admins) ----
+# ---- Subjects (per-school catalog, managed by admins) ----
 @router.get("/subjects", response_model=list[SubjectRead])
-def list_subjects(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_role(
-    "parent", "teacher", "admin", "master"
-))):
-    return repo.list_subjects(db)
+def list_subjects(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    return repo.list_subjects(db, school_id)
 
 
 @router.post("/subjects", response_model=SubjectRead, status_code=201)
 def create_subject(
     payload: SubjectCreate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.create_subject(db, payload.name)
+    return repo.create_subject(db, school_id, payload.name)
 
 
 @router.patch("/subjects/{subject_id}", response_model=SubjectRead)
@@ -82,9 +85,10 @@ def update_subject(
     subject_id: int,
     payload: SubjectUpdate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    subject = repo.get_subject(db, subject_id)
+    subject = repo.get_subject(db, school_id, subject_id)
     if not subject:
         raise NotFoundError("Subject not found")
     return repo.update_subject(db, subject, payload.model_dump(exclude_unset=True))
@@ -94,9 +98,10 @@ def update_subject(
 def delete_subject(
     subject_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    subject = repo.get_subject(db, subject_id)
+    subject = repo.get_subject(db, school_id, subject_id)
     if not subject:
         raise NotFoundError("Subject not found")
     repo.delete_subject(db, subject)

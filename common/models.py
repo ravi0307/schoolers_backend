@@ -84,7 +84,10 @@ class Subject(AuditColumnsMixin, Base):
     __tablename__ = "subjects"
 
     subject_id = Column(Integer, primary_key=True)
-    name = Column(String(40), unique=True, nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(40), nullable=False)
+
+    __table_args__ = (UniqueConstraint("school_id", "name"),)
 
 
 class SchoolClass(AuditColumnsMixin, Base):

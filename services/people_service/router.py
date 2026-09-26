@@ -68,9 +68,10 @@ def delete_teacher(
 def assign_teaching_load(
     payload: TeacherClassSubjectCreate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.add_teaching_assignment(db, payload.model_dump())
+    return repo.add_teaching_assignment(db, school_id, payload.model_dump())
 
 
 @router.get("/teachers/{teacher_id}/load")

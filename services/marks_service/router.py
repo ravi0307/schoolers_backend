@@ -73,7 +73,7 @@ def upsert_mark(
 ):
     if not repo.student_exists(db, student_id):
         raise NotFoundError("Student not found")
-    if not repo.subject_exists(db, subject_id):
+    if not repo.subject_exists(db, subject_id, current_user.school_id):
         raise NotFoundError("Subject not found")
 
     # Admin can grade anything in their own school; a teacher only what

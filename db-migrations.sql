@@ -407,3 +407,22 @@ ALTER TABLE IF EXISTS schoolers.media
 ALTER TABLE IF EXISTS schoolers.schools
     ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),
     ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+
+-- Per-school subject catalogs: subjects are no longer a single global list.
+-- Each school manages its own (school_id + name unique, name alone is not).
+-- Existing global rows are claimed by the primary seeded school (id 1).
+ALTER TABLE IF EXISTS schoolers.subjects
+    ADD COLUMN IF NOT EXISTS school_id INTEGER;
+
+UPDATE schoolers.subjects SET school_id = 1 WHERE school_id IS NULL;
+
+ALTER TABLE IF EXISTS schoolers.subjects
+    ALTER COLUMN school_id SET NOT NULL,
+    ADD CONSTRAINT subjects_school_id_fkey
+        FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS schoolers.subjects
+    DROP CONSTRAINT IF EXISTS subjects_name_key;
+
+ALTER TABLE IF EXISTS schoolers.subjects
+    ADD CONSTRAINT subjects_school_id_name_key UNIQUE (school_id, name);
