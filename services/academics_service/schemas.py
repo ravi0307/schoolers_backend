@@ -1,6 +1,33 @@
 from datetime import time
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def _clean_subject_name(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise ValueError("Subject name cannot be blank")
+    if len(name) > 40:
+        raise ValueError("Subject name must be 40 characters or fewer")
+    return name
+
+
+class SubjectCreate(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        return _clean_subject_name(value)
+
+
+class SubjectUpdate(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        return _clean_subject_name(value)
 
 
 class ClassCreate(BaseModel):

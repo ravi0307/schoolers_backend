@@ -22,8 +22,11 @@ def student_exists(db: Session, student_id: int) -> bool:
     return db.query(Student.student_id).filter(Student.student_id == student_id).first() is not None
 
 
-def subject_exists(db: Session, subject_id: int) -> bool:
-    return db.query(Subject.subject_id).filter(Subject.subject_id == subject_id).first() is not None
+def subject_exists(db: Session, subject_id: int, school_id: int | None = None) -> bool:
+    query = db.query(Subject.subject_id).filter(Subject.subject_id == subject_id)
+    if school_id is not None:
+        query = query.filter(Subject.school_id == school_id)
+    return query.first() is not None
 
 
 def student_in_school(db: Session, student_id: int, school_id: int) -> bool:

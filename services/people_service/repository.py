@@ -16,8 +16,10 @@ from common.models import (
     SchoolClass,
     School,
     User,
+    Subject,
 )
 from common.audit import bulk_modified_columns
+from common.exceptions import ConflictError
 from common.email import (
     FIELD_LABELS,
     send_record_updated_email,
@@ -109,7 +111,29 @@ def delete_teacher(db: Session, teacher: Teacher) -> None:
     db.commit()
 
 
-def add_teaching_assignment(db: Session, data: dict) -> TeacherClassSubject:
+def add_teaching_assignment(db: Session, school_id: int, data: dict) -> TeacherClassSubject:
+    subject = db.query(Subject).filter(
+        Subject.subject_id == data["subject_id"], Subject.school_id == school_id
+    ).first()
+    if not subject:
+        raise ConflictError("Subject does not belong to this school")
+
+    teacher = db.query(Teacher).filter(
+        Teacher.teacher_id == data["teacher_id"],
+        Teacher.school_id == school_id,
+        Teacher.is_active.is_(True),
+    ).first()
+    if not teacher:
+        raise ConflictError("Teacher does not belong to this school")
+
+    school_class = db.query(SchoolClass).filter(
+        SchoolClass.class_id == data["class_id"],
+        SchoolClass.school_id == school_id,
+        SchoolClass.is_active.is_(True),
+    ).first()
+    if not school_class:
+        raise ConflictError("Class does not belong to this school")
+
     tcs = TeacherClassSubject(**data)
     db.add(tcs)
     db.commit()

@@ -2,7 +2,14 @@ from datetime import datetime, time
 
 from sqlalchemy.orm import Session
 
-from common.models import TimetableEntry, Holiday, Period, SchoolClass
+from common.models import TimetableEntry, Holiday, Period, SchoolClass, Subject
+from common.exceptions import NotFoundError
+
+
+def subject_in_school(db: Session, school_id: int, subject_id: int) -> bool:
+    return db.query(Subject.subject_id).filter(
+        Subject.subject_id == subject_id, Subject.school_id == school_id
+    ).first() is not None
 
 
 def _parse_period_times(period_time: str) -> tuple[time | None, time | None]:
@@ -47,6 +54,9 @@ def create_week_period(
     if not school_class:
         return []
 
+    if subject_id is not None and not subject_in_school(db, school_id, subject_id):
+        raise NotFoundError("Subject not found for this school")
+
     last_period = db.query(Period).order_by(Period.period_no.desc()).first()
     period = Period(
         period_no=(last_period.period_no + 1 if last_period else 1),
@@ -88,6 +98,8 @@ def update_entry(
     school_id: int,
 ) -> TimetableEntry:
     if subject_id is not None:
+        if not subject_in_school(db, school_id, subject_id):
+            raise NotFoundError("Subject not found for this school")
         entry.subject_id = subject_id
     if teacher_id is not None:
         entry.teacher_id = teacher_id

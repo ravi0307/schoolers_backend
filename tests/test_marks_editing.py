@@ -23,9 +23,9 @@ def seed(db: Session):
             Student(student_id=1, school_id=1, class_id=1, admission_no="A1", name="Alice"),
             Student(student_id=2, school_id=1, class_id=1, admission_no="A2", name="Bob"),
             Student(student_id=3, school_id=1, class_id=2, admission_no="A3", name="Carol"),
-            Subject(subject_id=3, name="Maths"),
-            Subject(subject_id=5, name="Science"),
-            Subject(subject_id=8, name="English"),
+            Subject(subject_id=3, school_id=1, name="Maths"),
+            Subject(subject_id=5, school_id=1, name="Science"),
+            Subject(subject_id=8, school_id=1, name="English"),
             TeacherClassSubject(teacher_id=7, class_id=1, subject_id=3, is_class_teacher=True),
             TeacherClassSubject(teacher_id=7, class_id=1, subject_id=8, is_class_teacher=True),
             TeacherClassSubject(teacher_id=9, class_id=2, subject_id=3, is_class_teacher=True),
@@ -170,8 +170,9 @@ class MarksEditingTests(unittest.TestCase):
         self.assertFalse(repo.student_exists(self.db, 4242))
 
     def test_subject_exists_distinguishes_known_from_unknown(self):
-        self.assertTrue(repo.subject_exists(self.db, 3))
-        self.assertFalse(repo.subject_exists(self.db, 999))
+        self.assertTrue(repo.subject_exists(self.db, 3, 1))
+        self.assertFalse(repo.subject_exists(self.db, 999, 1))
+        self.assertFalse(repo.subject_exists(self.db, 3, 2))
 
     def test_student_in_school_scopes_by_school(self):
         self.assertTrue(repo.student_in_school(self.db, 1, 1))
