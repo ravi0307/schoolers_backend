@@ -6,8 +6,8 @@ from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import NotFoundError
 import repository as repo
 from schemas import (
-    ClassCreate, ClassUpdate, ClassRead, SubjectRead, PeriodRead, PeriodUpdate,
-    HolidayRead, HolidayUpdate,
+    ClassCreate, ClassUpdate, ClassRead, SubjectRead, SubjectCreate, SubjectUpdate,
+    PeriodRead, PeriodUpdate, HolidayRead, HolidayUpdate,
 )
 
 router = APIRouter(tags=["academics"])
@@ -60,12 +60,46 @@ def delete_class(
     repo.delete_class(db, cls)
 
 
-# ---- Subjects (global lookup) ----
+# ---- Subjects (global catalog, managed by admins) ----
 @router.get("/subjects", response_model=list[SubjectRead])
 def list_subjects(db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_role(
     "parent", "teacher", "admin", "master"
 ))):
     return repo.list_subjects(db)
+
+
+@router.post("/subjects", response_model=SubjectRead, status_code=201)
+def create_subject(
+    payload: SubjectCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_subject(db, payload.name)
+
+
+@router.patch("/subjects/{subject_id}", response_model=SubjectRead)
+def update_subject(
+    subject_id: int,
+    payload: SubjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    subject = repo.get_subject(db, subject_id)
+    if not subject:
+        raise NotFoundError("Subject not found")
+    return repo.update_subject(db, subject, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/subjects/{subject_id}", status_code=204)
+def delete_subject(
+    subject_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    subject = repo.get_subject(db, subject_id)
+    if not subject:
+        raise NotFoundError("Subject not found")
+    repo.delete_subject(db, subject)
 
 
 # ---- Periods (global lookup, editable by admin) ----
