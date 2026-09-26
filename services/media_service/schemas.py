@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -17,6 +19,7 @@ class MediaRead(BaseModel):
     icon: str | None
     file_url: str | None
     media_kind: str | None
+    created_at: datetime | None
 
     class Config:
         from_attributes = True
