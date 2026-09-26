@@ -94,8 +94,8 @@ def update_subject(
     return repo.update_subject(db, subject, payload.model_dump(exclude_unset=True))
 
 
-@router.delete("/subjects/{subject_id}", status_code=204)
-def delete_subject(
+@router.patch("/subjects/{subject_id}/deactivate", response_model=SubjectRead)
+def deactivate_subject(
     subject_id: int,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
@@ -104,7 +104,20 @@ def delete_subject(
     subject = repo.get_subject(db, school_id, subject_id)
     if not subject:
         raise NotFoundError("Subject not found")
-    repo.delete_subject(db, subject)
+    return repo.deactivate_subject(db, subject)
+
+
+@router.patch("/subjects/{subject_id}/activate", response_model=SubjectRead)
+def activate_subject(
+    subject_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    subject = repo.get_subject(db, school_id, subject_id)
+    if not subject:
+        raise NotFoundError("Subject not found")
+    return repo.activate_subject(db, subject)
 
 
 # ---- Periods (global lookup, editable by admin) ----

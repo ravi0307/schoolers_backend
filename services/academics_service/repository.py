@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from common.models import (
     SchoolClass, Subject, Period, Holiday, Teacher, TimetableEntry,
-    Mark, TeacherClassSubject,
 )
 from common.exceptions import ConflictError, NotFoundError
 
@@ -71,7 +70,9 @@ def delete_class(db: Session, cls: SchoolClass) -> None:
 
 
 def list_subjects(db: Session, school_id: int) -> list[Subject]:
-    return db.query(Subject).filter(Subject.school_id == school_id).order_by(Subject.name).all()
+    return db.query(Subject).filter(
+        Subject.school_id == school_id
+    ).order_by(Subject.is_active.desc(), Subject.name).all()
 
 
 def get_subject(db: Session, school_id: int, subject_id: int) -> Subject | None:
@@ -110,21 +111,22 @@ def update_subject(db: Session, subject: Subject, data: dict) -> Subject:
     return subject
 
 
-SUBJECT_USAGE = [
-    (TimetableEntry, TimetableEntry.subject_id),
-    (Mark, Mark.subject_id),
-    (TeacherClassSubject, TeacherClassSubject.subject_id),
-]
-
-
-def delete_subject(db: Session, subject: Subject) -> None:
-    for model, column in SUBJECT_USAGE:
-        if db.query(model).filter(column == subject.subject_id).first():
-            raise ConflictError(
-                "Subject is in use by timetable entries, marks, or teacher assignments and cannot be removed"
-            )
-    db.delete(subject)
+def deactivate_subject(db: Session, subject: Subject) -> Subject:
+    """Soft delete: marks, timetable entries, and assignments referencing this
+    subject stay intact, and the subject can be reactivated later."""
+    subject.is_active = False
     db.commit()
+    db.refresh(subject)
+    return subject
+
+
+def activate_subject(db: Session, subject: Subject) -> Subject:
+    if subject_name_taken(db, subject.school_id, subject.name, exclude_id=subject.subject_id):
+        raise ConflictError("A subject with this name already exists for this school")
+    subject.is_active = True
+    db.commit()
+    db.refresh(subject)
+    return subject
 
 
 def list_periods(db: Session) -> list[Period]:
