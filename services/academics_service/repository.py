@@ -127,54 +127,6 @@ def delete_subject(db: Session, subject: Subject) -> None:
     db.commit()
 
 
-def get_subject(db: Session, subject_id: int) -> Subject | None:
-    return db.query(Subject).filter(Subject.subject_id == subject_id).first()
-
-
-def subject_name_taken(db: Session, name: str, exclude_id: int | None = None) -> bool:
-    query = db.query(Subject).filter(func.lower(Subject.name) == name.lower())
-    if exclude_id is not None:
-        query = query.filter(Subject.subject_id != exclude_id)
-    return query.first() is not None
-
-
-def create_subject(db: Session, name: str) -> Subject:
-    if subject_name_taken(db, name):
-        raise ConflictError("A subject with this name already exists")
-    subject = Subject(name=name)
-    db.add(subject)
-    db.commit()
-    db.refresh(subject)
-    return subject
-
-
-def update_subject(db: Session, subject: Subject, data: dict) -> Subject:
-    name = data.get("name")
-    if name and subject_name_taken(db, name, exclude_id=subject.subject_id):
-        raise ConflictError("A subject with this name already exists")
-    subject.name = name
-    db.commit()
-    db.refresh(subject)
-    return subject
-
-
-SUBJECT_USAGE = [
-    (TimetableEntry, TimetableEntry.subject_id),
-    (Mark, Mark.subject_id),
-    (TeacherClassSubject, TeacherClassSubject.subject_id),
-]
-
-
-def delete_subject(db: Session, subject: Subject) -> None:
-    for model, column in SUBJECT_USAGE:
-        if db.query(model).filter(column == subject.subject_id).first():
-            raise ConflictError(
-                "Subject is in use by timetable entries, marks, or teacher assignments and cannot be removed"
-            )
-    db.delete(subject)
-    db.commit()
-
-
 def list_periods(db: Session) -> list[Period]:
     return db.query(Period).order_by(Period.period_no).all()
 
