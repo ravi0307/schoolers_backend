@@ -359,6 +359,12 @@ class BackendContractTests(unittest.TestCase):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, migrations)
 
+    def test_media_read_schema_exposes_created_at(self):
+        """MediaRead must carry created_at so gallery albums display timestamps."""
+        schema = (ROOT / "services" / "media_service" / "schemas.py").read_text(encoding="utf-8")
+        self.assertIn("created_at", schema)
+        self.assertIn("MediaRead", schema)
+
     def test_database_init_and_migration_files_are_present(self):
         for filename in ("db-init-schema.sql", "db-migrations.sql"):
             path = ROOT / filename

@@ -130,6 +130,23 @@ class MediaGalleryRepositoryTests(unittest.TestCase):
         self.assertEqual(created.file_url, "/api/v1/media/files/image_x.jpg")
         self.assertEqual(created.media_kind, "image")
 
+    def test_media_read_surfaces_created_at(self):
+        """MediaRead exposes created_at so gallery albums can display timestamps."""
+        created = repo.create_media(
+            self.session,
+            1,
+            {
+                "title": "Timestamped photo",
+                "posted_by": "Ms. Dora",
+                "class_id": None,
+                "file_url": "/api/v1/media/files/img.png",
+                "media_kind": "image",
+            },
+        )
+        read = MediaRead.model_validate(created)
+        self.assertIsNotNone(read.created_at)
+        self.assertIsInstance(read.created_at, datetime)
+
     def test_list_media_scopes_to_school_and_skips_inactive(self):
         rows = repo.list_media(self.session, 1)
         ids = {m.media_id for m in rows}
