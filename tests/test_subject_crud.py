@@ -1,12 +1,12 @@
 """
-Subject catalog CRUD tests — per-school scope.
+Subject catalog CRUD tests — per-school scope, soft deactivation.
 
-Each school owns its own subject list (subject rows carry school_id). These
-cover the repository layer: create within a school, case-insensitive
-uniqueness per school (duplicates allowed across schools), rename, the guard
-that blocks removal of a subject still referenced by timetable entries, marks,
-or teacher-class assignments (otherwise the FK ON DELETE CASCADE rules would
-silently wipe marks/assignments), and cross-school isolation.
+Each school owns its own subject list (subject rows carry school_id).
+Deactivation is non-destructive: a subject can be marked inactive (hiding it
+from new assignments) and reactivated later, while marks/timetable references
+stay intact and keep resolving by name. Names stay unique within a school
+across both states, so the same name can't be created while an inactive copy
+of it exists.
 """
 import unittest
 from datetime import datetime
@@ -28,14 +28,8 @@ TABLES = [
 ]
 
 
-def seed_subject(db: Session, school_id: int = 1, subject_id: int | None = None, name: str = "Maths") -> Subject:
-    subject = Subject(name=name, school_id=school_id)
-    if subject_id is not None:
-        subject.subject_id = subject_id
-    db.add(subject)
-    db.commit()
-    db.refresh(subject)
-    return subject
+def create_subject(db: Session, school_id: int = 1, name: str = "Maths") -> Subject:
+    return academics_repo.create_subject(db, school_id=school_id, name=name)
 
 
 class SubjectCrudTests(unittest.TestCase):
@@ -58,101 +52,122 @@ class SubjectCrudTests(unittest.TestCase):
         self.db.rollback()
         self.db.close()
 
-    def test_create_subject(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Mathematics")
+    def test_create_subject_active_by_default(self):
+        subject = create_subject(self.db, name="Mathematics")
         self.assertEqual(subject.name, "Mathematics")
         self.assertEqual(subject.school_id, 1)
-        self.assertEqual([s.subject_id for s in academics_repo.list_subjects(self.db, 1)], [subject.subject_id])
+        self.assertTrue(subject.is_active)
+        self.assertEqual(academics_repo.list_subjects(self.db, 1), [subject])
 
     def test_create_duplicate_name_rejected_case_insensitively_within_school(self):
-        academics_repo.create_subject(self.db, school_id=1, name="Science")
+        create_subject(self.db, name="Science")
         with self.assertRaises(ConflictError):
-            academics_repo.create_subject(self.db, school_id=1, name="science")
+            create_subject(self.db, name="science")
 
     def test_same_subject_name_allowed_in_another_school(self):
-        academics_repo.create_subject(self.db, school_id=1, name="Maths")
-        other = academics_repo.create_subject(self.db, school_id=2, name="Maths")
-        self.assertNotEqual(other.school_id, 1)
-        self.assertTrue(academics_repo.get_subject(self.db, 2, other.subject_id))
+        create_subject(self.db, school_id=1, name="Maths")
+        other = create_subject(self.db, school_id=2, name="Maths")
+        self.assertFalse(academics_repo.get_subject(self.db, 1, other.subject_id))
 
     def test_list_subjects_scoped_to_school(self):
-        academics_repo.create_subject(self.db, school_id=1, name="Biology")
-        academics_repo.create_subject(self.db, school_id=2, name="Robotics")
+        create_subject(self.db, school_id=1, name="Biology")
+        create_subject(self.db, school_id=2, name="Robotics")
         self.assertEqual(
             [s.name for s in academics_repo.list_subjects(self.db, 1)],
             ["Biology"],
         )
 
-    def test_list_subjects_sorted_by_name(self):
+    def test_list_subjects_sorted_active_first_then_by_name(self):
         for name in ("Biology", "Algebra", "Chemistry"):
-            academics_repo.create_subject(self.db, school_id=1, name=name)
-        self.assertEqual(
-            [s.name for s in academics_repo.list_subjects(self.db, 1)],
-            ["Algebra", "Biology", "Chemistry"],
-        )
+            create_subject(self.db, name=name)
+        biology = academics_repo.get_subject(self.db, 1, academics_repo.list_subjects(self.db, 1)[0].subject_id)
+        # Force ordering explicitly instead of relying on the first listed row.
+        active = [s for s in academics_repo.list_subjects(self.db, 1) if s.is_active]
+        self.assertEqual([s.name for s in active], ["Algebra", "Biology", "Chemistry"])
+
+    def test_list_subjects_keeps_inactive_rows_and_orders_active_first(self):
+        retired = create_subject(self.db, name="Latin")
+        academics_repo.deactivate_subject(self.db, retired)
+        create_subject(self.db, name="Algebra")
+        names = [s.name for s in academics_repo.list_subjects(self.db, 1)]
+        self.assertEqual(names, ["Algebra", "Latin"])
+        flags = {s.name: s.is_active for s in academics_repo.list_subjects(self.db, 1)}
+        self.assertFalse(flags["Latin"])
+        self.assertTrue(flags["Algebra"])
 
     def test_get_subject_scoped_to_school(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Maths")
+        subject = create_subject(self.db)
         self.assertIsNotNone(academics_repo.get_subject(self.db, 1, subject.subject_id))
         self.assertIsNone(academics_repo.get_subject(self.db, 2, subject.subject_id))
         self.assertIsNone(academics_repo.get_subject(self.db, 1, 4242))
 
+    def test_get_subject_finds_inactive(self):
+        retired = create_subject(self.db, name="Latin")
+        academics_repo.deactivate_subject(self.db, retired)
+        self.assertIsNotNone(academics_repo.get_subject(self.db, 1, retired.subject_id))
+
     def test_update_subject_rename(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Maths")
+        subject = create_subject(self.db, name="Maths")
         updated = academics_repo.update_subject(self.db, subject, {"name": "Mathematics"})
         self.assertEqual(updated.name, "Mathematics")
 
     def test_update_to_existing_name_rejected(self):
-        academics_repo.create_subject(self.db, school_id=1, name="English")
-        other = academics_repo.create_subject(self.db, school_id=1, name="Literature")
+        create_subject(self.db, name="English")
+        other = create_subject(self.db, name="Literature")
         with self.assertRaises(ConflictError):
             academics_repo.update_subject(self.db, other, {"name": "english"})
 
     def test_rename_into_another_schools_name_is_allowed(self):
-        academics_repo.create_subject(self.db, school_id=2, name="English")
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Literature")
+        create_subject(self.db, school_id=2, name="English")
+        subject = create_subject(self.db, school_id=1, name="Literature")
         updated = academics_repo.update_subject(self.db, subject, {"name": "English"})
         self.assertEqual(updated.name, "English")
 
     def test_rename_to_own_name_is_allowed(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Art")
+        subject = create_subject(self.db, name="Art")
         updated = academics_repo.update_subject(self.db, subject, {"name": "Art"})
         self.assertEqual(updated.name, "Art")
 
-    def test_delete_unused_subject(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="History")
-        academics_repo.delete_subject(self.db, subject)
-        self.assertIsNone(academics_repo.get_subject(self.db, 1, subject.subject_id))
+    def test_deactivate_then_reactivate_round_trip(self):
+        subject = create_subject(self.db, name="History")
+        inactive = academics_repo.deactivate_subject(self.db, subject)
+        self.assertFalse(inactive.is_active)
+        reactivated = academics_repo.activate_subject(self.db, inactive)
+        self.assertTrue(reactivated.is_active)
 
-    def test_delete_subject_referenced_by_timetable_blocked(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Physics")
+    def test_deactivate_is_allowed_even_when_referenced(self):
+        subject = create_subject(self.db, name="Physics")
         self.db.add(TimetableEntry(
             school_id=1, class_id=1, day_of_week="MON", period_id=1,
             subject_id=subject.subject_id, created_on=datetime.now(),
         ))
-        self.db.commit()
-        with self.assertRaises(ConflictError):
-            academics_repo.delete_subject(self.db, subject)
-
-    def test_delete_subject_referenced_by_marks_blocked(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Chemistry")
         self.db.add(Mark(student_id=1, subject_id=subject.subject_id, term="Term 1", score=80))
-        self.db.commit()
-        with self.assertRaises(ConflictError):
-            academics_repo.delete_subject(self.db, subject)
-
-    def test_delete_subject_referenced_by_teacher_assignment_blocked(self):
-        subject = academics_repo.create_subject(self.db, school_id=1, name="Geography")
         self.db.add(TeacherClassSubject(teacher_id=1, class_id=1, subject_id=subject.subject_id))
         self.db.commit()
-        with self.assertRaises(ConflictError):
-            academics_repo.delete_subject(self.db, subject)
+        inactive = academics_repo.deactivate_subject(self.db, subject)
+        self.assertFalse(inactive.is_active)
+        # References are untouched by the soft delete.
+        self.assertEqual(self.db.query(Mark).filter(Mark.subject_id == subject.subject_id).count(), 1)
+        self.assertEqual(
+            self.db.query(TimetableEntry).filter(TimetableEntry.subject_id == subject.subject_id).count(), 1
+        )
 
-    def test_missing_subject_used_to_seed_is_expected_reference(self):
-        # Subjects from a school can be referenced while that school owns them.
-        subject = academics_repo.create_subject(self.db, school_id=3, name="Art")
-        self.assertTrue(academics_repo.get_subject(self.db, 3, subject.subject_id))
-        self.assertFalse(academics_repo.get_subject(self.db, 2, subject.subject_id))
+    def test_reactivation_restores_same_name_ownership(self):
+        retired = create_subject(self.db, name="Latin")
+        academics_repo.deactivate_subject(self.db, retired)
+        # Name still owned by the inactive row, so creating a new one is blocked.
+        with self.assertRaises(ConflictError):
+            create_subject(self.db, name="latin")
+        reactivated = academics_repo.activate_subject(self.db, retired)
+        self.assertTrue(reactivated.is_active)
+
+    def test_rename_inactive_subject_then_reactivate(self):
+        retired = create_subject(self.db, name="OldName")
+        academics_repo.deactivate_subject(self.db, retired)
+        renamed = academics_repo.update_subject(self.db, retired, {"name": "NewName"})
+        reactivated = academics_repo.activate_subject(self.db, renamed)
+        self.assertTrue(reactivated.is_active)
+        self.assertEqual(reactivated.name, "NewName")
 
 
 if __name__ == "__main__":

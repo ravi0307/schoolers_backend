@@ -86,6 +86,7 @@ class Subject(AuditColumnsMixin, Base):
     subject_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     name = Column(String(40), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
     __table_args__ = (UniqueConstraint("school_id", "name"),)
 

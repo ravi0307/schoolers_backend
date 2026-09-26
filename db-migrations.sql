@@ -426,3 +426,8 @@ ALTER TABLE IF EXISTS schoolers.subjects
 
 ALTER TABLE IF EXISTS schoolers.subjects
     ADD CONSTRAINT subjects_school_id_name_key UNIQUE (school_id, name);
+
+-- Subjects are soft-deletable: deactivating one hides it from new assignments
+-- while keeping marks/timetable references intact; it can be reactivated.
+ALTER TABLE IF EXISTS schoolers.subjects
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;

@@ -54,7 +54,9 @@ class ClassRead(BaseModel):
 
 class SubjectRead(BaseModel):
     subject_id: int
+    school_id: int
     name: str
+    is_active: bool
 
     class Config:
         from_attributes = True
