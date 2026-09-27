@@ -1,9 +1,12 @@
+from datetime import date
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.models import (
     SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
 )
+from common.holidays import list_holidays as list_holiday_rows
 from common.exceptions import ConflictError, NotFoundError
 
 
@@ -170,15 +173,74 @@ def update_period(
 
 
 def list_holidays(db: Session, school_id: int) -> list[Holiday]:
-    return db.query(Holiday).filter(Holiday.school_id == school_id).all()
+    """The school's holidays, soonest first. A pure read: an empty list means
+    the school genuinely has no holidays recorded."""
+    return list_holiday_rows(db, school_id)
 
 
-def set_holiday(db: Session, school_id: int, day: str, is_holiday: bool) -> Holiday | None:
-    holiday = db.query(Holiday).filter(
-        Holiday.school_id == school_id, Holiday.day_of_week == day
+def get_holiday(db: Session, school_id: int, holiday_id: int) -> Holiday | None:
+    return db.query(Holiday).filter(
+        Holiday.school_id == school_id, Holiday.holiday_id == holiday_id
     ).first()
-    if holiday:
-        holiday.is_holiday = is_holiday
-        db.commit()
-        db.refresh(holiday)
+
+
+def holiday_date_taken(
+    db: Session, school_id: int, holiday_date: date, exclude_id: int | None = None
+) -> bool:
+    """True when the school already has a holiday on ``holiday_date``.
+
+    Guarded in the repository rather than left to the database so the admin gets
+    a readable 409 instead of a raw IntegrityError, and so updating a holiday
+    without touching its date does not collide with itself.
+    """
+    query = db.query(Holiday).filter(
+        Holiday.school_id == school_id, Holiday.holiday_date == holiday_date
+    )
+    if exclude_id is not None:
+        query = query.filter(Holiday.holiday_id != exclude_id)
+    return query.first() is not None
+
+
+def create_holiday(
+    db: Session, school_id: int, occasion: str, holiday_date: date
+) -> Holiday:
+    if holiday_date_taken(db, school_id, holiday_date):
+        raise ConflictError(
+            f"This school already has a holiday on {holiday_date.isoformat()}"
+        )
+    holiday = Holiday(school_id=school_id, occasion=occasion, holiday_date=holiday_date)
+    db.add(holiday)
+    db.commit()
+    db.refresh(holiday)
     return holiday
+
+
+def update_holiday(
+    db: Session, holiday: Holiday, occasion: str | None, holiday_date: date | None
+) -> Holiday:
+    """Apply a partial update. Passing None for a field leaves it unchanged."""
+    if holiday_date is not None and holiday_date != holiday.holiday_date:
+        if holiday_date_taken(
+            db, holiday.school_id, holiday_date, exclude_id=holiday.holiday_id
+        ):
+            raise ConflictError(
+                f"This school already has a holiday on {holiday_date.isoformat()}"
+            )
+        holiday.holiday_date = holiday_date
+    if occasion is not None:
+        holiday.occasion = occasion
+    db.commit()
+    db.refresh(holiday)
+    return holiday
+
+
+def delete_holiday(db: Session, holiday: Holiday) -> None:
+    """Remove the holiday outright.
+
+    A hard delete rather than the soft-delete pattern used for subjects: a
+    holiday is a calendar fact, not a configurable entity that anything else
+    references, so "removing" it should actually remove it.
+    """
+    db.delete(holiday)
+    db.commit()
+

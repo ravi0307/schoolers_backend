@@ -339,8 +339,16 @@ class BackendContractTests(unittest.TestCase):
         # Every write endpoint must be admin-only — no teacher-grade writes.
         self.assertEqual(router.count('require_role("admin")'), 4)
         self.assertNotIn('require_role("teacher", "admin")', router)
-        # Reads stay open to parents, teachers, and admins.
-        self.assertEqual(router.count('require_role("parent", "teacher", "admin")'), 2)
+        # Reads stay open to parents, teachers, and admins: the class list, the
+        # class week view, and the single-entry lookup.
+        reads = (
+            'router.get("/class/{class_id}"',
+            'router.get("/class/{class_id}/week"',
+            'router.get("/entry/{entry_id}"',
+        )
+        for marker in reads:
+            self.assertIn(marker, router)
+        self.assertEqual(router.count('require_role("parent", "teacher", "admin")'), len(reads))
 
     def test_migrations_cover_current_schema_changes(self):
         migrations = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")

@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,9 @@ from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import NotFoundError
 import repository as repo
-from schemas import TimetableEntryRead, TimetableEntryUpdate, TimetableWeekCreate
+from schemas import (
+    TimetableEntryRead, TimetableEntryUpdate, TimetableWeekCreate, TimetableWeekRead,
+)
 
 router = APIRouter(prefix="/timetable", tags=["timetable"])
 
@@ -14,9 +18,32 @@ router = APIRouter(prefix="/timetable", tags=["timetable"])
 def get_class_timetable(
     class_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
-    return repo.get_class_timetable(db, class_id)
+    # Scoped to the caller's school: without school_id this leaked any other
+    # school's class timetable to any authenticated parent/teacher/admin.
+    if not repo.get_class_in_school(db, class_id, school_id):
+        raise NotFoundError("Class not found")
+    return repo.get_class_timetable(db, class_id, school_id)
+
+
+@router.get("/class/{class_id}/week", response_model=TimetableWeekRead)
+def get_class_week(
+    class_id: int,
+    week_start: date | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    """The class timetable for one calendar week, with holiday flags resolved.
+
+    ``week_start`` is optional and defaults to the current week; any day inside
+    the desired week is accepted and normalised to its Monday.
+    """
+    if not repo.get_class_in_school(db, class_id, school_id):
+        raise NotFoundError("Class not found")
+    return repo.get_class_week(db, class_id, school_id, week_start)
 
 
 @router.post("/class/{class_id}/period", response_model=list[TimetableEntryRead], status_code=201)
@@ -78,6 +105,7 @@ def update_entry(
         payload.period_start_time,
         payload.period_end_time,
         school_id,
+        payload.is_holiday_override,
     )
 
 

@@ -118,14 +118,25 @@ class Period(AuditColumnsMixin, Base):
 
 
 class Holiday(AuditColumnsMixin, Base):
+    """A single named holiday on a single calendar date.
+
+    This is deliberately *not* a recurring weekday flag: "we are closed every
+    Saturday" and "Diwali on 8 November" are different facts, and a table can
+    only answer one of them at a time. Timetable entries stay a recurring
+    weekday template, so a dated holiday is resolved against the real dates of
+    whichever week is being displayed.
+    """
+
     __tablename__ = "holidays"
 
     holiday_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    day_of_week = Column(String(3), nullable=False)
-    is_holiday = Column(Boolean, nullable=False, default=False)
+    occasion = Column(String(120), nullable=False)
+    holiday_date = Column(Date, nullable=False)
 
-    __table_args__ = (UniqueConstraint("school_id", "day_of_week"),)
+    # A school cannot have two holidays on the same date; the timetable would
+    # otherwise have to pick one arbitrarily when highlighting that column.
+    __table_args__ = (UniqueConstraint("school_id", "holiday_date"),)
 
 
 # ============================================================================

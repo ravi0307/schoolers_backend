@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import date, time
 
 from pydantic import AliasChoices, BaseModel, Field, field_validator
 
@@ -93,12 +93,49 @@ class PeriodUpdate(BaseModel):
 
 
 class HolidayRead(BaseModel):
-    day_of_week: str
-    is_holiday: bool
+    holiday_id: int
+    school_id: int
+    occasion: str
+    holiday_date: date
 
     class Config:
         from_attributes = True
 
 
+def _clean_occasion(value: str) -> str:
+    """Trim the occasion and reject anything that could not label a date.
+
+    Without this an occasion of "  " would pass every length check and render as
+    a blank cell in the admin table and as an unnamed red column in the
+    timetable, which is indistinguishable from a bug.
+    """
+    occasion = (value or "").strip()
+    if not occasion:
+        raise ValueError("Occasion cannot be blank")
+    if len(occasion) > 120:
+        raise ValueError("Occasion must be 120 characters or fewer")
+    return occasion
+
+
+class HolidayCreate(BaseModel):
+    """Add one named holiday on one calendar date."""
+
+    occasion: str
+    holiday_date: date
+
+    _validate_occasion = field_validator("occasion")(_clean_occasion)
+
+
 class HolidayUpdate(BaseModel):
-    is_holiday: bool
+    """Change a holiday in place. Both fields are optional so the admin portal
+    can PATCH just the date (rescheduling a holiday) or just the name."""
+
+    occasion: str | None = None
+    holiday_date: date | None = None
+
+    @field_validator("occasion")
+    @classmethod
+    def _known_occasion(cls, value: str | None) -> str | None:
+        return None if value is None else _clean_occasion(value)
+
+
