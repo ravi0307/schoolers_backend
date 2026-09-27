@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.database import Base
-from common.models import Parent, Pilot, School, Staff, Student, Teacher, User
+from common.models import Parent, Pilot, School, Staff, Student, User
 import common.email as email_helpers
 import services.schools_service.repository as schools_repo
 import services.people_service.repository as people_repo
@@ -207,12 +207,13 @@ class SchoolsNotificationTests(unittest.TestCase):
         })
 
         # Teacher + its login account.
-        teacher = Teacher(school_id=school.school_id, name="Teacher T", role_title="Math", phone="33")
+        teacher = Staff(school_id=school.school_id, name="Teacher T", role="Teacher",
+                        person_type="teacher", role_title="Math", phone="33")
         self.db.add(teacher)
         self.db.flush()
         self.db.add(User(
             school_id=school.school_id, role="teacher", username="teacher@northstar",
-            password_hash="x", linked_person_id=teacher.teacher_id,
+            password_hash="x", linked_person_id=teacher.staff_id,
         ))
 
         # Parent + its login account.
@@ -249,7 +250,7 @@ class SchoolsNotificationTests(unittest.TestCase):
         for student_id in (students[0].student_id, students[1].student_id):
             self.assertFalse(self.db.query(Student).filter(Student.student_id == student_id).one().is_active,
                              f"student {student_id} should be inactive")
-        self.assertFalse(self.db.query(Teacher).filter(Teacher.teacher_id == teacher.teacher_id).one().is_active)
+        self.assertFalse(self.db.query(Staff).filter(Staff.staff_id == teacher.staff_id).one().is_active)
         self.assertFalse(self.db.query(Parent).filter(Parent.parent_id == parent.parent_id).one().is_active)
         self.assertFalse(self.db.query(Pilot).filter(Pilot.staff_id == pilot_staff.staff_id).one().is_active)
 
@@ -443,8 +444,9 @@ class RecordUpdateNotificationTests(unittest.TestCase):
 
     @mock.patch("common.email.send_email")
     def test_teacher_update_emails_teacher(self, mock_send):
-        teacher = Teacher(school_id=1, name="Meera Nair", role_title="Math",
-                          phone="123", email="meera@sunrise.edu")
+        teacher = Staff(school_id=1, name="Meera Nair", role="Teacher",
+                        person_type="teacher", role_title="Math",
+                        phone="123", email="meera@sunrise.edu")
         self.db.add(teacher)
         self.db.flush()
         mock_send.reset_mock()

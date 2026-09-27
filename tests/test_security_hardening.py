@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
 from common.exceptions import ForbiddenError, UnauthorizedError
-from common.models import Base, Broadcast, Parent, School, SchoolClass, Staff, Teacher, User, Pilot
+from common.models import Base, Broadcast, Parent, Pilot, School, SchoolClass, Staff, User
 from common.security import hash_password, validate_password_byte_length, verify_password
 from services.auth_service.schemas import ForgotPasswordResetRequest
 from services.transport_service.schemas import PilotCreate, PilotUpdate
@@ -103,7 +103,7 @@ class PasswordByteLengthTests(unittest.TestCase):
 class PasswordResetTokenTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.Session = make_session(["users", "schools", "teachers", "staff", "parents", "pilots"])
+        cls.Session = make_session(["users", "schools", "staff", "parents", "pilots"])
 
     def setUp(self):
         self.db: Session = self.Session()
@@ -236,17 +236,19 @@ class BroadcastAuthorizationTests(unittest.TestCase):
 class BroadcastSenderIdentityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.Session = make_session(["teachers", "staff", "pilots"])
+        cls.Session = make_session(["staff", "pilots"])
 
     def setUp(self):
         self.db: Session = self.Session()
-        for name in ("teachers", "staff", "pilots"):
+        for name in ("staff", "pilots"):
             self.db.execute(Base.metadata.tables[name].delete())
         self.db.commit()
         self.db.add_all([
             Staff(staff_id=5, school_id=1, name="V. Joshi", role="Admin"),
-            Teacher(teacher_id=3, school_id=1, name="T. Eacher", role_title="Teacher", phone="1"),
-            Pilot(pilot_id=1, user_id=7, school_id=1, full_name="P. One", phone="1"),
+            Staff(staff_id=3, school_id=1, name="T. Eacher", role="Teacher",
+                   person_type="teacher", phone="1"),
+            Staff(staff_id=7, school_id=1, name="P. One", role="Pilot", person_type="pilot", phone="1"),
+            Pilot(pilot_id=1, staff_id=7),
         ])
         self.db.commit()
 
@@ -264,7 +266,7 @@ class BroadcastSenderIdentityTests(unittest.TestCase):
             comm_repo.resolve_sender_identity(self.db, user)
 
     def test_pilot_identity_is_derived(self):
-        user = CurrentUser(user_id=7, role="pilot", school_id=1)
+        user = CurrentUser(user_id=7, role="pilot", school_id=1, linked_person_id=7)
         self.assertEqual(comm_repo.resolve_sender_identity(self.db, user), ("Pilot", "P. One"))
 
     def test_admin_identity_uses_staff_record_or_falls_back(self):
@@ -358,7 +360,7 @@ class ResetResponseUniformityTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.Session = make_session(["users", "schools", "staff", "teachers", "parents", "pilots"])
+        cls.Session = make_session(["users", "schools", "staff", "parents", "pilots"])
         sys.path.insert(0, "services/auth_service")
         cls._saved = {name: sys.modules.pop(name, None) for name in ("schemas", "service", "router")}
         try:

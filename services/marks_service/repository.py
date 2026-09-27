@@ -48,7 +48,7 @@ def teacher_teaches_student(db: Session, teacher_id: int, student_id: int) -> bo
     if not student:
         return False
     exists = db.query(TeacherClassSubject).filter(
-        TeacherClassSubject.teacher_id == teacher_id,
+        TeacherClassSubject.staff_id == teacher_id,
         TeacherClassSubject.class_id == student.class_id,
     ).first()
     return exists is not None
@@ -61,7 +61,7 @@ def teacher_can_grade(db: Session, teacher_id: int, student_id: int, subject_id:
     if not student:
         return False
     exists = db.query(TeacherClassSubject).filter(
-        TeacherClassSubject.teacher_id == teacher_id,
+        TeacherClassSubject.staff_id == teacher_id,
         TeacherClassSubject.class_id == student.class_id,
         TeacherClassSubject.subject_id == subject_id,
     ).first()
@@ -71,7 +71,7 @@ def teacher_can_grade(db: Session, teacher_id: int, student_id: int, subject_id:
 def get_subject_ids_for_class(db: Session, teacher_id: int, class_id: int) -> list[int]:
     """The set of subject ids a teacher is assigned to teach in one class."""
     rows = db.query(TeacherClassSubject.subject_id).filter(
-        TeacherClassSubject.teacher_id == teacher_id,
+        TeacherClassSubject.staff_id == teacher_id,
         TeacherClassSubject.class_id == class_id,
     ).all()
     return [row[0] for row in rows]

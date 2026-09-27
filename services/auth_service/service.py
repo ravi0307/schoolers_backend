@@ -13,7 +13,7 @@ from common.security import (
     verify_password, create_access_token, create_refresh_token, decode_token,
     hash_password,
 )
-from common.models import User, Teacher, Staff, Parent, Pilot, School
+from common.models import User, Staff, Parent, School
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +71,15 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     if user:
         return user
 
-    # IDs are only unique within their own table.  Match both the account role
-    # and its corresponding person table to prevent an email from selecting an
-    # unrelated account with the same numeric linked_person_id.
+    # linked_person_id is only unique within its own table, so match the
+    # account role and its person table together to stop an email from
+    # selecting an unrelated account that happens to share the numeric id.
+    # Teachers, staff, admins and pilots all resolve through the staff table.
     lookups = (
-        ("teacher", Teacher, Teacher.teacher_id),
+        ("teacher", Staff, Staff.staff_id),
         ("staff", Staff, Staff.staff_id),
         ("admin", Staff, Staff.staff_id),
+        ("pilot", Staff, Staff.staff_id),
         ("parent", Parent, Parent.parent_id),
     )
     for role, person_model, person_id in lookups:
@@ -93,19 +95,7 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
         )
         if user:
             return user
-
-    # Pilots link directly to users through Pilot.user_id rather than
-    # User.linked_person_id.
-    return (
-        db.query(User)
-        .join(Pilot, Pilot.user_id == User.user_id)
-        .filter(
-            User.role == "pilot",
-            User.is_active.is_(True),
-            func.lower(Pilot.email) == normalized_identifier,
-        )
-        .first()
-    )
+    return None
 
 
 def user_email_address(db: Session, user: User) -> str | None:
@@ -117,18 +107,12 @@ def user_email_address(db: Session, user: User) -> str | None:
     if user.role == "admin":
         school = db.query(School).filter(School.school_id == user.school_id).first()
         return school.primary_email if school else None
-    if user.role == "teacher":
-        person = db.query(Teacher).filter(Teacher.teacher_id == user.linked_person_id).first()
-        return person.email if person else None
-    if user.role == "staff":
+    if user.role in ("teacher", "staff", "pilot"):
         person = db.query(Staff).filter(Staff.staff_id == user.linked_person_id).first()
         return person.email if person else None
     if user.role == "parent":
         person = db.query(Parent).filter(Parent.parent_id == user.linked_person_id).first()
         return person.email if person else None
-    if user.role == "pilot":
-        pilot = db.query(Pilot).filter(Pilot.user_id == user.user_id).first()
-        return pilot.email if pilot else None
     return None
 
 

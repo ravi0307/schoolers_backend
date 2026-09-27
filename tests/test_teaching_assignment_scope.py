@@ -11,13 +11,13 @@ import unittest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from common.models import Base, Subject, Teacher, SchoolClass
+from common.models import Base, SchoolClass, Staff, Subject
 from common.exceptions import ConflictError
 import services.people_service.repository as people_repo
 
 TABLES = [
+    "staff",
     "subjects",
-    "teachers",
     "classes",
     "teacher_class_subjects",
 ]
@@ -28,8 +28,10 @@ def seed(db: Session):
         [
             Subject(subject_id=1, school_id=1, name="Maths"),
             Subject(subject_id=2, school_id=2, name="Robotics"),
-            Teacher(teacher_id=1, school_id=1, name="T. One", role_title="Maths", phone="000"),
-            Teacher(teacher_id=2, school_id=2, name="T. Two", role_title="Robotics", phone="000"),
+            Staff(staff_id=1, school_id=1, name="T. One", role="Teacher",
+                  person_type="teacher", role_title="Maths", phone="000"),
+            Staff(staff_id=2, school_id=2, name="T. Two", role="Teacher",
+                  person_type="teacher", role_title="Robotics", phone="000"),
             SchoolClass(class_id=1, school_id=1, name="Class 1"),
             SchoolClass(class_id=2, school_id=2, name="Class 2"),
         ]
@@ -80,7 +82,7 @@ class TeachingAssignmentScopeTests(unittest.TestCase):
 
     def test_foreign_teacher_rejected(self):
         with self.assertRaises(ConflictError):
-            self._assignment(teacher_id=2)
+            self._assignment(staff_id=2)
 
     def test_foreign_class_rejected(self):
         with self.assertRaises(ConflictError):

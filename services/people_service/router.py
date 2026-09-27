@@ -71,7 +71,15 @@ def assign_teaching_load(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.add_teaching_assignment(db, school_id, payload.model_dump())
+    tcs = repo.add_teaching_assignment(db, school_id, payload.model_dump())
+    return {
+        "id": tcs.id,
+        "staff_id": tcs.staff_id,
+        "teacher_id": tcs.staff_id,
+        "class_id": tcs.class_id,
+        "subject_id": tcs.subject_id,
+        "is_class_teacher": tcs.is_class_teacher,
+    }
 
 
 @router.get("/teachers/{teacher_id}/load")
@@ -80,7 +88,17 @@ def teaching_load(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
-    return repo.teaching_load(db, teacher_id)
+    return [
+        {
+            "id": tcs.id,
+            "staff_id": tcs.staff_id,
+            "teacher_id": tcs.staff_id,
+            "class_id": tcs.class_id,
+            "subject_id": tcs.subject_id,
+            "is_class_teacher": tcs.is_class_teacher,
+        }
+        for tcs in repo.teaching_load(db, teacher_id)
+    ]
 
 
 # ---- Staff ----

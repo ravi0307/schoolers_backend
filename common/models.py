@@ -97,11 +97,16 @@ class SchoolClass(AuditColumnsMixin, Base):
     class_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     name = Column(String(40), nullable=False)
-    class_teacher_id = Column(Integer, ForeignKey("teachers.teacher_id", ondelete="SET NULL"))
+    class_teacher_staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
     student_count = Column(Integer, nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
     __table_args__ = (UniqueConstraint("school_id", "name"),)
+
+    @property
+    def class_teacher_id(self) -> int | None:
+        """Read-only alias of class_teacher_staff_id for existing clients."""
+        return self.class_teacher_staff_id
 
 
 class Period(AuditColumnsMixin, Base):
@@ -127,36 +132,26 @@ class Holiday(AuditColumnsMixin, Base):
 # 3. PEOPLE
 # ============================================================================
 
-class Teacher(AuditColumnsMixin, Base):
-    __tablename__ = "teachers"
-
-    teacher_id = Column(Integer, primary_key=True)
-    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"), unique=True)
-    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(100), nullable=False)
-    role_title = Column(String(100), nullable=False)
-    phone = Column(String(30), nullable=False)
-    email = Column(String(120))
-    present_address = Column(String(255))
-    permanent_address = Column(String(255))
-    date_of_birth = Column(Date)
-    emergency_number = Column(String(30))
-    gender = Column(String(20))
-    attendance_status = Column(String(15), nullable=False, default="On time")
-    created_at = Column(DateTime, server_default=func.now())
-    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
-
-
 class TeacherClassSubject(AuditColumnsMixin, Base):
+    """A staff member's teaching assignment.
+
+    staff_id points at the unified staff table; teacher_id is a read-only alias
+    kept so existing clients keep working after the teachers/pilots merge.
+    """
+
     __tablename__ = "teacher_class_subjects"
 
     id = Column(Integer, primary_key=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.teacher_id", ondelete="CASCADE"), nullable=False)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"), nullable=False)
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
     is_class_teacher = Column(Boolean, nullable=False, default=False)
 
-    __table_args__ = (UniqueConstraint("teacher_id", "class_id", "subject_id"),)
+    __table_args__ = (UniqueConstraint("staff_id", "class_id", "subject_id"),)
+
+    @property
+    def teacher_id(self) -> int:
+        return self.staff_id
 
 
 class Staff(AuditColumnsMixin, Base):
@@ -165,7 +160,14 @@ class Staff(AuditColumnsMixin, Base):
     staff_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
+    # role is the free-text display label; person_type is the reliable
+    # discriminator (teacher/pilot/admin/staff) that teaching assignments and
+    # reporting filter on. role_title replaces the old teachers.role_title.
     role = Column(String(60), nullable=False)
+    role_title = Column(String(100))
+    person_type = Column(
+        String(20), nullable=False, default="staff", server_default="staff"
+    )
     phone = Column(String(30))
     email = Column(String(120))
     date_of_birth = Column(Date)
@@ -178,6 +180,13 @@ class Staff(AuditColumnsMixin, Base):
     driving_license = Column(String(40))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        CheckConstraint(
+            "person_type IN ('teacher', 'pilot', 'admin', 'staff')",
+            name="ck_staff_person_type",
+        ),
+    )
 
 
 class Parent(AuditColumnsMixin, Base):
@@ -235,10 +244,22 @@ class Route(AuditColumnsMixin, Base):
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
     vehicle = Column(String(60), nullable=False)
-    driver_name = Column(String(100), nullable=False)
+    # The driver is not stored here: a route's driver is the staff member whose
+    # pilots row points at this route. See Pilot.route_id.
     status = Column(String(15), nullable=False, default="Scheduled")
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    pilot = relationship("Pilot", uselist=False, viewonly=True, back_populates="route")
+
+    @property
+    def driver_name(self) -> str | None:
+        """Derived driver name. Kept in the API so the parent pick/drop
+        payload and existing clients are unaffected by the drivers table
+        becoming a reference to pilots."""
+        if self.pilot is not None and self.pilot.staff is not None:
+            return self.pilot.staff.name
+        return None
 
 
 class Vehicle(AuditColumnsMixin, Base):
@@ -295,12 +316,16 @@ class TimetableEntry(AuditColumnsMixin, Base):
     period_start_time = Column(Time)
     period_end_time = Column(Time)
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="SET NULL"))
-    teacher_id = Column(Integer, ForeignKey("teachers.teacher_id", ondelete="SET NULL"))
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
     created_on = Column(DateTime, server_default=text("timezone('Asia/Kolkata', now())"))
     created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     is_holiday_override = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (UniqueConstraint("class_id", "day_of_week", "period_id"),)
+
+    @property
+    def teacher_id(self) -> int | None:
+        return self.staff_id
 
 
 # ============================================================================
@@ -315,7 +340,7 @@ class Attendance(AuditColumnsMixin, Base):
     class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"), nullable=False)
     date = Column(Date, nullable=False)
     status = Column(String(10), nullable=False)
-    marked_by = Column(Integer, ForeignKey("teachers.teacher_id"))
+    marked_by = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
 
     __table_args__ = (UniqueConstraint("student_id", "date"),)
 
@@ -328,8 +353,8 @@ class Mark(AuditColumnsMixin, Base):
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
     term = Column(String(20), nullable=False, default="Term 1")
     score = Column(Integer, nullable=False)
-    updated_by = Column(Integer, ForeignKey("teachers.teacher_id"))
-    updated_by_user = Column(Integer, ForeignKey("users.user_id"))
+    updated_by = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
+    updated_by_user = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
@@ -493,21 +518,59 @@ class User(AuditColumnsMixin, Base):
 
 
 class Pilot(AuditColumnsMixin, Base):
+    """Driver-specific extension of a staff member.
+
+    A pilot row exists only for staff who drive, and holds just the fields a
+    generic staff row should not carry. Every personal detail (name, phone,
+    addresses, aadhaar) lives on the linked staff row. Because each row holds
+    at most one route_id, the driver<->route relationship is 1:1.
+    """
+
     __tablename__ = "pilots"
 
     pilot_id = Column(Integer, primary_key=True)
-    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"), unique=True)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, unique=True)
-    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    full_name = Column(String(100), nullable=False)
-    email = Column(String(120))
-    phone = Column(String(30), nullable=False)
-    present_address = Column(String(255))
-    permanent_address = Column(String(255))
-    aadhaar_number = Column(String(30))
-    dl_number = Column(String(40))
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="CASCADE"), nullable=False, unique=True)
+    license_expiry = Column(Date)
+    route_id = Column(
+        Integer, ForeignKey("routes.route_id", ondelete="SET NULL"), unique=True
+    )
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
-    created_at = Column(DateTime, server_default=func.now())
+
+    staff = relationship("Staff", uselist=False, viewonly=True)
+    route = relationship(
+        "Route", uselist=False, viewonly=True, back_populates="pilot"
+    )
+
+
+class StaffAttendance(AuditColumnsMixin, Base):
+    """Dated attendance for any staff member (teacher, pilot, admin, staff).
+
+    Replaces the denormalised teachers.attendance_status column, which could
+    only ever hold one current value per teacher.
+    """
+
+    __tablename__ = "staff_attendance"
+
+    attendance_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    status = Column(String(10), nullable=False)
+    check_in = Column(Time)
+    check_out = Column(Time)
+    remarks = Column(String(255))
+    # Whoever marked the row. An admin accounts for staff attendance, so this
+    # points at the login rather than at a teacher record.
+    marked_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    modified_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    __table_args__ = (
+        UniqueConstraint("staff_id", "date"),
+        CheckConstraint(
+            "status IN ('Present','Absent','On leave','Half day')",
+            name="staff_attendance_status_check",
+        ),
+    )
 
 
 # Register the audit stamper so every process importing the models configures

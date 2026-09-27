@@ -24,7 +24,6 @@ from common.models import (
     Staff,
     Student,
     Subject,
-    Teacher,
     TeacherClassSubject,
 )
 import services.communication_service.repository as repo
@@ -32,7 +31,6 @@ from services.communication_service.schemas import BroadcastCreate
 
 TABLES = [
     "staff",
-    "teachers",
     "subjects",
     "classes",
     "teacher_class_subjects",
@@ -67,7 +65,8 @@ class BroadcastDeliveryTests(unittest.TestCase):
         school_1 = 1
 
         staff = Staff(staff_id=1, school_id=school_1, name="Staff", role="Admin")
-        teacher = Teacher(teacher_id=1, school_id=school_1, name="T. Eacher", role_title="Teacher", staff_id=1, phone="000")
+        teacher = Staff(staff_id=2, school_id=school_1, name="T. Eacher", role="Teacher",
+                        person_type="teacher", role_title="Teacher", phone="000")
         self.db.add_all([staff, teacher])
 
         self.subject_1 = Subject(subject_id=1, school_id=school_1, name="Maths")
@@ -78,7 +77,7 @@ class BroadcastDeliveryTests(unittest.TestCase):
         self.db.add_all([self.cls_1, self.cls_75])
 
         # Teacher 1 teaches a subject in Class 1 only.
-        self.db.add(TeacherClassSubject(teacher_id=1, class_id=1, subject_id=1, is_class_teacher=True))
+        self.db.add(TeacherClassSubject(staff_id=1, class_id=1, subject_id=1, is_class_teacher=True))
 
         student_7 = Student(student_id=7, school_id=school_1, class_id=1, admission_no="A7", name="Tara Dhaliwal")
         student_446 = Student(student_id=446, school_id=school_1, class_id=75, admission_no="A446", name="Other Kid")
@@ -93,8 +92,8 @@ class BroadcastDeliveryTests(unittest.TestCase):
             ParentStudent(parent_id=168, student_id=446),
         ])
 
-        self.route_1 = Route(route_id=1, school_id=school_1, name="Route 1", vehicle="Bus A", driver_name="Driver A")
-        self.route_51 = Route(route_id=51, school_id=school_1, name="Route 51", vehicle="Bus B", driver_name="Driver B")
+        self.route_1 = Route(route_id=1, school_id=school_1, name="Route 1", vehicle="Bus A")
+        self.route_51 = Route(route_id=51, school_id=school_1, name="Route 51", vehicle="Bus B")
         self.db.add_all([self.route_1, self.route_51])
 
         self.db.add_all([

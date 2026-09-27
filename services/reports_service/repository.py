@@ -2,13 +2,23 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 
 from common.models import (
-    Teacher, Staff, Student, Parent, SchoolClass, LeaveRequest, Route, Attendance,
+    Staff, Student, Parent, SchoolClass, LeaveRequest, Route, Attendance,
 )
 
 
 def school_overview(db: Session, school_id: int) -> dict:
-    teachers = db.query(func.count(Teacher.teacher_id)).filter(Teacher.school_id == school_id, Teacher.is_active.is_(True)).scalar()
-    staff = db.query(func.count(Staff.staff_id)).filter(Staff.school_id == school_id, Staff.is_active.is_(True)).scalar()
+    # Teachers are staff rows, so "staff" counts the non-teaching employees to
+    # keep the two figures disjoint rather than double counting.
+    teachers = db.query(func.count(Staff.staff_id)).filter(
+        Staff.school_id == school_id,
+        Staff.person_type == "teacher",
+        Staff.is_active.is_(True),
+    ).scalar()
+    staff = db.query(func.count(Staff.staff_id)).filter(
+        Staff.school_id == school_id,
+        Staff.person_type != "teacher",
+        Staff.is_active.is_(True),
+    ).scalar()
     students = db.query(func.count(Student.student_id)).filter(Student.school_id == school_id, Student.is_active.is_(True)).scalar()
     parents = db.query(func.count(distinct(Parent.parent_id))).filter(Parent.school_id == school_id, Parent.is_active.is_(True)).scalar()
     classes = db.query(func.count(SchoolClass.class_id)).filter(SchoolClass.school_id == school_id, SchoolClass.is_active.is_(True)).scalar()

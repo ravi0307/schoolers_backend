@@ -431,3 +431,223 @@ ALTER TABLE IF EXISTS schoolers.subjects
 -- while keeping marks/timetable references intact; it can be reactivated.
 ALTER TABLE IF EXISTS schoolers.subjects
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+
+-- ============================================================================
+-- STAFF / TEACHER / PILOT UNIFICATION
+-- Phase 1 (additive): new staff columns, pilot driver fields, staff attendance.
+-- ============================================================================
+
+-- staff becomes the single record for every employee. role stays free text
+-- (the "Other staff" form sends a custom label); person_type is the reliable
+-- discriminator that teaching assignments and reporting filter on.
+ALTER TABLE IF EXISTS schoolers.staff
+    ADD COLUMN IF NOT EXISTS role_title VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS person_type VARCHAR(20) NOT NULL DEFAULT 'staff';
+
+ALTER TABLE IF EXISTS schoolers.staff
+    DROP CONSTRAINT IF EXISTS staff_person_type_check;
+
+ALTER TABLE IF EXISTS schoolers.staff
+    ADD CONSTRAINT staff_person_type_check
+        CHECK (person_type::text = ANY (ARRAY[
+            'teacher'::character varying, 'pilot'::character varying,
+            'admin'::character varying, 'staff'::character varying
+        ]::text[]));
+
+CREATE INDEX IF NOT EXISTS idx_staff_person_type
+    ON schoolers.staff(school_id, person_type);
+
+-- Driver-specific fields that a generic staff row should not carry.
+ALTER TABLE IF EXISTS schoolers.pilots
+    ADD COLUMN IF NOT EXISTS license_expiry DATE,
+    ADD COLUMN IF NOT EXISTS route_id INTEGER;
+
+ALTER TABLE IF EXISTS schoolers.pilots
+    DROP CONSTRAINT IF EXISTS pilots_route_id_fkey;
+
+ALTER TABLE IF EXISTS schoolers.pilots
+    ADD CONSTRAINT pilots_route_id_fkey
+        FOREIGN KEY (route_id) REFERENCES schoolers.routes(route_id) ON DELETE SET NULL;
+
+-- One driver per route. Postgres allows repeated NULLs, so unassigned pilots
+-- are unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pilots_route_id
+    ON schoolers.pilots(route_id) WHERE route_id IS NOT NULL;
+
+-- pilots.user_id becomes optional: the pilot account is now reachable through
+-- users.linked_person_id -> staff.staff_id, so the dedicated link is redundant.
+ALTER TABLE IF EXISTS schoolers.pilots
+    ALTER COLUMN user_id DROP NOT NULL;
+
+-- Dated attendance for every staff member. This replaces the single-value
+-- teachers.attendance_status column, which could not record history.
+CREATE TABLE IF NOT EXISTS schoolers.staff_attendance (
+    attendance_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    staff_id INTEGER NOT NULL REFERENCES schoolers.staff(staff_id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    status VARCHAR(10) NOT NULL,
+    check_in TIME,
+    check_out TIME,
+    remarks VARCHAR(255),
+    marked_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT staff_attendance_staff_id_date_key UNIQUE (staff_id, date),
+    CONSTRAINT staff_attendance_status_check
+        CHECK (status::text = ANY (ARRAY[
+            'Present'::character varying, 'Absent'::character varying,
+            'On leave'::character varying, 'Half day'::character varying
+        ]::text[]))
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_school_date
+    ON schoolers.staff_attendance(school_id, date);
+
+-- ============================================================================
+-- STAFF / TEACHER / PILOT UNIFICATION
+-- Phase 2-4 (destructive): fold teachers + pilots into staff.
+--
+-- teacher_id is retired as a column everywhere and survives only as a
+-- read-only API alias of staff_id, so existing clients keep working.
+-- ============================================================================
+
+-- A1. Give every teacher a staff row. Teachers that already had staff_id NULL
+--     (API-created ones never got a staff row) are matched on school+name+phone.
+INSERT INTO schoolers.staff
+    (school_id, name, role, role_title, person_type, phone, email,
+     present_address, permanent_address, date_of_birth, emergency_number,
+     gender, is_active, created_at)
+SELECT t.school_id, t.name, 'Teacher', t.role_title, 'teacher', t.phone, t.email,
+       t.present_address, t.permanent_address, t.date_of_birth, t.emergency_number,
+       t.gender, t.is_active, COALESCE(t.created_at, now())
+FROM schoolers.teachers t
+WHERE t.staff_id IS NULL;
+
+UPDATE schoolers.teachers t
+SET staff_id = s.staff_id
+FROM schoolers.staff s
+WHERE t.staff_id IS NULL
+  AND s.school_id = t.school_id AND s.name = t.name AND s.phone = t.phone;
+
+-- A2. Mark the staff rows that are teachers, carrying over the job title.
+UPDATE schoolers.staff s
+SET person_type = 'teacher',
+    role_title = COALESCE(s.role_title, t.role_title)
+FROM schoolers.teachers t
+WHERE t.staff_id = s.staff_id;
+
+-- A3. Adopt the generic staff identity onto the pilot rows, then drop the
+--     duplicated personal columns. dl_number/aadhaar already exist on staff.
+UPDATE schoolers.pilots p
+SET full_name = s.name,
+    email = s.email,
+    phone = s.phone,
+    present_address = s.present_address,
+    permanent_address = s.permanent_address,
+    aadhaar_number = s.aadhaar_card
+FROM schoolers.staff s
+WHERE p.staff_id = s.staff_id;
+
+-- A4. Pilot logins now resolve through users.linked_person_id -> staff.staff_id.
+UPDATE schoolers.users u
+SET linked_person_id = p.staff_id
+FROM schoolers.pilots p
+WHERE p.user_id = u.user_id;
+
+-- A5. Teacher logins resolve to the same staff space.
+UPDATE schoolers.users u
+SET linked_person_id = t.staff_id
+FROM schoolers.teachers t
+WHERE t.teacher_id = u.linked_person_id
+  AND u.role = 'teacher'
+  AND t.staff_id IS NOT NULL;
+
+-- B0. Rewrite the stored teacher ids to the new staff ids BEFORE the columns
+--     are renamed. A bare RENAME keeps the old numbers, which would silently
+--     point every assignment at an unrelated staff row (teacher 2 -> staff 2).
+--     This must run while schoolers.teachers still exists.
+UPDATE schoolers.teacher_class_subjects tcs
+SET teacher_id = t.staff_id
+FROM schoolers.teachers t
+WHERE tcs.teacher_id = t.teacher_id AND t.staff_id IS NOT NULL;
+
+UPDATE schoolers.timetable_entries te
+SET teacher_id = t.staff_id
+FROM schoolers.teachers t
+WHERE te.teacher_id = t.teacher_id AND t.staff_id IS NOT NULL;
+
+UPDATE schoolers.classes c
+SET class_teacher_id = t.staff_id
+FROM schoolers.teachers t
+WHERE c.class_teacher_id = t.teacher_id AND t.staff_id IS NOT NULL;
+
+-- Any teacher id with no matching staff row would be left dangling; null it out
+-- so the new SET NULL / cascade semantics apply instead of a wrong reference.
+UPDATE schoolers.teacher_class_subjects tcs
+SET teacher_id = NULL
+WHERE teacher_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM schoolers.teachers t WHERE t.teacher_id = tcs.teacher_id);
+
+UPDATE schoolers.timetable_entries te
+SET teacher_id = NULL
+WHERE teacher_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM schoolers.teachers t WHERE t.teacher_id = te.teacher_id);
+
+UPDATE schoolers.classes c
+SET class_teacher_id = NULL
+WHERE class_teacher_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM schoolers.teachers t WHERE t.teacher_id = c.class_teacher_id);
+
+-- B. Repoint the five foreign keys off teachers.teacher_id.
+ALTER TABLE schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_teacher_id_fkey;
+ALTER TABLE schoolers.teacher_class_subjects RENAME COLUMN teacher_id TO staff_id;
+ALTER TABLE schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_teacher_id_class_id_subject_id_key;
+ALTER TABLE schoolers.teacher_class_subjects ADD CONSTRAINT teacher_class_subjects_staff_id_class_id_subject_id_key UNIQUE (staff_id, class_id, subject_id);
+ALTER TABLE schoolers.teacher_class_subjects ADD CONSTRAINT teacher_class_subjects_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES schoolers.staff(staff_id) ON DELETE CASCADE;
+
+ALTER TABLE schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_teacher_id_fkey;
+ALTER TABLE schoolers.timetable_entries RENAME COLUMN teacher_id TO staff_id;
+ALTER TABLE schoolers.timetable_entries ADD CONSTRAINT timetable_entries_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL;
+
+ALTER TABLE schoolers.classes DROP CONSTRAINT IF EXISTS classes_class_teacher_id_fkey;
+ALTER TABLE schoolers.classes DROP CONSTRAINT IF EXISTS fk_classes_teacher;
+ALTER TABLE schoolers.classes RENAME COLUMN class_teacher_id TO class_teacher_staff_id;
+ALTER TABLE schoolers.classes ADD CONSTRAINT classes_class_teacher_staff_id_fkey FOREIGN KEY (class_teacher_staff_id) REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL;
+
+ALTER TABLE schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_marked_by_fkey;
+ALTER TABLE schoolers.attendance DROP COLUMN IF EXISTS marked_by;
+ALTER TABLE schoolers.attendance ADD COLUMN IF NOT EXISTS marked_by INTEGER;
+ALTER TABLE schoolers.attendance ADD CONSTRAINT attendance_marked_by_fkey FOREIGN KEY (marked_by) REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL;
+
+ALTER TABLE schoolers.marks DROP CONSTRAINT IF EXISTS marks_updated_by_fkey;
+ALTER TABLE schoolers.marks DROP COLUMN IF EXISTS updated_by;
+ALTER TABLE schoolers.marks ADD COLUMN IF NOT EXISTS updated_by INTEGER;
+ALTER TABLE schoolers.marks ADD CONSTRAINT marks_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES schoolers.staff(staff_id) ON DELETE SET NULL;
+
+-- C. Retire the teachers table and the free-text route driver.
+DROP TABLE IF EXISTS schoolers.teachers;
+ALTER TABLE schoolers.routes DROP COLUMN IF EXISTS driver_name;
+
+-- D. Reduce pilots to the driver-specific fields only.
+ALTER TABLE schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_user_id_fkey;
+ALTER TABLE schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_school_id_fkey;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS user_id;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS school_id;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS full_name;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS email;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS phone;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS present_address;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS permanent_address;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS aadhaar_number;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS dl_number;
+ALTER TABLE schoolers.pilots DROP COLUMN IF EXISTS created_at;
+
+-- staff_id is now mandatory and cascading, matching the model.
+DELETE FROM schoolers.pilots WHERE staff_id IS NULL;
+ALTER TABLE schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_staff_id_fkey;
+ALTER TABLE schoolers.pilots ALTER COLUMN staff_id SET NOT NULL;
+ALTER TABLE schoolers.pilots ADD CONSTRAINT pilots_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES schoolers.staff(staff_id) ON DELETE CASCADE;
+
+-- E. The denormalised single-value attendance column lived on teachers and
+--    goes away with the table; the dated staff_attendance table replaces it.

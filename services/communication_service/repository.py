@@ -4,8 +4,8 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from common.models import (
-    Broadcast, ParentStudent, Pilot, Route, RouteStudent, SchoolClass,
-    Staff, Student, Teacher, TeacherClassSubject,
+    Broadcast, ParentStudent, Route, RouteStudent, SchoolClass,
+    Staff, Student, TeacherClassSubject,
 )
 from common.exceptions import NotFoundError, ForbiddenError
 from common.dependencies import CurrentUser
@@ -81,14 +81,14 @@ def _teacher_visible_filter(db: Session, teacher_id: int):
     the transport routes carrying students from those classes."""
     taught_class_ids = (
         db.query(TeacherClassSubject.class_id)
-        .filter(TeacherClassSubject.teacher_id == teacher_id)
+        .filter(TeacherClassSubject.staff_id == teacher_id)
     )
     scoped_classes = (
         db.query(SchoolClass.class_id)
         .filter(
             or_(
                 SchoolClass.class_id.in_(taught_class_ids),
-                SchoolClass.class_teacher_id == teacher_id,
+                SchoolClass.class_teacher_staff_id == teacher_id,
             )
         )
     )
@@ -109,31 +109,9 @@ def resolve_sender_identity(db: Session, current_user: CurrentUser) -> tuple[str
     user rather than trusting client-supplied values, so a teacher or pilot
     cannot impersonate an admin."""
     role = current_user.role
-    if role == "teacher":
-        if not current_user.linked_person_id:
-            raise ForbiddenError("This teacher account isn't linked to a teacher record")
-        teacher = (
-            db.query(Teacher)
-            .filter(
-                Teacher.teacher_id == current_user.linked_person_id,
-                Teacher.is_active.is_(True),
-            )
-            .first()
-        )
-        if not teacher:
-            raise ForbiddenError("Teacher record not found")
-        return "Teacher", teacher.name
-    if role == "pilot":
-        pilot = (
-            db.query(Pilot)
-            .filter(Pilot.user_id == current_user.user_id)
-            .first()
-        )
-        if not pilot:
-            raise ForbiddenError("Pilot record not found")
-        return "Pilot", pilot.full_name
-    if current_user.linked_person_id:
-        staff = (
+
+    def linked_staff() -> Staff | None:
+        return (
             db.query(Staff)
             .filter(
                 Staff.staff_id == current_user.linked_person_id,
@@ -141,6 +119,21 @@ def resolve_sender_identity(db: Session, current_user: CurrentUser) -> tuple[str
             )
             .first()
         )
+
+    # Teachers and pilots broadcast under their own name, so an account that
+    # isn't linked to a live staff row must not be allowed to post.
+    if role in ("teacher", "pilot"):
+        if not current_user.linked_person_id:
+            raise ForbiddenError(
+                f"This {role} account isn't linked to a staff record"
+            )
+        staff = linked_staff()
+        if not staff:
+            raise ForbiddenError("Staff record not found")
+        return ("Teacher" if role == "teacher" else "Pilot"), staff.name
+
+    if current_user.linked_person_id:
+        staff = linked_staff()
         if staff:
             return "Admin", staff.name
     return "Admin", "Admin"

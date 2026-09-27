@@ -9,6 +9,7 @@ from common.exceptions import ForbiddenError, NotFoundError
 import repository as repo
 from schemas import (
     AttendanceMarkBulk, AttendanceRead, ClassAttendanceSummary,
+    StaffAttendanceMarkBulk, StaffAttendanceRead,
 )
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
@@ -93,3 +94,56 @@ def class_summary(
             raise ForbiddenError("You can only view summaries for classes you teach")
 
     return repo.class_summary(db, class_id, on_date)
+
+
+# ---- Staff attendance -------------------------------------------------------
+# An admin accounts for staff attendance. Teachers may read it for themselves
+# but never mark it, mirroring how student attendance is admin/teacher-only.
+@router.post("/staff/mark", response_model=list[StaffAttendanceRead])
+def mark_staff_attendance(
+    payload: StaffAttendanceMarkBulk,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    school_id = current_user.school_id
+    if school_id is None:
+        raise ForbiddenError("Only a school admin can mark staff attendance")
+
+    # Never trust staff ids in the body: every entry must belong to this school.
+    for entry in payload.entries:
+        if not repo.staff_in_school(db, entry.staff_id, school_id):
+            raise NotFoundError(f"Staff member {entry.staff_id} is not in your school")
+
+    return repo.mark_staff_bulk(
+        db, school_id, payload.date,
+        [e.model_dump() for e in payload.entries], current_user.user_id,
+    )
+
+
+@router.get("/staff", response_model=list[StaffAttendanceRead])
+def get_staff_attendance(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    staff_id: int | None = Query(default=None),
+    latest_only: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin", "teacher", "staff", "pilot")),
+):
+    school_id = current_user.school_id
+    if school_id is None:
+        raise ForbiddenError("No school is associated with this account")
+
+    # A non-admin may only ever read their own row.
+    if current_user.role != "admin":
+        if not current_user.linked_person_id:
+            raise ForbiddenError("This account isn't linked to a staff record")
+        if staff_id is not None and staff_id != current_user.linked_person_id:
+            raise ForbiddenError("You can only view your own attendance")
+        staff_id = current_user.linked_person_id
+
+    if latest_only:
+        rows = repo.latest_staff_attendance(db, school_id)
+        return [r for r in rows if staff_id is None or r["staff_id"] == staff_id]
+
+    wanted = [staff_id] if staff_id is not None else None
+    return repo.staff_attendance_rows(db, school_id, date_from, date_to, wanted)
