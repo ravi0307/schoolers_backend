@@ -26,9 +26,9 @@ def seed(db: Session):
             Subject(subject_id=3, school_id=1, name="Maths"),
             Subject(subject_id=5, school_id=1, name="Science"),
             Subject(subject_id=8, school_id=1, name="English"),
-            TeacherClassSubject(teacher_id=7, class_id=1, subject_id=3, is_class_teacher=True),
-            TeacherClassSubject(teacher_id=7, class_id=1, subject_id=8, is_class_teacher=True),
-            TeacherClassSubject(teacher_id=9, class_id=2, subject_id=3, is_class_teacher=True),
+            TeacherClassSubject(staff_id=7, class_id=1, subject_id=3, is_class_teacher=True),
+            TeacherClassSubject(staff_id=7, class_id=1, subject_id=8, is_class_teacher=True),
+            TeacherClassSubject(staff_id=9, class_id=2, subject_id=3, is_class_teacher=True),
         ]
     )
     db.commit()

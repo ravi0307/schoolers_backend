@@ -31,10 +31,10 @@ def seed(db: Session):
             Student(student_id=3, school_id=1, class_id=2, admission_no="A3", name="Carol"),
             SchoolClass(class_id=1, school_id=1, name="Class 1"),
             SchoolClass(class_id=2, school_id=2, name="Class 2"),
-            SchoolClass(class_id=3, school_id=1, name="Class 3", class_teacher_id=99),
+            SchoolClass(class_id=3, school_id=1, name="Class 3", class_teacher_staff_id=99),
             Student(student_id=5, school_id=1, class_id=3, admission_no="A5", name="Dana"),
             Student(student_id=6, school_id=2, class_id=2, admission_no="A6", name="Eve"),
-            TeacherClassSubject(teacher_id=7, class_id=1, subject_id=3, is_class_teacher=True),
+            TeacherClassSubject(staff_id=7, class_id=1, subject_id=3, is_class_teacher=True),
         ]
     )
     db.commit()

@@ -8,7 +8,7 @@ from common.email import (
     send_school_removed_email,
     send_school_registered_email,
 )
-from common.models import School, Teacher, Staff, Student, Parent, User
+from common.models import School, Staff, Student, Parent, User
 from common.security import generate_temp_password, hash_password
 from services.people_service import repository as people_repo
 
@@ -156,8 +156,18 @@ def delete_school(db: Session, school: School) -> None:
 
 
 def compute_stats(db: Session, school_id: int) -> dict:
-    teachers = db.query(func.count(Teacher.teacher_id)).filter(Teacher.school_id == school_id, Teacher.is_active.is_(True)).scalar()
-    staff = db.query(func.count(Staff.staff_id)).filter(Staff.school_id == school_id, Staff.is_active.is_(True)).scalar()
+    # Teachers are staff rows; count non-teaching employees separately so the
+    # two figures do not overlap.
+    teachers = db.query(func.count(Staff.staff_id)).filter(
+        Staff.school_id == school_id,
+        Staff.person_type == "teacher",
+        Staff.is_active.is_(True),
+    ).scalar()
+    staff = db.query(func.count(Staff.staff_id)).filter(
+        Staff.school_id == school_id,
+        Staff.person_type != "teacher",
+        Staff.is_active.is_(True),
+    ).scalar()
     students = db.query(func.count(Student.student_id)).filter(Student.school_id == school_id, Student.is_active.is_(True)).scalar()
     parents = db.query(func.count(distinct(Parent.parent_id))).filter(Parent.school_id == school_id, Parent.is_active.is_(True)).scalar()
     return {"teachers": teachers, "staff": staff, "students": students, "parents": parents}

@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, field_validator, model_validator
 
 from common.security import validate_password_byte_length
@@ -33,15 +35,18 @@ class VehicleRead(BaseModel):
 
 
 class PilotCreate(BaseModel):
-    username: str
-    password: str
+    # Credentials are optional: a driver can be recorded without portal access.
+    username: str | None = None
+    password: str | None = None
     full_name: str
-    phone: str
+    phone: str = ""
     email: str | None = None
     present_address: str | None = None
     permanent_address: str | None = None
     aadhaar_number: str | None = None
     dl_number: str | None = None
+    license_expiry: date | None = None
+    route_id: int | None = None
 
     @field_validator("password")
     @classmethod
@@ -60,6 +65,8 @@ class PilotUpdate(BaseModel):
     permanent_address: str | None = None
     aadhaar_number: str | None = None
     dl_number: str | None = None
+    license_expiry: date | None = None
+    route_id: int | None = None
     is_active: bool | None = None
 
     @field_validator("password")
@@ -73,10 +80,10 @@ class PilotUpdate(BaseModel):
 class PilotRead(BaseModel):
     pilot_id: int
     staff_id: int | None = None
-    user_id: int
+    user_id: int | None = None
     school_id: int
     role: str
-    username: str
+    username: str | None = None
     full_name: str
     email: str | None
     phone: str
@@ -84,6 +91,8 @@ class PilotRead(BaseModel):
     permanent_address: str | None
     aadhaar_number: str | None
     dl_number: str | None
+    license_expiry: date | None = None
+    route_id: int | None = None
     is_active: bool
 
     class Config:
@@ -93,14 +102,15 @@ class PilotRead(BaseModel):
 class RouteCreate(BaseModel):
     name: str
     vehicle: str
-    driver_name: str
+    driver_pilot_id: int | None = None
     status: str = "Scheduled"
 
 
 class RouteUpdate(BaseModel):
     name: str | None = None
     vehicle: str | None = None
-    driver_name: str | None = None
+    # driver_name is intentionally not writable: it is derived from the driver.
+    driver_pilot_id: int | None = None
     status: str | None = None
 
 
@@ -109,7 +119,8 @@ class RouteRead(BaseModel):
     school_id: int
     name: str
     vehicle: str
-    driver_name: str
+    # Derived from the assigned driver, so the parent portal keeps working.
+    driver_name: str | None = None
     status: str
 
     class Config:

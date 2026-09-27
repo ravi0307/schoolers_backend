@@ -1,8 +1,11 @@
 from sqlalchemy.orm import Session
 
-from common.models import Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent, Student, User, Vehicle
+from common.models import (
+    Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent,
+    Staff, Student, User, Vehicle,
+)
 from common.security import hash_password
-from common.exceptions import ConflictError
+from common.exceptions import AppError, ConflictError, NotFoundError
 
 
 def list_vehicles(db: Session, school_id: int) -> list[Vehicle]:
@@ -43,86 +46,182 @@ def update_vehicle(db: Session, vehicle: Vehicle, data: dict) -> Vehicle:
     return vehicle
 
 
-def _pilot_response(pilot: Pilot, user: User) -> dict:
+# The driver API still speaks the old pilot vocabulary; map it onto the
+# unified staff columns in one place.
+PILOT_TO_STAFF_FIELDS = {
+    "full_name": "name",
+    "email": "email",
+    "phone": "phone",
+    "present_address": "present_address",
+    "permanent_address": "permanent_address",
+    "aadhaar_number": "aadhaar_card",
+    "dl_number": "driving_license",
+}
+
+
+def _pilot_response(pilot: Pilot, staff: Staff, user: User | None) -> dict:
+    """A pilot row joined to its staff record (personal details) and login.
+
+    The login is optional: a driver does not need an account to be listed.
+    """
     return {
         "pilot_id": pilot.pilot_id,
         "staff_id": pilot.staff_id,
-        "user_id": user.user_id,
-        "school_id": pilot.school_id,
-        "role": user.role,
-        "username": user.username,
-        "full_name": pilot.full_name,
-        "email": pilot.email,
-        "phone": pilot.phone,
-        "present_address": pilot.present_address,
-        "permanent_address": pilot.permanent_address,
-        "aadhaar_number": pilot.aadhaar_number,
-        "dl_number": pilot.dl_number,
-        "is_active": pilot.is_active and user.is_active,
+        "school_id": staff.school_id,
+        "user_id": user.user_id if user else None,
+        "role": user.role if user else "pilot",
+        "username": user.username if user else None,
+        "full_name": staff.name,
+        "email": staff.email,
+        "phone": staff.phone or "",
+        "present_address": staff.present_address,
+        "permanent_address": staff.permanent_address,
+        "aadhaar_number": staff.aadhaar_card,
+        "dl_number": staff.driving_license,
+        "license_expiry": pilot.license_expiry,
+        "route_id": pilot.route_id,
+        "is_active": bool(pilot.is_active and staff.is_active),
     }
+
+
+def _pilot_query(db: Session, school_id: int):
+    return (
+        db.query(Pilot, Staff, User)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .outerjoin(User, (User.role == "pilot") & (User.linked_person_id == Pilot.staff_id))
+        .filter(Staff.school_id == school_id)
+    )
 
 
 def list_pilots(db: Session, school_id: int) -> list[dict]:
     return [
-        _pilot_response(pilot, user)
-        for pilot, user in (
-            db.query(Pilot, User)
-            .join(User, User.user_id == Pilot.user_id)
-        .filter(
-            Pilot.school_id == school_id,
-            User.role == "pilot",
-        )
-        .order_by(User.username)
+        _pilot_response(pilot, staff, user)
+        for pilot, staff, user in _pilot_query(db, school_id)
+        .order_by(Staff.name)
         .all()
-        )
     ]
 
 
-def get_pilot(db: Session, school_id: int, pilot_id: int) -> tuple[Pilot, User] | None:
+def get_pilot(db: Session, school_id: int, pilot_id: int) -> tuple[Pilot, Staff, User | None] | None:
     return (
-        db.query(Pilot, User)
-        .join(User, User.user_id == Pilot.user_id)
-        .filter(
-            Pilot.pilot_id == pilot_id,
-            Pilot.school_id == school_id,
-            User.role == "pilot",
-        )
+        _pilot_query(db, school_id)
+        .filter(Pilot.pilot_id == pilot_id)
+        .first()
+    )
+
+
+def pilot_for_route(db: Session, route_id: int) -> tuple[Pilot, Staff] | None:
+    return (
+        db.query(Pilot, Staff)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(Pilot.route_id == route_id)
         .first()
     )
 
 
 def create_pilot(db: Session, school_id: int, data: dict) -> dict:
-    username = data.pop("username")
-    password = data.pop("password")
-    user = User(
+    """Create the driver login + staff record + thin pilots row."""
+    username = data.pop("username", None)
+    password = data.pop("password", None)
+    license_expiry = data.pop("license_expiry", None)
+    route_id = data.pop("route_id", None)
+
+    if route_id is not None:
+        _assert_route_assignable(db, school_id, route_id, None)
+
+    # Personal details belong on the unified staff row, not the driver row.
+    personal = {k: data.pop(k) for k in list(data) if k in PILOT_TO_STAFF_FIELDS}
+    if not personal.get("full_name"):
+        raise AppError("full_name is required to create a pilot")
+    personal.setdefault("phone", "")
+
+    staff = Staff(
         school_id=school_id,
-        role="pilot",
-        username=username,
-        password_hash=hash_password(password),
+        role="Pilot",
+        role_title="Pilot",
+        person_type="pilot",
+        **{attr: value for key, attr in PILOT_TO_STAFF_FIELDS.items()
+           if (value := personal.get(key)) is not None},
     )
-    db.add(user)
+    db.add(staff)
     db.flush()
-    pilot = Pilot(user_id=user.user_id, school_id=school_id, **data)
+
+    user = None
+    if username and password:
+        user = User(
+            school_id=school_id,
+            role="pilot",
+            username=username,
+            password_hash=hash_password(password),
+        )
+        db.add(user)
+        db.flush()
+        user.linked_person_id = staff.staff_id
+
+    pilot = Pilot(
+        staff_id=staff.staff_id,
+        license_expiry=license_expiry,
+        route_id=route_id,
+        is_active=True,
+    )
     db.add(pilot)
     db.commit()
-    db.refresh(user)
     db.refresh(pilot)
-    return _pilot_response(pilot, user)
+    db.refresh(staff)
+    if user is not None:
+        db.refresh(user)
+    return _pilot_response(pilot, staff, user)
 
 
-def update_pilot(db: Session, pilot: Pilot, user: User, data: dict) -> dict:
+def _assert_route_assignable(
+    db: Session, school_id: int, route_id: int, exclude_pilot_id: int | None
+) -> None:
+    """A route has exactly one driver, so refuse to steal an assigned route."""
+    taken = (
+        db.query(Pilot)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(Pilot.route_id == route_id, Staff.school_id == school_id)
+        .first()
+    )
+    if taken and taken.pilot_id != exclude_pilot_id:
+        raise ConflictError("That route already has a driver")
+
+
+def update_pilot(db: Session, pilot: Pilot, staff: Staff, user: User | None, data: dict) -> dict:
     password = data.pop("password", None)
-    if password is not None:
-        user.password_hash = hash_password(password)
-    if "username" in data:
-        user.username = data.pop("username")
-    for key, value in data.items():
-        if value is not None:
-            setattr(pilot, key, value)
+    if user is not None:
+        if password is not None:
+            user.password_hash = hash_password(password)
+        if "username" in data and data["username"]:
+            user.username = data.pop("username")
+    else:
+        data.pop("username", None)
+        password = None
+
+    if "route_id" in data:
+        route_id = data["route_id"]
+        if route_id is not None:
+            _assert_route_assignable(db, staff.school_id, route_id, pilot.pilot_id)
+        pilot.route_id = route_id
+
+    if "license_expiry" in data:
+        pilot.license_expiry = data["license_expiry"]
+    if "is_active" in data and data["is_active"] is not None:
+        pilot.is_active = data["is_active"]
+        staff.is_active = data["is_active"]
+        if user is not None:
+            user.is_active = data["is_active"]
+
+    # Personal details live on the staff row.
+    for key, attr in PILOT_TO_STAFF_FIELDS.items():
+        if data.get(key) is not None:
+            setattr(staff, attr, data[key])
     db.commit()
-    db.refresh(user)
     db.refresh(pilot)
-    return _pilot_response(pilot, user)
+    db.refresh(staff)
+    if user is not None:
+        db.refresh(user)
+    return _pilot_response(pilot, staff, user)
 
 
 def list_routes(db: Session, school_id: int) -> list[Route]:
@@ -133,15 +232,48 @@ def get_route(db: Session, school_id: int, route_id: int) -> Route | None:
     return db.query(Route).filter(Route.school_id == school_id, Route.route_id == route_id, Route.is_active.is_(True)).first()
 
 
+def _set_route_driver(db: Session, school_id: int, route: Route, pilot_id: int) -> None:
+    """Point a route at a driver, clearing any previous assignment."""
+    pilot = (
+        db.query(Pilot)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(
+            Pilot.pilot_id == pilot_id,
+            Staff.school_id == school_id,
+            Staff.is_active.is_(True),
+        )
+        .first()
+    )
+    if not pilot:
+        raise NotFoundError("Driver not found for this school")
+    # A route has exactly one driver, so release the previous holder first.
+    db.query(Pilot).filter(
+        Pilot.route_id == route.route_id, Pilot.pilot_id != pilot.pilot_id
+    ).update({Pilot.route_id: None}, synchronize_session=False)
+    pilot.route_id = route.route_id
+
+
 def create_route(db: Session, school_id: int, data: dict) -> Route:
+    driver_pilot_id = data.pop("driver_pilot_id", None)
     route = Route(school_id=school_id, **data)
     db.add(route)
+    db.flush()
+    if driver_pilot_id is not None:
+        _set_route_driver(db, school_id, route, driver_pilot_id)
     db.commit()
     db.refresh(route)
     return route
 
 
 def update_route(db: Session, route: Route, data: dict) -> Route:
+    if "driver_pilot_id" in data:
+        driver_pilot_id = data.pop("driver_pilot_id")
+        if driver_pilot_id is None:
+            db.query(Pilot).filter(Pilot.route_id == route.route_id).update(
+                {Pilot.route_id: None}, synchronize_session=False
+            )
+        else:
+            _set_route_driver(db, route.school_id, route, driver_pilot_id)
     for k, v in data.items():
         if v is not None:
             setattr(route, k, v)

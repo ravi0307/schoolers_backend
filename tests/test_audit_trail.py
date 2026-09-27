@@ -16,7 +16,7 @@ from common.audit import bulk_modified_columns, current_actor
 from common.database import Base
 from common.models import (
     School,
-    Teacher,
+    Staff,
     Student,
     SchoolClass,
     User,
@@ -52,11 +52,13 @@ def build_school(school_id=1):
     )
 
 
-def build_teacher(teacher_id=1, school_id=1):
-    return Teacher(
-        teacher_id=teacher_id,
+def build_teacher(staff_id=1, school_id=1):
+    return Staff(
+        staff_id=staff_id,
         school_id=school_id,
         name="Ravi Kumar",
+        role="Teacher",
+        person_type="teacher",
         role_title="Mathematics",
         phone="9876543210",
     )
@@ -83,14 +85,14 @@ class AuditStampingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.Session = make_session(
-            ["users", "schools", "teachers", "classes", "students"]
+            ["users", "schools", "staff", "classes", "students"]
         )
 
     def setUp(self):
         self.db: Session = self.Session()
         self.db.query(Student).delete()
         self.db.query(SchoolClass).delete()
-        self.db.query(Teacher).delete()
+        self.db.query(Staff).delete()
         self.db.query(User).delete()
         self.db.query(School).delete()
         self.db.add(build_school())
@@ -102,8 +104,8 @@ class AuditStampingTests(unittest.TestCase):
         self.db.rollback()
         self.db.close()
 
-    def load_teacher(self) -> Teacher:
-        return self.db.query(Teacher).first()
+    def load_teacher(self) -> Staff:
+        return self.db.query(Staff).first()
 
     def test_update_stamps_actor_and_time_only_when_actor_set(self):
         audit.set_current_actor(42)
@@ -124,7 +126,7 @@ class AuditStampingTests(unittest.TestCase):
 
     def test_insert_stamps_creator_from_context(self):
         audit.set_current_actor(7)
-        new_teacher = build_teacher(teacher_id=2)
+        new_teacher = build_teacher(staff_id=2)
         self.db.add(new_teacher)
         self.db.commit()
 
@@ -200,7 +202,7 @@ class AuditBulkUpdateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.Session = make_session(
-            ["users", "schools", "teachers", "classes", "students"]
+            ["users", "schools", "staff", "classes", "students"]
         )
         from services.people_service import repository as people_repo  # noqa: E402
 
@@ -210,7 +212,7 @@ class AuditBulkUpdateTests(unittest.TestCase):
         self.db: Session = self.Session()
         self.db.query(Student).delete()
         self.db.query(SchoolClass).delete()
-        self.db.query(Teacher).delete()
+        self.db.query(Staff).delete()
         self.db.query(User).delete()
         self.db.query(School).delete()
         self.db.add(build_school())
@@ -324,7 +326,7 @@ class AuditEndToEndHttpTests(unittest.TestCase):
             cls.engine,
             tables=[
                 Base.metadata.tables[name]
-                for name in ("users", "schools", "teachers", "staff", "classes", "students", "parents")
+                for name in ("users", "schools", "staff", "classes", "students", "parents")
             ],
         )
         cls.Session = sessionmaker(bind=cls.engine, autoflush=False, future=True)
@@ -386,7 +388,7 @@ class AuditEndToEndHttpTests(unittest.TestCase):
     def test_authenticated_update_stamps_modified_by_from_token(self):
         self._update_through_threadpool(self.token, "Physics")
 
-        teacher = self.db.query(Teacher).first()
+        teacher = self.db.query(Staff).first()
         self.assertEqual(teacher.role_title, "Physics")
         self.assertEqual(teacher.modified_by, 99)
         self.assertIsNotNone(teacher.modified_at)
@@ -398,7 +400,7 @@ class AuditEndToEndHttpTests(unittest.TestCase):
         other_token = create_access_token(user_id=77, role="admin", school_id=1)
         self._update_through_threadpool(other_token, "Chemistry")
 
-        teacher = self.db.query(Teacher).first()
+        teacher = self.db.query(Staff).first()
         self.assertEqual(teacher.role_title, "Chemistry")
         self.assertEqual(teacher.modified_by, 77)
 

@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import exists, or_
 
 from common.models import (
-    Teacher,
     Staff,
     Parent,
     Student,
@@ -30,9 +29,11 @@ from common.email import (
 from common.security import hash_password
 
 
-# ---- Teachers ----
-def list_teachers(db: Session, school_id: int) -> list[Teacher]:
-    return db.query(Teacher).filter(Teacher.school_id == school_id, Teacher.is_active.is_(True)).order_by(Teacher.name).all()
+# ---- Teachers (staff rows with person_type='teacher') ----
+# The teachers table no longer exists: a teacher is a staff member whose
+# person_type is 'teacher'. teacher_id is reported as an alias of staff_id so
+# existing clients keep working unchanged.
+TEACHER_PERSON_TYPE = "teacher"
 
 
 def _fmt_value(db: Session, field: str, value) -> str:
@@ -81,33 +82,79 @@ def _notify_record_update(
     send_record_updated_email(record_type, record_name, school, labeled, to_addrs)
 
 
-def get_teacher(db: Session, school_id: int, teacher_id: int) -> Teacher | None:
-    return db.query(Teacher).filter(Teacher.school_id == school_id, Teacher.teacher_id == teacher_id, Teacher.is_active.is_(True)).first()
+def teacher_response(staff: Staff) -> dict:
+    return {
+        "teacher_id": staff.staff_id,
+        "staff_id": staff.staff_id,
+        "school_id": staff.school_id,
+        "name": staff.name,
+        "role": staff.role,
+        "role_title": staff.role_title,
+        "person_type": staff.person_type,
+        "phone": staff.phone or "",
+        "email": staff.email,
+        "present_address": staff.present_address,
+        "permanent_address": staff.permanent_address,
+        "date_of_birth": staff.date_of_birth,
+        "emergency_number": staff.emergency_number,
+        "gender": staff.gender,
+        "is_active": staff.is_active,
+    }
 
 
-def create_teacher(db: Session, school_id: int, data: dict) -> Teacher:
-    teacher = Teacher(school_id=school_id, **data)
-    db.add(teacher)
+def _teacher_query(db: Session, school_id: int):
+    return db.query(Staff).filter(
+        Staff.school_id == school_id,
+        Staff.person_type == TEACHER_PERSON_TYPE,
+        Staff.is_active.is_(True),
+    )
+
+
+def list_teachers(db: Session, school_id: int) -> list[dict]:
+    rows = _teacher_query(db, school_id).order_by(Staff.name).all()
+    return [teacher_response(r) for r in rows]
+
+
+def get_teacher(db: Session, school_id: int, teacher_id: int) -> Staff | None:
+    return _teacher_query(db, school_id).filter(Staff.staff_id == teacher_id).first()
+
+
+def create_teacher(db: Session, school_id: int, data: dict) -> dict:
+    values = {k: v for k, v in data.items() if k != "role_title"}
+    values["role_title"] = data.get("role_title")
+    # role is the free-text label; person_type is what the API actually keys on.
+    values.setdefault("role", data.get("role_title") or "Teacher")
+    staff = Staff(school_id=school_id, person_type=TEACHER_PERSON_TYPE, **values)
+    db.add(staff)
     db.commit()
-    db.refresh(teacher)
-    return teacher
+    db.refresh(staff)
+    return teacher_response(staff)
 
 
-def update_teacher(db: Session, teacher: Teacher, data: dict) -> Teacher:
-    changes = _changed_fields(db, teacher, data)
-    old_email = teacher.email
+def update_teacher(db: Session, staff: Staff, data: dict) -> dict:
+    changes = _changed_fields(db, staff, data)
+    old_email = staff.email
     for k, v in data.items():
         if v is not None:
-            setattr(teacher, k, v)
+            setattr(staff, k, v)
+    staff.person_type = TEACHER_PERSON_TYPE
     db.commit()
-    db.refresh(teacher)
+    db.refresh(staff)
     if changes:
-        _notify_record_update(db, "Teacher", teacher.name, teacher.school_id, changes, [old_email, teacher.email])
-    return teacher
+        _notify_record_update(
+            db, "Teacher", staff.name, staff.school_id, changes, [old_email, staff.email]
+        )
+    return teacher_response(staff)
 
 
-def delete_teacher(db: Session, teacher: Teacher) -> None:
-    teacher.is_active = False
+def delete_teacher(db: Session, staff: Staff) -> None:
+    staff.is_active = False
+    # Keep any linked login from outliving the teacher record.
+    db.query(User).filter(
+        User.role == "teacher",
+        User.linked_person_id == staff.staff_id,
+        User.is_active.is_(True),
+    ).update({User.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     db.commit()
 
 
@@ -118,11 +165,8 @@ def add_teaching_assignment(db: Session, school_id: int, data: dict) -> TeacherC
     if not subject:
         raise ConflictError("Subject does not belong to this school")
 
-    teacher = db.query(Teacher).filter(
-        Teacher.teacher_id == data["teacher_id"],
-        Teacher.school_id == school_id,
-        Teacher.is_active.is_(True),
-    ).first()
+    staff_id = data.get("staff_id", data.get("teacher_id"))
+    teacher = get_teacher(db, school_id, staff_id) if staff_id else None
     if not teacher:
         raise ConflictError("Teacher does not belong to this school")
 
@@ -134,7 +178,24 @@ def add_teaching_assignment(db: Session, school_id: int, data: dict) -> TeacherC
     if not school_class:
         raise ConflictError("Class does not belong to this school")
 
-    tcs = TeacherClassSubject(**data)
+    existing = (
+        db.query(TeacherClassSubject)
+        .filter(
+            TeacherClassSubject.staff_id == staff_id,
+            TeacherClassSubject.class_id == data["class_id"],
+            TeacherClassSubject.subject_id == data["subject_id"],
+        )
+        .first()
+    )
+    if existing:
+        raise ConflictError("This teacher is already assigned to that class and subject")
+
+    tcs = TeacherClassSubject(
+        staff_id=staff_id,
+        class_id=data["class_id"],
+        subject_id=data["subject_id"],
+        is_class_teacher=data.get("is_class_teacher", False),
+    )
     db.add(tcs)
     db.commit()
     db.refresh(tcs)
@@ -142,144 +203,14 @@ def add_teaching_assignment(db: Session, school_id: int, data: dict) -> TeacherC
 
 
 def teaching_load(db: Session, teacher_id: int) -> list[TeacherClassSubject]:
-    return db.query(TeacherClassSubject).filter(TeacherClassSubject.teacher_id == teacher_id).all()
+    return (
+        db.query(TeacherClassSubject)
+        .filter(TeacherClassSubject.staff_id == teacher_id)
+        .all()
+    )
 
 
 # ---- Staff ----
-def _is_teacher_staff(staff: Staff) -> bool:
-    return staff.role.strip().casefold() == "teacher"
-
-
-def _linked_teacher(db: Session, staff: Staff) -> Teacher | None:
-    teacher = db.query(Teacher).filter(Teacher.staff_id == staff.staff_id).first()
-    if teacher:
-        return teacher
-    return (
-        db.query(Teacher)
-        .filter(
-            Teacher.staff_id.is_(None),
-            Teacher.school_id == staff.school_id,
-            Teacher.name == staff.name,
-            Teacher.phone == staff.phone,
-        )
-        .first()
-    )
-
-
-def _sync_teacher_from_staff(db: Session, staff: Staff) -> None:
-    teacher = _linked_teacher(db, staff)
-    if not _is_teacher_staff(staff) or not staff.is_active:
-        if teacher:
-            teacher.is_active = False
-        return
-
-    values = {
-        "staff_id": staff.staff_id,
-        "school_id": staff.school_id,
-        "name": staff.name,
-        "role_title": staff.role,
-        "phone": staff.phone or "",
-        "email": staff.email,
-        "date_of_birth": staff.date_of_birth,
-        "gender": staff.gender,
-        "present_address": staff.present_address,
-        "permanent_address": staff.permanent_address,
-        "emergency_number": staff.emergency_number,
-    }
-    if teacher is None:
-        teacher = Teacher(**values)
-        db.add(teacher)
-    else:
-        for key, value in values.items():
-            setattr(teacher, key, value)
-        teacher.is_active = True
-
-
-def _is_pilot_staff(staff: Staff) -> bool:
-    return staff.role.strip().casefold() == "pilot"
-
-
-def _linked_pilot(db: Session, staff: Staff) -> tuple[Pilot, User] | None:
-    linked = (
-        db.query(Pilot, User)
-        .join(User, User.user_id == Pilot.user_id)
-        .filter(Pilot.staff_id == staff.staff_id)
-        .first()
-    )
-    if linked:
-        return linked
-    return (
-        db.query(Pilot, User)
-        .join(User, User.user_id == Pilot.user_id)
-        .filter(
-            Pilot.staff_id.is_(None),
-            Pilot.school_id == staff.school_id,
-            Pilot.full_name == staff.name,
-            Pilot.phone == (staff.phone or ""),
-        )
-        .first()
-    )
-
-
-def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
-    linked = _linked_pilot(db, staff)
-    if not _is_pilot_staff(staff) or not staff.is_active:
-        if linked:
-            pilot, user = linked
-            pilot.is_active = False
-            user.is_active = False
-        return
-
-    pilot = linked[0] if linked else None
-    user = linked[1] if linked else None
-    if pilot is None or user is None:
-        user = User(
-            school_id=staff.school_id,
-            role="pilot",
-            username=f"pilot_{staff.school_id}_{staff.staff_id}",
-            password_hash=hash_password(secrets.token_urlsafe(32)),
-            is_active=True,
-        )
-        db.add(user)
-        db.flush()
-        pilot = Pilot(
-            staff_id=staff.staff_id,
-            user_id=user.user_id,
-            school_id=staff.school_id,
-            full_name=staff.name,
-            email=staff.email,
-            phone=staff.phone or "",
-            present_address=staff.present_address,
-            permanent_address=staff.permanent_address,
-            aadhaar_number=staff.aadhaar_card,
-            dl_number=staff.driving_license,
-            is_active=True,
-        )
-        db.add(pilot)
-        db.flush()
-        user.linked_person_id = pilot.pilot_id
-        return
-
-    user.school_id = staff.school_id
-    user.role = "pilot"
-    user.is_active = True
-    pilot.staff_id = staff.staff_id
-    pilot.school_id = staff.school_id
-    pilot.full_name = staff.name
-    pilot.email = staff.email
-    pilot.phone = staff.phone or ""
-    pilot.present_address = staff.present_address
-    pilot.permanent_address = staff.permanent_address
-    pilot.aadhaar_number = staff.aadhaar_card
-    pilot.dl_number = staff.driving_license
-    pilot.is_active = True
-
-
-def _sync_person_from_staff(db: Session, staff: Staff) -> None:
-    _sync_teacher_from_staff(db, staff)
-    _sync_pilot_from_staff(db, staff)
-
-
 def list_staff(db: Session, school_id: int, search: str | None = None) -> list[Staff]:
     q = db.query(Staff).filter(Staff.school_id == school_id, Staff.is_active.is_(True))
     if search:
@@ -289,19 +220,90 @@ def list_staff(db: Session, school_id: int, search: str | None = None) -> list[S
 
 
 def get_staff(db: Session, school_id: int, staff_id: int) -> Staff | None:
-    return db.query(Staff).filter(Staff.school_id == school_id, Staff.staff_id == staff_id, Staff.is_active.is_(True)).first()
+    return (
+        db.query(Staff)
+        .filter(Staff.school_id == school_id, Staff.staff_id == staff_id, Staff.is_active.is_(True))
+        .first()
+    )
+
+
+def infer_person_type(role: str | None) -> str:
+    """Best-effort person_type for older payloads that only send a role label.
+
+    person_type is the discriminator everything else keys on, so clients that
+    still say role="Pilot" must not silently become a plain staff member.
+    """
+    label = str(role or "").strip().lower()
+    if "pilot" in label or "driver" in label:
+        return "pilot"
+    if "teacher" in label:
+        return "teacher"
+    if "admin" in label:
+        return "admin"
+    return "staff"
 
 
 def create_staff(db: Session, school_id: int, data: dict) -> Staff:
-    staff = Staff(school_id=school_id, **data)
+    values = dict(data)
+    values.setdefault("person_type", infer_person_type(values.get("role")))
+    staff = Staff(school_id=school_id, **values)
     db.add(staff)
     db.flush()
-    _sync_person_from_staff(db, staff)
+    # A staff member who drives gets a pilots row plus a driver login; the
+    # generic staff row stays the single record for their personal details.
+    if staff.person_type == "pilot":
+        _sync_pilot_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
     if staff.email:
         send_staff_added_email(school_name(db, school_id), staff.name, [staff.email])
     return staff
+
+
+def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
+    """Keep the driver row and driver login in step with the staff record.
+
+    A driver needs a pilots row to exist at all, and every driver gets a login
+    so the transport portal keeps working. The login id is the staff id.
+    """
+    pilot = db.query(Pilot).filter(Pilot.staff_id == staff.staff_id).first()
+    user = (
+        db.query(User)
+        .filter(
+            User.linked_person_id == staff.staff_id, User.role == "pilot"
+        )
+        .first()
+    )
+
+    if not staff.is_active:
+        # A deactivated driver loses the driver row and the login with it.
+        if pilot:
+            pilot.is_active = False
+        if user:
+            user.is_active = False
+        return
+
+    if pilot is None:
+        pilot = Pilot(staff_id=staff.staff_id, is_active=True)
+        db.add(pilot)
+        db.flush()
+    else:
+        pilot.is_active = True
+
+    if user is None:
+        user = User(
+            school_id=staff.school_id,
+            role="pilot",
+            username=f"pilot_{staff.school_id}_{staff.staff_id}",
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        user.school_id = staff.school_id
+        user.is_active = True
+    user.linked_person_id = staff.staff_id
 
 
 def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
@@ -310,7 +312,8 @@ def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
     for k, v in data.items():
         if v is not None:
             setattr(staff, k, v)
-    _sync_person_from_staff(db, staff)
+    if staff.person_type == "pilot":
+        _sync_pilot_from_staff(db, staff)
     db.commit()
     db.refresh(staff)
     if changes:
@@ -323,7 +326,12 @@ def delete_staff(db: Session, staff: Staff) -> None:
     name = staff.name
     school = school_name(db, staff.school_id)
     staff.is_active = False
-    _sync_person_from_staff(db, staff)
+    # Block the login and drop the driver's route assignment with the driver.
+    db.query(User).filter(
+        User.linked_person_id == staff.staff_id, User.is_active.is_(True)
+    ).update({User.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
+    for pilot in db.query(Pilot).filter(Pilot.staff_id == staff.staff_id).all():
+        pilot.is_active = False
     db.commit()
     if email:
         send_staff_removed_email(school, name, [email])
@@ -345,8 +353,8 @@ def deactivate_school_staff(db: Session, school_id: int) -> int:
     """Mark every active staff member of a school inactive.
 
     Used when the school (i.e. its admin account) is removed by a master.
-    Keeps each deactivated staff member's linked teacher/pilot/user records in
-    sync so their login credentials are also blocked.
+    Because teachers and pilots are staff rows, one pass covers every employee;
+    their login accounts are blocked alongside.
     """
     staff_rows = (
         db.query(Staff)
@@ -355,7 +363,13 @@ def deactivate_school_staff(db: Session, school_id: int) -> int:
     )
     for staff in staff_rows:
         staff.is_active = False
-        _sync_person_from_staff(db, staff)
+    for pilot in (
+        db.query(Pilot)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(Staff.school_id == school_id, Pilot.is_active.is_(True))
+        .all()
+    ):
+        pilot.is_active = False
     db.flush()
     return len(staff_rows)
 
@@ -372,11 +386,19 @@ def deactivate_school_students(db: Session, school_id: int) -> int:
 
 
 def deactivate_school_teachers(db: Session, school_id: int) -> int:
-    """Mark every active teacher of a school inactive."""
+    """Mark every active teacher of a school inactive.
+
+    Kept for callers that only want to retire teaching staff; the rows are
+    staff records with person_type='teacher'.
+    """
     result = (
-        db.query(Teacher)
-        .filter(Teacher.school_id == school_id, Teacher.is_active.is_(True))
-        .update({Teacher.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
+        db.query(Staff)
+        .filter(
+            Staff.school_id == school_id,
+            Staff.person_type == TEACHER_PERSON_TYPE,
+            Staff.is_active.is_(True),
+        )
+        .update({Staff.is_active: False, **bulk_modified_columns()}, synchronize_session=False)
     )
     db.flush()
     return int(result)

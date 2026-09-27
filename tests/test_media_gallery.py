@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from common.config import settings
 from common.dependencies import CurrentUser
 from common.exceptions import AppError, ForbiddenError, NotFoundError
-from common.models import Base, Media, Staff, Teacher
+from common.models import Base, Media, Staff
 from common.storage import (
     ALLOWED_MEDIA_TYPES,
     ALLOWED_VIDEO_TYPES,
@@ -86,7 +86,8 @@ def seed(db: Session):
                 media_kind="image",
             ),
             Staff(staff_id=9, school_id=1, name="Ms. Dora", role="Other"),
-            Teacher(teacher_id=7, school_id=1, name="Mr. Tripathi", role_title="Teacher", phone="12345"),
+            Staff(staff_id=7, school_id=1, name="Mr. Tripathi", role="Teacher",
+                  person_type="teacher", phone="12345"),
         ]
     )
     db.commit()
@@ -129,6 +130,23 @@ class MediaGalleryRepositoryTests(unittest.TestCase):
         self.assertEqual(created.title, "Fun day")
         self.assertEqual(created.file_url, "/api/v1/media/files/image_x.jpg")
         self.assertEqual(created.media_kind, "image")
+
+    def test_media_read_surfaces_created_at(self):
+        """MediaRead exposes created_at so gallery albums can display timestamps."""
+        created = repo.create_media(
+            self.session,
+            1,
+            {
+                "title": "Timestamped photo",
+                "posted_by": "Ms. Dora",
+                "class_id": None,
+                "file_url": "/api/v1/media/files/img.png",
+                "media_kind": "image",
+            },
+        )
+        read = MediaRead.model_validate(created)
+        self.assertIsNotNone(read.created_at)
+        self.assertIsInstance(read.created_at, datetime)
 
     def test_list_media_scopes_to_school_and_skips_inactive(self):
         rows = repo.list_media(self.session, 1)
@@ -194,7 +212,7 @@ class MediaGalleryRepositoryTests(unittest.TestCase):
             repo.delete_media(self.session, 1, 1)
 
     def test_resolve_poster_inactive_teacher_raises(self):
-        teacher = self.session.query(Teacher).filter_by(teacher_id=7).one()
+        teacher = self.session.query(Staff).filter_by(staff_id=7).one()
         teacher.is_active = False
         self.session.commit()
         current_user = CurrentUser(user_id=1, role="teacher", school_id=1, linked_person_id=7)

@@ -93,8 +93,10 @@ def update_pilot(
     pilot = repo.get_pilot(db, school_id, pilot_id)
     if not pilot:
         raise NotFoundError("Pilot not found")
-    pilot_record, user = pilot
-    return repo.update_pilot(db, pilot_record, user, payload.model_dump(exclude_unset=True))
+    pilot_record, staff_record, user = pilot
+    return repo.update_pilot(
+        db, pilot_record, staff_record, user, payload.model_dump(exclude_unset=True)
+    )
 
 
 @router.get("/pilots/{pilot_id}", response_model=PilotRead)

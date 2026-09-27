@@ -1,4 +1,6 @@
 from datetime import date
+from typing import Literal
+
 from pydantic import AliasChoices, BaseModel, Field
 
 
@@ -44,15 +46,22 @@ class TeacherUpdate(BaseModel):
         ),
     )
     gender: str | None = None
-    attendance_status: str | None = None
 
 
 class TeacherRead(BaseModel):
+    """A teaching staff member.
+
+    teacher_id is a read-only alias of staff_id: the teachers table is gone and
+    every teacher is a staff row with person_type='teacher'.
+    """
+
     teacher_id: int
-    staff_id: int | None
+    staff_id: int
     school_id: int
     name: str
-    role_title: str
+    role: str
+    role_title: str | None = None
+    person_type: str
     phone: str
     email: str | None
     present_address: str | None
@@ -60,7 +69,7 @@ class TeacherRead(BaseModel):
     date_of_birth: date | None
     emergency_number: str | None
     gender: str | None
-    attendance_status: str
+    is_active: bool
 
     class Config:
         from_attributes = True
@@ -72,6 +81,9 @@ class StaffCreate(BaseModel):
         min_length=1,
         validation_alias=AliasChoices("role", "role_title"),
     )
+    # Employment category used by teaching assignments and reporting. A staff
+    # member who drives is identified by a pilots row, not by person_type.
+    person_type: Literal["teacher", "pilot", "admin", "staff"] = "staff"
     phone: str
     email: str = Field(
         min_length=1,
@@ -108,6 +120,8 @@ class StaffUpdate(BaseModel):
         min_length=1,
         validation_alias=AliasChoices("role", "role_title"),
     )
+    role_title: str | None = None
+    person_type: Literal["teacher", "pilot", "admin", "staff"] | None = None
     phone: str | None = None
     email: str | None = Field(
         default=None,
@@ -143,6 +157,8 @@ class StaffRead(BaseModel):
     school_id: int
     name: str
     role: str
+    role_title: str | None = None
+    person_type: str
     phone: str | None
     email: str | None
     date_of_birth: date | None
@@ -238,7 +254,9 @@ class StudentRead(BaseModel):
 
 
 class TeacherClassSubjectCreate(BaseModel):
-    teacher_id: int
+    # staff_id is the stored key; teacher_id is accepted as an alias so existing
+    # clients keep working now that the teachers table is gone.
+    staff_id: int = Field(validation_alias=AliasChoices("staff_id", "teacher_id"))
     class_id: int
     subject_id: int
     is_class_teacher: bool = False

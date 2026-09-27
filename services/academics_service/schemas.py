@@ -1,6 +1,6 @@
 from datetime import time
 
-from pydantic import BaseModel, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 
 def _clean_subject_name(value: str) -> str:
@@ -32,19 +32,32 @@ class SubjectUpdate(BaseModel):
 
 class ClassCreate(BaseModel):
     name: str
-    class_teacher_id: int | None = None
+    class_teacher_staff_id: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "class_teacher_staff_id", "class_teacher_id"
+        ),
+    )
 
 
 class ClassUpdate(BaseModel):
     name: str | None = None
-    class_teacher_id: int | None = None
+    class_teacher_staff_id: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "class_teacher_staff_id", "class_teacher_id"
+        ),
+    )
     student_count: int | None = None
 
 
 class ClassRead(BaseModel):
+    """class_teacher_id is a read-only alias of class_teacher_staff_id."""
+
     class_id: int
     school_id: int
     name: str
+    class_teacher_staff_id: int | None
     class_teacher_id: int | None
     student_count: int
 

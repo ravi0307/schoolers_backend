@@ -2,13 +2,23 @@ from datetime import datetime, time
 
 from sqlalchemy.orm import Session
 
-from common.models import TimetableEntry, Holiday, Period, SchoolClass, Subject
+from common.models import TimetableEntry, Holiday, Period, SchoolClass, Staff, Subject
 from common.exceptions import NotFoundError
 
 
 def subject_in_school(db: Session, school_id: int, subject_id: int) -> bool:
     return db.query(Subject.subject_id).filter(
         Subject.subject_id == subject_id, Subject.school_id == school_id
+    ).first() is not None
+
+
+def teacher_in_school(db: Session, school_id: int, teacher_id: int) -> bool:
+    """True when the staff id is an active teacher inside this school."""
+    return db.query(Staff.staff_id).filter(
+        Staff.staff_id == teacher_id,
+        Staff.school_id == school_id,
+        Staff.person_type == "teacher",
+        Staff.is_active.is_(True),
     ).first() is not None
 
 
@@ -57,6 +67,11 @@ def create_week_period(
     if subject_id is not None and not subject_in_school(db, school_id, subject_id):
         raise NotFoundError("Subject not found for this school")
 
+    # Never trust a teacher id from the body: it must be an active teacher in
+    # this same school. (Previously unvalidated, which allowed cross-school ids.)
+    if teacher_id is not None and not teacher_in_school(db, school_id, teacher_id):
+        raise NotFoundError("Teacher not found for this school")
+
     last_period = db.query(Period).order_by(Period.period_no.desc()).first()
     period = Period(
         period_no=(last_period.period_no + 1 if last_period else 1),
@@ -74,7 +89,7 @@ def create_week_period(
             day_of_week=day,
             period_id=period.period_id,
             subject_id=subject_id,
-            teacher_id=teacher_id,
+            staff_id=teacher_id,
             period_start_time=period_start_time,
             period_end_time=period_end_time,
             created_by=created_by,
@@ -102,7 +117,9 @@ def update_entry(
             raise NotFoundError("Subject not found for this school")
         entry.subject_id = subject_id
     if teacher_id is not None:
-        entry.teacher_id = teacher_id
+        if not teacher_in_school(db, school_id, teacher_id):
+            raise NotFoundError("Teacher not found for this school")
+        entry.staff_id = teacher_id
     if period_start_time is not None:
         entry.period_start_time = period_start_time
     if period_end_time is not None:

@@ -145,7 +145,7 @@ TRANSPORT
 curl http://localhost:8000/api/v1/routes -H "$AUTH_HEADER" | jq
 curl -X POST http://localhost:8000/api/v1/routes \
   -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
-  -d '{"name":"Route A","vehicle":"KA-01-AB-1234","driver_name":"Mohan Das","status":"Scheduled"}' | jq
+  -d '{"name":"Route A","vehicle":"KA-01-AB-1234","driver_pilot_id":1,"status":"Scheduled"}' | jq
 curl -X PATCH http://localhost:8000/api/v1/routes/1 \
   -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
   -d '{"status":"Active"}' | jq

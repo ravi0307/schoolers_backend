@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from common.dependencies import CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
-from common.models import Media, Staff, Teacher
+from common.models import Media, Staff
 
 
 def resolve_poster_name(db: Session, current_user: CurrentUser) -> str:
@@ -13,12 +13,12 @@ def resolve_poster_name(db: Session, current_user: CurrentUser) -> str:
     rather than trusting client-supplied values."""
     if current_user.role == "teacher":
         if not current_user.linked_person_id:
-            raise ForbiddenError("This teacher account isn't linked to a teacher record")
+            raise ForbiddenError("This teacher account isn't linked to a staff record")
         teacher = (
-            db.query(Teacher)
+            db.query(Staff)
             .filter(
-                Teacher.teacher_id == current_user.linked_person_id,
-                Teacher.is_active.is_(True),
+                Staff.staff_id == current_user.linked_person_id,
+                Staff.is_active.is_(True),
             )
             .first()
         )

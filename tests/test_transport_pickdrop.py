@@ -18,10 +18,12 @@ from common.models import (
     Base,
     Parent,
     ParentStudent,
+    Pilot,
     Route,
     RouteStudent,
     School,
     SchoolClass,
+    Staff,
     Student,
 )
 
@@ -78,9 +80,15 @@ def seed(db):
             ParentStudent(parent_id=10, student_id=104, relationship_="Mother"),
             # Cross-school child linked to the same parent.
             ParentStudent(parent_id=10, student_id=105, relationship_="Mother"),
-            Route(route_id=1, school_id=1, name="Route A", vehicle="KA-01-AB-1234", driver_name="Ramesh", status="Scheduled"),
-            Route(route_id=2, school_id=1, name="Route B", vehicle="KA-02-BB-9999", driver_name="Suresh", status="Cancelled", is_active=False),
-            Route(route_id=3, school_id=2, name="Route C", vehicle="KA-03-CC-1111", driver_name="Dinesh", status="Scheduled"),
+            Staff(staff_id=1, school_id=1, name="Ramesh", role="Driver", person_type="pilot"),
+            Staff(staff_id=2, school_id=1, name="Suresh", role="Driver", person_type="pilot"),
+            Staff(staff_id=3, school_id=2, name="Dinesh", role="Driver", person_type="pilot"),
+            Pilot(pilot_id=1, staff_id=1, route_id=1),
+            Pilot(pilot_id=2, staff_id=2, route_id=2),
+            Pilot(pilot_id=3, staff_id=3, route_id=3),
+            Route(route_id=1, school_id=1, name="Route A", vehicle="KA-01-AB-1234", status="Scheduled"),
+            Route(route_id=2, school_id=1, name="Route B", vehicle="KA-02-BB-9999", status="Cancelled", is_active=False),
+            Route(route_id=3, school_id=2, name="Route C", vehicle="KA-03-CC-1111", status="Scheduled"),
             RouteStudent(route_id=1, student_id=101, status="picked"),
             # Rohit is assigned only to the inactive Route B.
             RouteStudent(route_id=2, student_id=103, status="pending"),
