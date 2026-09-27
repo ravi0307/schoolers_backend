@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from common.database import get_db
@@ -7,7 +7,7 @@ from common.exceptions import NotFoundError
 import repository as repo
 from schemas import (
     ClassCreate, ClassUpdate, ClassRead, SubjectRead, SubjectCreate, SubjectUpdate,
-    PeriodRead, PeriodUpdate, HolidayRead, HolidayUpdate,
+    PeriodRead, PeriodUpdate, HolidayRead, HolidayCreate, HolidayUpdate,
 )
 
 router = APIRouter(tags=["academics"])
@@ -159,15 +159,47 @@ def list_holidays(
     return repo.list_holidays(db, school_id)
 
 
-@router.patch("/holidays/{day}", response_model=HolidayRead)
-def set_holiday(
-    day: str,
+@router.post("/holidays", response_model=HolidayRead, status_code=201)
+def create_holiday(
+    payload: HolidayCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Add one named holiday on one date."""
+    return repo.create_holiday(
+        db, school_id, payload.occasion, payload.holiday_date
+    )
+
+
+@router.patch("/holidays/{holiday_id}", response_model=HolidayRead)
+def update_holiday(
+    holiday_id: int,
     payload: HolidayUpdate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    holiday = repo.set_holiday(db, school_id, day, payload.is_holiday)
-    if not holiday:
-        raise NotFoundError("Holiday row not found for that day")
-    return holiday
+    """Reschedule or rename a holiday. Scoped to the caller's own school, so
+    another school's holiday_id is a 404 rather than an edit."""
+    holiday = repo.get_holiday(db, school_id, holiday_id)
+    if holiday is None:
+        raise NotFoundError("Holiday not found")
+    return repo.update_holiday(
+        db, holiday, payload.occasion, payload.holiday_date
+    )
+
+
+@router.delete("/holidays/{holiday_id}", status_code=204)
+def delete_holiday(
+    holiday_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Remove a holiday."""
+    holiday = repo.get_holiday(db, school_id, holiday_id)
+    if holiday is None:
+        raise NotFoundError("Holiday not found")
+    repo.delete_holiday(db, holiday)
+    return Response(status_code=204)

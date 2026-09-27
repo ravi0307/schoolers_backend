@@ -94,6 +94,8 @@ def create_school(db: Session, data: dict) -> School:
         if credentials:
             school.admin_username = credentials["admin_username"]
             school.admin_password = credentials["admin_password"]
+    # No holiday seeding: holidays are named, dated rows the admin adds, so a
+    # new school correctly starts with none.
     send_school_registered_email(
         school.name,
         school_recipients(school),
