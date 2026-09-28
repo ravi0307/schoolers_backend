@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
-    UniqueConstraint, CheckConstraint, func, text, JSON
+    Numeric, UniqueConstraint, CheckConstraint, func, text, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -508,7 +508,54 @@ class WebsiteTestimonial(AuditColumnsMixin, Base):
 
 
 # ============================================================================
-# 10. PLATFORM USERS / AUTH
+# 12. ACCOUNTS
+# ============================================================================
+# One row per person per calendar month. `month` is a 'YYYY-MM' string rather
+# than a date because the admin view is a six-column month grid, and a month
+# bucket has no meaningful day. The unique constraints make a second payment
+# for the same month an overwrite rather than a duplicate row, which is what
+# the grid expects: one figure per cell.
+#
+# Both tables keep their own school_id even though staff and students are
+# already school-scoped. It is denormalised on purpose: the accounts read is a
+# single grouped query filtered by school, and it makes the ownership check on
+# write explicit rather than something a join has to be trusted for.
+
+class StaffSalary(AuditColumnsMixin, Base):
+    __tablename__ = "staff_salaries"
+
+    salary_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="CASCADE"), nullable=False)
+    month = Column(String(7), nullable=False)
+    # Numeric, not Float: money does not belong in binary floating point.
+    amount = Column(Numeric(12, 2), nullable=False)
+    paid_on = Column(Date)
+    note = Column(String(200))
+
+    __table_args__ = (
+        UniqueConstraint("staff_id", "month"),
+    )
+
+
+class StudentFee(AuditColumnsMixin, Base):
+    __tablename__ = "student_fees"
+
+    fee_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    month = Column(String(7), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    paid_on = Column(Date)
+    note = Column(String(200))
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "month"),
+    )
+
+
+# ============================================================================
+# 13. PLATFORM USERS / AUTH
 # ============================================================================
 
 class User(AuditColumnsMixin, Base):

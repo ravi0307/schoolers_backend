@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_ROOT = ROOT / "services"
 EXPECTED_SERVICES = {
+    "accounts_service",
     "academics_service",
     "activities_service",
     "attendance_service",
