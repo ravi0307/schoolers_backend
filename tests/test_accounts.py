@@ -9,7 +9,7 @@ import unittest
 from datetime import date
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from common.exceptions import NotFoundError
 from common.models import Base, School, SchoolClass, Staff, Student, User
@@ -204,6 +204,117 @@ class AccountsSheetTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(accounts_repo.salary_sheet(self.db, 1, self.months)["rows"], [])
         self.assertEqual(accounts_repo.fee_sheet(self.db, 1, self.months)["rows"], [])
+
+
+class AnchoredWindowTests(unittest.TestCase):
+    """The window is anchored on its LAST month so the selector can page back.
+
+    An unanchored window could only ever answer "the last six months", which
+    would leave the admin with no previous page to look at.
+    """
+
+    def test_window_ends_on_the_anchor(self):
+        self.assertEqual(
+            accounts_repo.month_window(6, "2026-09"),
+            ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"],
+        )
+
+    def test_paging_back_one_month_shifts_the_whole_window(self):
+        # Six months ending 2026-08, not 2026-03 alone: paging must move the
+        # window, not leave a gap in the middle of the grid.
+        self.assertEqual(
+            accounts_repo.month_window(6, "2026-08"),
+            ["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"],
+        )
+
+    def test_paging_back_past_a_year_boundary(self):
+        self.assertEqual(
+            accounts_repo.month_window(6, "2026-02"),
+            ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02"],
+        )
+
+    def test_anchored_and_unanchored_agree_for_the_current_month(self):
+        # recent_months(today=...) must equal month_window at that same month.
+        # The seed script uses the first and the API the second; if they ever
+        # disagreed the seed would quietly miss the grid's newest column.
+        for anchor in ("2026-01", "2026-06", "2026-09", "2026-12"):
+            year, month = int(anchor[:4]), int(anchor[5:7])
+            self.assertEqual(
+                accounts_repo.recent_months(6, date(year, month, 15)),
+                accounts_repo.month_window(6, anchor),
+                f"window disagreement at {anchor}",
+            )
+
+    def test_window_length_is_honoured(self):
+        for count in (1, 3, 6, 12):
+            window = accounts_repo.month_window(count, "2026-09")
+            self.assertEqual(len(window), count)
+            self.assertEqual(window[-1], "2026-09")
+            self.assertEqual(window, sorted(window))
+
+    def _seed_db(self):
+        """A two-school fixture mirroring the sheet tests."""
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(
+            engine, tables=[Base.metadata.tables[name] for name in TABLES]
+        )
+        db = sessionmaker(bind=engine, future=True)()
+        db.add_all(
+            [
+                School(school_id=1, name="Greenfield", address="1 St", pincode="1",
+                       city="T", state="S", primary_contact="p", primary_email="a@g.test"),
+                School(school_id=2, name="Riverside", address="2 St", pincode="2",
+                       city="T", state="S", primary_contact="p", primary_email="a@r.test"),
+                SchoolClass(class_id=1, school_id=1, name="Grade 5"),
+                Staff(staff_id=10, school_id=1, name="Meera", role="teacher"),
+                Student(student_id=100, school_id=1, class_id=1, admission_no="A1", name="Riya"),
+            ]
+        )
+        db.commit()
+        return db
+
+    def test_anchored_window_reads_payments_from_that_range(self):
+        # The anchor has to reach the query, not just the column headers.
+        db = self._seed_db()
+        try:
+            accounts_repo.record_salary(db, 1, {"staff_id": 10, "month": "2026-08", "amount": 100})
+            accounts_repo.record_salary(db, 1, {"staff_id": 10, "month": "2026-09", "amount": 200})
+            accounts_repo.record_salary(db, 1, {"staff_id": 10, "month": "2026-02", "amount": 999})
+
+            # A window ending in March does not include August or September.
+            march = accounts_repo.salary_sheet(
+                db, 1, accounts_repo.month_window(6, "2026-03")
+            )
+            meera = next(r for r in march["rows"] if r["staff_id"] == 10)
+            self.assertEqual(meera["amounts"], {"2026-02": 999.0})
+
+            # A window ending in September includes both, and not February.
+            sept = accounts_repo.salary_sheet(
+                db, 1, accounts_repo.month_window(6, "2026-09")
+            )
+            meera = next(r for r in sept["rows"] if r["staff_id"] == 10)
+            self.assertEqual(meera["amounts"], {"2026-08": 100.0, "2026-09": 200.0})
+        finally:
+            db.close()
+
+    def test_paging_does_not_lose_data(self):
+        # Every recorded month is reachable by some window, so an admin can
+        # always find a payment they made.
+        db = self._seed_db()
+        try:
+            for month in ("2025-11", "2026-01", "2026-04", "2026-09"):
+                accounts_repo.record_salary(
+                    db, 1, {"staff_id": 10, "month": month, "amount": 100}
+                )
+            seen = set()
+            for anchor in ("2025-11", "2026-01", "2026-04", "2026-09"):
+                window = accounts_repo.month_window(6, anchor)
+                sheet = accounts_repo.salary_sheet(db, 1, window)
+                meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
+                seen.update(meera["amounts"])
+            self.assertEqual(seen, {"2025-11", "2026-01", "2026-04", "2026-09"})
+        finally:
+            db.close()
 
 
 class MonthValidationTests(unittest.TestCase):
