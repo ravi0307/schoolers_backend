@@ -16,15 +16,24 @@ from common.models import SchoolClass, Staff, StaffSalary, Student, StudentFee
 DEFAULT_MONTHS = 6
 
 
-def recent_months(count: int = DEFAULT_MONTHS, today: date | None = None) -> list[str]:
-    """The last `count` calendar months, oldest first, current month last.
+def month_window(count: int = DEFAULT_MONTHS, end: str | None = None) -> list[str]:
+    """`count` calendar months ending at `end` ('YYYY-MM'), oldest first.
 
-    For 2026-09 with count=6 this is 2026-04 .. 2026-09. Doing the window
-    server-side keeps one definition of "the last six months" for the API,
-    the tests and the grid columns, instead of each re-deriving it.
+    `end` defaults to the current month, which is what the admin grid shows on
+    first load. Passing it explicitly is what lets the month selector page
+    backwards: without an anchor the API could only ever answer "the last six
+    months", and there would be no previous page to show.
+
+    The window is computed here rather than in each caller so the API, the
+    seed script and the grid columns can never disagree about which six months
+    "the last six months" means.
     """
-    today = today or date.today()
-    year, month = today.year, today.month
+    if end:
+        year, month = int(end[:4]), int(end[5:7])
+    else:
+        today = date.today()
+        year, month = today.year, today.month
+
     months = []
     for _ in range(count):
         months.append(f"{year:04d}-{month:02d}")
@@ -32,6 +41,17 @@ def recent_months(count: int = DEFAULT_MONTHS, today: date | None = None) -> lis
         if month == 0:
             year, month = year - 1, 12
     return list(reversed(months))
+
+
+def recent_months(count: int = DEFAULT_MONTHS, today: date | None = None) -> list[str]:
+    """The last `count` calendar months ending today, oldest first.
+
+    For 2026-09 with count=6 this is 2026-04 .. 2026-09. Kept as the unanchored
+    form the seed script and most tests want; month_window is the general case.
+    """
+    if today is None:
+        return month_window(count)
+    return month_window(count, f"{today.year:04d}-{today.month:02d}")
 
 
 def _amount(value) -> float:
