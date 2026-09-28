@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import NotFoundError
+from common.models import Route
 import repository as repo
 from schemas import (
     VehicleCreate, VehicleUpdate, VehicleRead,
@@ -158,13 +159,30 @@ def delete_route(
     repo.delete_route(db, route)
 
 
+def _owned_route(db: Session, school_id: int, route_id: int) -> Route:
+    """Resolve a route, but only if it belongs to the caller's own school.
+
+    route_stops and route_students carry no school_id — they are scoped only
+    by route_id. Without this check any caller could read or write another
+    school's stops and student roster simply by walking route_id upwards.
+    A miss is reported as "not found" rather than "forbidden" so the endpoint
+    does not confirm that the other school's route exists.
+    """
+    route = repo.get_route(db, school_id, route_id)
+    if not route:
+        raise NotFoundError("Route not found")
+    return route
+
+
 @router.post("/{route_id}/stops", response_model=StopRead, status_code=201)
 def add_stop(
     route_id: int,
     payload: StopCreate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    _owned_route(db, school_id, route_id)
     return repo.add_stop(db, route_id, payload.model_dump())
 
 
@@ -172,8 +190,10 @@ def add_stop(
 def list_stops(
     route_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "admin", "pilot")),
 ):
+    _owned_route(db, school_id, route_id)
     return repo.list_stops(db, route_id)
 
 
@@ -182,9 +202,10 @@ def update_stop(
     stop_id: int,
     payload: StopUpdate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    stop = repo.get_stop(db, stop_id)
+    stop = repo.get_stop(db, school_id, stop_id)
     if not stop:
         raise NotFoundError("Stop not found")
     return repo.update_stop(db, stop, payload.model_dump(exclude_unset=True))
@@ -194,9 +215,12 @@ def update_stop(
 def remove_stop(
     stop_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    repo.remove_stop(db, stop_id)
+    if not repo.get_stop(db, school_id, stop_id):
+        raise NotFoundError("Stop not found")
+    repo.remove_stop(db, school_id, stop_id)
 
 
 @router.post("/{route_id}/students/{student_id}", response_model=RouteStudentRead, status_code=201)
@@ -204,9 +228,13 @@ def add_student_to_route(
     route_id: int,
     student_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.add_student(db, route_id, student_id)
+    # add_student also filters the student by school_id, so a student from
+    # another school cannot be pulled onto this route even if it exists.
+    _owned_route(db, school_id, route_id)
+    return repo.add_student(db, school_id, route_id, student_id)
 
 
 @router.delete("/{route_id}/students/{student_id}", status_code=204)
@@ -214,8 +242,10 @@ def remove_student_from_route(
     route_id: int,
     student_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    _owned_route(db, school_id, route_id)
     repo.remove_student(db, route_id, student_id)
 
 
@@ -223,8 +253,10 @@ def remove_student_from_route(
 def list_route_students(
     route_id: int,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "admin", "pilot")),
 ):
+    _owned_route(db, school_id, route_id)
     return repo.list_route_students(db, route_id)
 
 
@@ -234,8 +266,10 @@ def update_pickup_drop_status(
     student_id: int,
     payload: RouteStudentStatusUpdate,
     db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("pilot", "admin")),
 ):
+    _owned_route(db, school_id, route_id)
     rs = repo.update_student_status(db, route_id, student_id, payload.status)
     if not rs:
         raise NotFoundError("Student is not on this route")
