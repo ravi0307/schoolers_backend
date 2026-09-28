@@ -110,6 +110,34 @@ class SeedAccountsTests(unittest.TestCase):
         salary_months = {r.month for r in self._read(StaffSalary)}
         self.assertEqual(salary_months, set(self.window))
 
+    def test_each_seeded_payment_is_stamped_with_a_paid_date(self):
+        # The grids show "paid on" next to every figure, so a fresh demo seed
+        # must not leave those dates blank. The 28th of the payment's own
+        # month is a neutral, believable payday.
+        seed_accounts.seed(self.engine)
+        for row in self._read(StaffSalary):
+            self.assertEqual(str(row.paid_on), row.month + "-28")
+        for row in self._read(StudentFee):
+            self.assertEqual(str(row.paid_on), row.month + "-28")
+
+    def test_rerunning_keeps_an_existing_paid_date(self):
+        # The paid date is real history: re-running the demo seed must not
+        # rewrite it back to the synthetic 28th.
+        seed_accounts.seed(self.engine)
+        db: Session = sessionmaker(bind=self.engine, future=True)()
+        row = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
+        row.paid_on = date(2026, 9, 15)
+        db.commit()
+        db.close()
+
+        seed_accounts.seed(self.engine)
+        db = sessionmaker(bind=self.engine, future=True)()
+        try:
+            again = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
+            self.assertEqual(str(again.paid_on), "2026-09-15")
+        finally:
+            db.close()
+
     def test_the_seeded_grid_reports_no_outstanding_months(self):
         # End to end through the same read the API uses, so "seeded" means the
         # admin actually sees a full grid rather than a half-empty one.

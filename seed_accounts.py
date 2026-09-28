@@ -1,5 +1,7 @@
 """Seed the accounts grid: a flat monthly salary per staff member and fee per
-student, across the six-month window the admin view shows (idempotent).
+student, across the six-month window the admin view shows (idempotent). Each
+payment is stamped with a payday -- the 28th of its month -- so the grid's
+"paid on" dates are not blank in a fresh demo.
 
 Written as a script rather than raw SQL so the month window comes from the same
 `recent_months` the API uses. If the two ever disagreed, the grid would show
@@ -10,6 +12,7 @@ must not be clobbered by re-running a demo seed. Pass --force to overwrite.
 """
 import argparse
 import os
+from datetime import date
 
 os.environ.setdefault(
     "DATABASE_URL",
@@ -24,6 +27,11 @@ import services.accounts_service.repository as accounts_repo
 
 DEFAULT_SALARY = 10000.00
 DEFAULT_FEE = 4000.00
+
+
+def _paid_on(month: str) -> date:
+    """A believable payday for a month bucket: the 28th of that month."""
+    return date(int(month[:4]), int(month[5:7]), 28)
 
 
 def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
@@ -51,6 +59,7 @@ def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
                         skipped += 1
                         continue
                     exists.amount = salary
+                    exists.paid_on = _paid_on(month)
                     salaries += 1
                     continue
                 db.add(
@@ -59,6 +68,7 @@ def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
                         staff_id=person.staff_id,
                         month=month,
                         amount=salary,
+                        paid_on=_paid_on(month),
                     )
                 )
                 salaries += 1
@@ -81,6 +91,7 @@ def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
                         skipped += 1
                         continue
                     exists.amount = fee
+                    exists.paid_on = _paid_on(month)
                     fees += 1
                     continue
                 db.add(
@@ -89,6 +100,7 @@ def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
                         student_id=person.student_id,
                         month=month,
                         amount=fee,
+                        paid_on=_paid_on(month),
                     )
                 )
                 fees += 1

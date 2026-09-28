@@ -68,12 +68,16 @@ class SalaryRow(BaseModel):
     `amounts` is keyed by 'YYYY-MM' and only carries the months that have a
     payment; the client treats a missing key as unpaid rather than zero,
     because "nothing recorded" and "recorded as zero" are different facts.
+    `paid_on` is the parallel map for the same months -- the date each figure
+    was paid -- so the grid can show "when" next to "how much". A month with
+    an amount but no recorded date carries None, never a made-up date.
     """
 
     staff_id: int
     staff_name: str
     designation: str | None = None
     amounts: dict[str, float]
+    paid_on: dict[str, str | None] = Field(default_factory=dict)
 
 
 class FeeRow(BaseModel):
@@ -82,6 +86,7 @@ class FeeRow(BaseModel):
     admission_no: str | None = None
     class_name: str | None = None
     amounts: dict[str, float]
+    paid_on: dict[str, str | None] = Field(default_factory=dict)
 
 
 class SalarySheet(BaseModel):

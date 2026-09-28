@@ -71,8 +71,12 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
         .all()
     )
     by_staff: dict[int, dict[str, float]] = {}
+    paid_by_staff: dict[int, dict[str, str | None]] = {}
     for pay in payments:
         by_staff.setdefault(pay.staff_id, {})[pay.month] = _amount(pay.amount)
+        paid_by_staff.setdefault(pay.staff_id, {})[pay.month] = (
+            pay.paid_on.isoformat() if pay.paid_on else None
+        )
 
     rows = [
         {
@@ -80,6 +84,7 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
             "staff_name": s.name,
             "designation": s.role_title or s.role,
             "amounts": by_staff.get(s.staff_id, {}),
+            "paid_on": paid_by_staff.get(s.staff_id, {}),
         }
         for s in staff
     ]
@@ -108,8 +113,12 @@ def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
         .all()
     )
     by_student: dict[int, dict[str, float]] = {}
+    paid_by_student: dict[int, dict[str, str | None]] = {}
     for pay in payments:
         by_student.setdefault(pay.student_id, {})[pay.month] = _amount(pay.amount)
+        paid_by_student.setdefault(pay.student_id, {})[pay.month] = (
+            pay.paid_on.isoformat() if pay.paid_on else None
+        )
 
     rows = [
         {
@@ -118,6 +127,7 @@ def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
             "admission_no": s.admission_no,
             "class_name": klass.name if klass else None,
             "amounts": by_student.get(s.student_id, {}),
+            "paid_on": paid_by_student.get(s.student_id, {}),
         }
         for s, klass in students
     ]
@@ -178,7 +188,10 @@ def record_salary(db: Session, school_id: int, data: dict) -> dict:
     )
     if existing:
         existing.amount = data["amount"]
-        existing.paid_on = data.get("paid_on")
+        # Editing the figure is not a second payment, so the paid date is kept
+        # unless one is explicitly sent.
+        if data.get("paid_on") is not None:
+            existing.paid_on = data["paid_on"]
         existing.note = data.get("note")
         existing.school_id = school_id
         row = existing
@@ -188,7 +201,8 @@ def record_salary(db: Session, school_id: int, data: dict) -> dict:
             staff_id=staff.staff_id,
             month=data["month"],
             amount=data["amount"],
-            paid_on=data.get("paid_on"),
+            # Recording a payment without a date means it was paid today.
+            paid_on=data.get("paid_on") or date.today(),
             note=data.get("note"),
         )
         db.add(row)
@@ -216,7 +230,8 @@ def record_fee(db: Session, school_id: int, data: dict) -> dict:
     )
     if existing:
         existing.amount = data["amount"]
-        existing.paid_on = data.get("paid_on")
+        if data.get("paid_on") is not None:
+            existing.paid_on = data["paid_on"]
         existing.note = data.get("note")
         existing.school_id = school_id
         row = existing
@@ -226,7 +241,7 @@ def record_fee(db: Session, school_id: int, data: dict) -> dict:
             student_id=student.student_id,
             month=data["month"],
             amount=data["amount"],
-            paid_on=data.get("paid_on"),
+            paid_on=data.get("paid_on") or date.today(),
             note=data.get("note"),
         )
         db.add(row)
