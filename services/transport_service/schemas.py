@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from common.security import validate_password_byte_length
 
@@ -220,3 +220,9 @@ class ParentPickDropRead(BaseModel):
     vehicle: str | None = None
     driver_name: str | None = None
     status: str = "not_assigned"  # 'pending' | 'picked' | 'dropped' | 'not_assigned'
+    # The route's stop schedule, in boarding order. Without this a parent sees
+    # only "Route 1 / Picked up" and cannot tell where or when. Note the stops
+    # belong to the route, not to the child: route_students does not record
+    # which stop a given student boards at, so this is the full route stop
+    # list and the client decides which one is next.
+    stops: list[StopRead] = Field(default_factory=list)

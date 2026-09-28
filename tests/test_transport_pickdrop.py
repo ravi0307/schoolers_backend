@@ -20,6 +20,7 @@ from common.models import (
     ParentStudent,
     Pilot,
     Route,
+    RouteStop,
     RouteStudent,
     School,
     SchoolClass,
@@ -89,6 +90,13 @@ def seed(db):
             Route(route_id=1, school_id=1, name="Route A", vehicle="KA-01-AB-1234", status="Scheduled"),
             Route(route_id=2, school_id=1, name="Route B", vehicle="KA-02-BB-9999", status="Cancelled", is_active=False),
             Route(route_id=3, school_id=2, name="Route C", vehicle="KA-03-CC-1111", status="Scheduled"),
+            # Route A's schedule, in boarding order.
+            RouteStop(stop_id=1, route_id=1, name="Koramangala", stop_time="07:45", stop_type="pickup", stop_order=1),
+            RouteStop(stop_id=2, route_id=1, name="Koramangala", stop_time="08:30", stop_type="drop", stop_order=1),
+            RouteStop(stop_id=3, route_id=1, name="Indiranagar", stop_time="08:00", stop_type="pickup", stop_order=2),
+            RouteStop(stop_id=4, route_id=1, name="Indiranagar", stop_time="08:45", stop_type="drop", stop_order=2),
+            # Route B has no stops at all, so a child on it would get [].
+            RouteStop(stop_id=5, route_id=3, name="Cross Stop", stop_time="06:30", stop_type="pickup", stop_order=1),
             RouteStudent(route_id=1, student_id=101, status="picked"),
             # Rohit is assigned only to the inactive Route B.
             RouteStudent(route_id=2, student_id=103, status="pending"),
@@ -132,6 +140,37 @@ class ParentPickdropRepositoryTests(unittest.TestCase):
         self.assertEqual(aarav["vehicle"], "KA-01-AB-1234")
         self.assertEqual(aarav["driver_name"], "Ramesh")
         self.assertEqual(aarav["status"], "picked")
+
+    def test_pickdrop_payload_carries_stop_name_and_time(self):
+        # Without this a parent only sees "Route A / Picked up" and has no way
+        # to tell where the bus stops or when.
+        aarav = {row["student_id"]: row for row in self._status()}[101]
+        stops = aarav["stops"]
+        self.assertEqual([s["stop_name"] for s in stops], ["Koramangala", "Indiranagar"])
+        first = stops[0]
+        self.assertEqual(first["pickup_time"], "07:45")
+        self.assertEqual(first["drop_time"], "08:30")
+        self.assertEqual(first["pickup_order"], 1)
+        second = stops[1]
+        self.assertEqual(second["pickup_time"], "08:00")
+        self.assertEqual(second["drop_time"], "08:45")
+
+    def test_stops_are_in_boarding_order(self):
+        aarav = {row["student_id"]: row for row in self._status()}[101]
+        orders = [s["pickup_order"] for s in aarav["stops"]]
+        self.assertEqual(orders, sorted(orders))
+
+    def test_unassigned_child_gets_empty_stops_not_another_routes(self):
+        anika = {row["student_id"]: row for row in self._status()}[102]
+        self.assertEqual(anika["stops"], [])
+
+    def test_stops_are_scoped_to_the_childs_own_route(self):
+        # Cross Stop belongs to Route C in the other school; it must not leak
+        # into a school 1 parent's payload.
+        aarav = {row["student_id"]: row for row in self._status()}[101]
+        self.assertNotIn("Cross Stop", [s["stop_name"] for s in aarav["stops"]])
+        for stop in aarav["stops"]:
+            self.assertEqual(stop["route_id"], 1)
 
     def test_unassigned_child_is_reported_not_assigned(self):
         result = {row["student_id"]: row for row in self._status()}
