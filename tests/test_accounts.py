@@ -197,6 +197,78 @@ class AccountsSheetTests(unittest.TestCase):
         row = accounts_repo.salary_sheet(self.db, 1, self.months)
         meera = next(r for r in row["rows"] if r["staff_id"] == 10)
         self.assertEqual(meera["amounts"], {"2026-09": 45000.0})
+        self.assertEqual(meera["paid_on"], {"2026-09": "2026-09-28"})
+
+    def test_the_paid_date_travels_with_its_own_month(self):
+        # paid_on is a parallel sparse map to amounts: only months that carry a
+        # payment carry a date, and the two never disagree about which months
+        # they cover.
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-08", "amount": 45000,
+                         "paid_on": date(2026, 8, 30)},
+        )
+        sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
+        meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
+        self.assertEqual(meera["amounts"], {"2026-08": 45000.0})
+        self.assertEqual(meera["paid_on"], {"2026-08": "2026-08-30"})
+
+    def test_recording_a_payment_without_a_date_stamps_today(self):
+        # The admin records "10,000 for September" and the grid shows the date
+        # it was paid -- which is the day they recorded it, unless they say
+        # otherwise. Leaving the date blank because none was typed would make
+        # the grids permanently date-less.
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000}
+        )
+        sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
+        meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
+        self.assertEqual(meera["paid_on"], {"2026-09": date.today().isoformat()})
+
+    def test_editing_an_amount_keeps_the_original_paid_date(self):
+        # A correction to a figure is not a second payment. Moving the paid
+        # date to "today" every time someone fixes a typo would rewrite
+        # history one keystroke at a time.
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000,
+                         "paid_on": date(2026, 9, 28)},
+        )
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 47000}
+        )
+        meera = next(r for r in
+                     accounts_repo.salary_sheet(self.db, 1, self.months)["rows"]
+                     if r["staff_id"] == 10)
+        self.assertEqual(meera["amounts"], {"2026-09": 47000.0})
+        self.assertEqual(meera["paid_on"], {"2026-09": "2026-09-28"})
+
+    def test_explicit_paid_on_overrides_on_edit(self):
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000,
+                         "paid_on": date(2026, 9, 28)},
+        )
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000,
+                         "paid_on": date(2026, 9, 30)},
+        )
+        meera = next(r for r in
+                     accounts_repo.salary_sheet(self.db, 1, self.months)["rows"]
+                     if r["staff_id"] == 10)
+        self.assertEqual(meera["paid_on"], {"2026-09": "2026-09-30"})
+
+    def test_fee_sheet_carries_the_paid_date_too(self):
+        accounts_repo.record_fee(
+            self.db, 1, {"student_id": 100, "month": "2026-09", "amount": 5000,
+                         "paid_on": date(2026, 9, 5)},
+        )
+        sheet = accounts_repo.fee_sheet(self.db, 1, self.months)
+        riya = next(r for r in sheet["rows"] if r["student_id"] == 100)
+        self.assertEqual(riya["amounts"], {"2026-09": 5000.0})
+        self.assertEqual(riya["paid_on"], {"2026-09": "2026-09-05"})
+
+    def test_a_row_with_no_payments_has_no_paid_dates(self):
+        sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
+        meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
+        self.assertEqual(meera["paid_on"], {})
 
     def test_empty_school_returns_empty_sheets_rather_than_failing(self):
         self.db.execute(Base.metadata.tables["students"].delete())
