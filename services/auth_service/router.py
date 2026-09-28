@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import get_current_user, CurrentUser
+from common.models import School
 from common.exceptions import AppError
 import service
 from schemas import (
@@ -129,10 +130,30 @@ def forgot_password_reset(payload: ForgotPasswordResetRequest, db: Session = Dep
 
 
 @router.get("/me")
-def me(current_user: CurrentUser = Depends(get_current_user)):
+def me(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Identity plus the caller's school name and logo.
+
+    Every role needs its own school's name and logo in the sidebar, but
+    GET /schools is master-only and GET /schools/{id} is master/admin-only,
+    so a teacher, pilot or parent cannot read it there. This is the one
+    endpoint every authenticated role can reach, so the branding travels
+    with the session instead of forcing a widened permission.
+    """
+    school_name = None
+    school_logo_url = None
+    if current_user.school_id is not None:
+        school = db.query(School).filter(School.school_id == current_user.school_id).first()
+        if school is not None:
+            school_name = school.name
+            school_logo_url = school.logo_url
     return {
         "user_id": current_user.user_id,
         "role": current_user.role,
         "school_id": current_user.school_id,
         "linked_person_id": current_user.linked_person_id,
+        "school_name": school_name,
+        "school_logo_url": school_logo_url,
     }
