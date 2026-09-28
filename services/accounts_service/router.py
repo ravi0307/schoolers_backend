@@ -22,21 +22,31 @@ router = APIRouter(tags=["accounts"])
 @router.get("/accounts/salaries", response_model=SalarySheet)
 def salary_sheet(
     months: int = Query(repo.DEFAULT_MONTHS, ge=1, le=24),
+    end: str | None = Query(
+        None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Last month of the window, YYYY-MM. Defaults to the current month.",
+    ),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.salary_sheet(db, school_id, repo.recent_months(months))
+    return repo.salary_sheet(db, school_id, repo.month_window(months, end))
 
 
 @router.get("/accounts/fees", response_model=FeeSheet)
 def fee_sheet(
     months: int = Query(repo.DEFAULT_MONTHS, ge=1, le=24),
+    end: str | None = Query(
+        None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Last month of the window, YYYY-MM. Defaults to the current month.",
+    ),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.fee_sheet(db, school_id, repo.recent_months(months))
+    return repo.fee_sheet(db, school_id, repo.month_window(months, end))
 
 
 @router.post("/accounts/salaries", response_model=SalaryEntry, status_code=201)
