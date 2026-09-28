@@ -374,8 +374,19 @@ def list_stops(db: Session, route_id: int) -> list[dict]:
     return _group_stops_by_name(stops)
 
 
-def get_stop(db: Session, stop_id: int) -> RouteStop | None:
-    return db.query(RouteStop).filter(RouteStop.stop_id == stop_id).first()
+def get_stop(db: Session, school_id: int, stop_id: int) -> RouteStop | None:
+    """Fetch a stop only if it belongs to one of the caller's own routes.
+
+    A stop has no school_id of its own, so it is scoped through its route.
+    Without the join, any admin could read or edit another school's stop by
+    guessing stop_id.
+    """
+    return (
+        db.query(RouteStop)
+        .join(Route, Route.route_id == RouteStop.route_id)
+        .filter(RouteStop.stop_id == stop_id, Route.school_id == school_id)
+        .first()
+    )
 
 
 def update_stop(db: Session, stop: RouteStop, data: dict) -> dict:
@@ -416,8 +427,8 @@ def update_stop(db: Session, stop: RouteStop, data: dict) -> dict:
     return get_stop_group(db, stop.route_id, name)
 
 
-def remove_stop(db: Session, stop_id: int) -> None:
-    stop = db.query(RouteStop).filter(RouteStop.stop_id == stop_id).first()
+def remove_stop(db: Session, school_id: int, stop_id: int) -> None:
+    stop = get_stop(db, school_id, stop_id)
     if stop:
         db.delete(stop)
         db.commit()
@@ -434,9 +445,10 @@ def route_student_response(route_student: RouteStudent, student: Student) -> dic
     }
 
 
-def add_student(db: Session, route_id: int, student_id: int) -> dict:
+def add_student(db: Session, school_id: int, route_id: int, student_id: int) -> dict:
     student = db.query(Student).filter(
         Student.student_id == student_id,
+        Student.school_id == school_id,
         Student.is_active.is_(True),
     ).first()
     if not student:
