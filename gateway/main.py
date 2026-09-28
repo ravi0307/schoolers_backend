@@ -53,6 +53,7 @@ ROUTE_MAP = {
     "public": "website",       # /api/v1/public/sites/{id}
     "notifications": "notifications",
     "reports": "reports",
+    "accounts": "accounts",
 }
 
 # Service-to-service calls must use the Compose network directly, not host

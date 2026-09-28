@@ -651,3 +651,59 @@ ALTER TABLE schoolers.pilots ADD CONSTRAINT pilots_staff_id_fkey FOREIGN KEY (st
 
 -- E. The denormalised single-value attendance column lived on teachers and
 --    goes away with the table; the dated staff_attendance table replaces it.
+
+-- ============================================================================
+-- ACCOUNTS: staff salaries and student fees
+-- ============================================================================
+-- One row per person per calendar month. `month` is a 'YYYY-MM' string because
+-- the admin view is a six-column month grid and a month bucket has no day.
+-- The unique constraints make a second payment for the same month overwrite
+-- the first rather than add a row, which is what the grid expects: one figure
+-- per cell.
+--
+-- school_id is denormalised even though staff and students are already
+-- school-scoped: the sheet read is a single query filtered by school, and the
+-- column makes the ownership of a payment explicit rather than something a
+-- join has to be trusted to derive.
+--
+-- amount is NUMERIC, never float: money does not belong in binary floating
+-- point. The API returns it as a JSON number for the admin display total.
+
+CREATE TABLE IF NOT EXISTS schoolers.staff_salaries (
+    salary_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    staff_id INTEGER NOT NULL REFERENCES schoolers.staff(staff_id) ON DELETE CASCADE,
+    month VARCHAR(7) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL,
+    paid_on DATE,
+    note VARCHAR(200),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT staff_salaries_staff_id_month_key UNIQUE (staff_id, month),
+    CONSTRAINT staff_salaries_month_check
+        CHECK (month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT staff_salaries_amount_check CHECK (amount >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS schoolers.student_fees (
+    fee_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES schoolers.students(student_id) ON DELETE CASCADE,
+    month VARCHAR(7) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL,
+    paid_on DATE,
+    note VARCHAR(200),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT student_fees_student_id_month_key UNIQUE (student_id, month),
+    CONSTRAINT student_fees_month_check
+        CHECK (month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT student_fees_amount_check CHECK (amount >= 0)
+);
+
+-- The accounts grid is useless without an index per school over the month
+-- column: the sheet read filters on school_id AND month IN (six values).
+CREATE INDEX IF NOT EXISTS staff_salaries_school_month_idx
+    ON schoolers.staff_salaries (school_id, month);
+CREATE INDEX IF NOT EXISTS student_fees_school_month_idx
+    ON schoolers.student_fees (school_id, month);

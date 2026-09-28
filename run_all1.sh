@@ -33,6 +33,7 @@ services=(
     notifications_service
     reports_service
     media_service
+    accounts_service
 )
 ports=(
     8001
@@ -51,10 +52,11 @@ ports=(
     8014
     8015
     8016
+    8017
 )
 
 stop_services() {
-    echo "Stopping Schoolers gateway and microservices on their ports (8000-8015)..."
+    echo "Stopping Schoolers gateway and microservices on their ports (8000-8017)..."
     # Kill only processes actually listening on this stack's ports so unrelated
     # uvicorn apps started by the user in other projects are left alone.
     for port in 8000 "${ports[@]}"; do
