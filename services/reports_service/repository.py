@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
+from datetime import date
 
 from common.models import (
     Staff, Student, Parent, ParentStudent, SchoolClass, Subject, LeaveRequest,
-    Route, Attendance, Mark,
+    Route, Attendance, Mark, StaffSalary, StaffAttendance,
 )
 
 
@@ -255,4 +256,192 @@ def student_report(db: Session, school_id: int, student_id: int) -> dict | None:
         "terms": [t["term"] for t in marks_by_term],
         "marks_by_term": marks_by_term,
         "attendance": _attendance(db, student.student_id),
+    }
+
+
+# ---- Per-staff report -------------------------------------------------------
+#
+# The same shape as the student report, about the people who get paid rather
+# than the people who study. Salary and attendance are both assembled here so
+# one school-scoped read answers the whole popup, and the paid date travels
+# with every amount (editing a figure is not a second payment).
+
+DEFAULT_SALARY_MONTHS = 6
+
+
+def _recent_months(count: int, today: date | None = None) -> list[str]:
+    """`count` calendar months ending at `today` (or now), oldest first."""
+    if today is None:
+        today = date.today()
+    year, month = today.year, today.month
+    months = []
+    for _ in range(count):
+        months.append(f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+    return list(reversed(months))
+
+
+def _staff_or_none(db: Session, school_id: int, staff_id: int):
+    """The staff member, but only if they belong to the caller's school.
+
+    Same None-or-found contract as the student lookup, so the router maps it
+    to a 404 and the endpoint cannot probe another school's ids.
+    """
+    return (
+        db.query(Staff)
+        .filter(Staff.staff_id == staff_id, Staff.school_id == school_id)
+        .first()
+    )
+
+
+def _salary(
+    db: Session,
+    school_id: int,
+    staff_id: int,
+    months: int,
+    today: date | None,
+) -> dict:
+    """The staff member's salary across a rolling month window.
+
+    The window mirrors the accounts grid -- the same "last N months" the admin
+    just used -- so the report and the grid cannot disagree about what an
+    unpaid month means. Only rows in the window are counted; an amount recorded
+    outside it is real history the window simply does not include.
+    """
+    window = _recent_months(months, today)
+    rows = (
+        db.query(StaffSalary)
+        .filter(StaffSalary.staff_id == staff_id, StaffSalary.school_id == school_id)
+        .order_by(StaffSalary.month)
+        .all()
+    )
+    records = [
+        {
+            "month": row.month,
+            "amount": float(row.amount),
+            "paid_on": row.paid_on.isoformat() if row.paid_on else None,
+            "note": row.note,
+        }
+        for row in rows
+        if row.month in window
+    ]
+
+    months_paid = len(records)
+    total_paid = sum(r["amount"] for r in records)
+    return {
+        "window": window,
+        "window_size": len(window),
+        "records": records,
+        "months_paid": months_paid,
+        # The window has six slots; every one without a payment stands for an
+        # unpaid month, exactly like the dash in the grid.
+        "outstanding_months": len(window) - months_paid,
+        "total_paid": round(total_paid, 2),
+        "average_monthly": round(total_paid / months_paid, 2) if months_paid else None,
+        "from_month": records[0]["month"] if records else None,
+        "to_month": records[-1]["month"] if records else None,
+    }
+
+
+def _staff_attendance(db: Session, staff_id: int) -> dict:
+    """Counts over the whole register, plus recent days.
+
+    Staff days are Present, Absent, On leave or Half day. All four are counted
+    separately so a half day never hides inside "absent", and the percentage is
+    present over marked, with None (not 0) when nothing was ever marked.
+    """
+    counts = dict(
+        db.query(StaffAttendance.status, func.count())
+        .filter(StaffAttendance.staff_id == staff_id)
+        .group_by(StaffAttendance.status)
+        .all()
+    )
+    present = counts.get("Present", 0)
+    absent = counts.get("Absent", 0)
+    on_leave = counts.get("On leave", 0)
+    half_day = counts.get("Half day", 0)
+    # Belt and braces: the column is constrained to the four statuses, but an
+    # older row with anything else still counts as a marked day, not vanish.
+    marked = present + absent + on_leave + half_day + sum(
+        n for status, n in counts.items() if status not in
+        ("Present", "Absent", "On leave", "Half day")
+    )
+
+    span = (
+        db.query(func.min(StaffAttendance.date), func.max(StaffAttendance.date))
+        .filter(StaffAttendance.staff_id == staff_id)
+        .one()
+    )
+    first_day, last_day = span
+
+    recent = [
+        {
+            "date": str(day),
+            "status": status,
+            "check_in": str(check_in) if check_in else None,
+            "check_out": str(check_out) if check_out else None,
+        }
+        for day, status, check_in, check_out in (
+            db.query(
+                StaffAttendance.date, StaffAttendance.status,
+                StaffAttendance.check_in, StaffAttendance.check_out,
+            )
+            .filter(StaffAttendance.staff_id == staff_id)
+            .order_by(StaffAttendance.date.desc())
+            .limit(RECENT_ATTENDANCE_DAYS)
+            .all()
+        )
+    ]
+
+    return {
+        "present": present,
+        "absent": absent,
+        "on_leave": on_leave,
+        "half_day": half_day,
+        "marked_days": marked,
+        "percentage": round(present * 100.0 / marked, 1) if marked else None,
+        "from_date": str(first_day) if first_day else None,
+        "to_date": str(last_day) if last_day else None,
+        "recent": recent,
+    }
+
+
+def staff_report(
+    db: Session,
+    school_id: int,
+    staff_id: int,
+    months: int = DEFAULT_SALARY_MONTHS,
+    today: date | None = None,
+) -> dict | None:
+    staff = _staff_or_none(db, school_id, staff_id)
+    if staff is None:
+        return None
+
+    return {
+        "staff": {
+            "staff_id": staff.staff_id,
+            "name": staff.name,
+            "role": staff.role,
+            "role_title": staff.role_title,
+            "person_type": staff.person_type,
+            # role_title is the refined label; role is the plain one. role_title
+            # wins because it is what the people UI displays.
+            "designation": staff.role_title or staff.role,
+            "phone": staff.phone,
+            "email": staff.email,
+            "date_of_birth": str(staff.date_of_birth) if staff.date_of_birth else None,
+            "gender": staff.gender,
+            "marital_status": staff.marital_status,
+            "present_address": staff.present_address,
+            "permanent_address": staff.permanent_address,
+            "aadhaar_card": staff.aadhaar_card,
+            "emergency_number": staff.emergency_number,
+            "driving_license": staff.driving_license,
+            "is_active": staff.is_active,
+            "recorded_on": str(staff.created_at) if staff.created_at else None,
+        },
+        "salary": _salary(db, school_id, staff_id, months, today),
+        "attendance": _staff_attendance(db, staff.staff_id),
     }
