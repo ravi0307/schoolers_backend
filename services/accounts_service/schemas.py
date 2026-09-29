@@ -78,6 +78,7 @@ class SalaryRow(BaseModel):
     designation: str | None = None
     amounts: dict[str, float]
     paid_on: dict[str, str | None] = Field(default_factory=dict)
+    notes: dict[str, str | None] = Field(default_factory=dict)
 
 
 class FeeRow(BaseModel):
