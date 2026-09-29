@@ -10,10 +10,28 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from common.exceptions import NotFoundError
+from common.exceptions import AppError, NotFoundError
 from common.models import SchoolClass, Staff, StaffSalary, Student, StudentFee
 
 DEFAULT_MONTHS = 6
+
+# Fee plans, in months. A parent hands over one amount for a period, and the
+# period is what gets recorded, so the plan is a length rather than a flag.
+# `monthly` is here so the same dialog covers the single-month case instead of
+# needing a second code path for "one month at a time".
+FEE_PLANS = {
+    "monthly": 1,
+    "quarterly": 3,
+    "half_yearly": 6,
+    "yearly": 12,
+}
+
+FEE_PLAN_LABELS = {
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "half_yearly": "Half yearly",
+    "yearly": "Yearly",
+}
 
 
 def month_window(count: int = DEFAULT_MONTHS, end: str | None = None) -> list[str]:
@@ -56,6 +74,49 @@ def recent_months(count: int = DEFAULT_MONTHS, today: date | None = None) -> lis
 
 def _amount(value) -> float:
     return float(value) if value is not None else 0.0
+
+
+def shift_month(month: str, delta: int) -> str:
+    """`month` moved by `delta` months, rolling across year boundaries.
+
+    The forward-only twin of the window arithmetic: a deposit needs the months
+    *after* its start, and `month_window` only ever answers for the months
+    before an end.
+    """
+    year, mon = int(month[:4]), int(month[5:7])
+    index = year * 12 + (mon - 1) + delta
+    return f"{index // 12:04d}-{index % 12 + 1:02d}"
+
+
+def plan_months(start: str, plan: str) -> list[str]:
+    """The `plan`'s worth of months beginning at `start`, oldest first.
+
+    Forward from the start month, because a deposit pays for the period it is
+    handed in for: a quarterly deposit taken in September covers September,
+    October and November, not the three months that have already gone. A
+    deposit for last term is a correction to one of those months, which the
+    grid already does in place.
+    """
+    if plan not in FEE_PLANS:
+        raise AppError(
+            f"Unknown fee plan {plan!r}. Use one of: {', '.join(FEE_PLANS)}."
+        )
+    count = FEE_PLANS[plan]
+    return month_window(count, shift_month(start, count - 1))
+
+
+def split_total(total: float, months: int) -> list[float]:
+    """`total` shared over `months` entries that add back up to it exactly.
+
+    Done in whole paise, so the parts never drift from the amount the parent
+    actually handed over by a fraction of a rupee. A total that does not divide
+    evenly puts the remainder on the FIRST month rather than spreading it
+    around: one month carries the odd paise and the rest stay clean round
+    figures, which is what a fee register reads like.
+    """
+    paise = int(round(_amount(total) * 100))
+    base, extra = divmod(paise, months)
+    return [round((base + (extra if i == 0 else 0)) / 100, 2) for i in range(months)]
 
 
 def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
@@ -117,11 +178,13 @@ def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
     )
     by_student: dict[int, dict[str, float]] = {}
     paid_by_student: dict[int, dict[str, str | None]] = {}
+    notes_by_student: dict[int, dict[str, str | None]] = {}
     for pay in payments:
         by_student.setdefault(pay.student_id, {})[pay.month] = _amount(pay.amount)
         paid_by_student.setdefault(pay.student_id, {})[pay.month] = (
             pay.paid_on.isoformat() if pay.paid_on else None
         )
+        notes_by_student.setdefault(pay.student_id, {})[pay.month] = pay.note
 
     rows = [
         {
@@ -131,6 +194,7 @@ def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
             "class_name": klass.name if klass else None,
             "amounts": by_student.get(s.student_id, {}),
             "paid_on": paid_by_student.get(s.student_id, {}),
+            "notes": notes_by_student.get(s.student_id, {}),
         }
         for s, klass in students
     ]
@@ -195,7 +259,11 @@ def record_salary(db: Session, school_id: int, data: dict) -> dict:
         # unless one is explicitly sent.
         if data.get("paid_on") is not None:
             existing.paid_on = data["paid_on"]
-        existing.note = data.get("note")
+        # The remark is only touched when the payload actually carries one. A
+        # caller correcting a figure who knows nothing about remarks must not
+        # delete the sentence explaining it; clearing is explicit (note: null).
+        if "note" in data:
+            existing.note = data["note"]
         existing.school_id = school_id
         row = existing
     else:
@@ -235,7 +303,10 @@ def record_fee(db: Session, school_id: int, data: dict) -> dict:
         existing.amount = data["amount"]
         if data.get("paid_on") is not None:
             existing.paid_on = data["paid_on"]
-        existing.note = data.get("note")
+        # As with salaries: a remark survives a correction that says nothing
+        # about remarks, and is only cleared when the payload says so.
+        if "note" in data:
+            existing.note = data["note"]
         existing.school_id = school_id
         row = existing
     else:
@@ -257,6 +328,100 @@ def record_fee(db: Session, school_id: int, data: dict) -> dict:
         "paid_on": row.paid_on,
         "note": row.note,
     }
+
+
+def plan_fee_deposit(db: Session, school_id: int, data: dict) -> dict:
+    """What a deposit would write, without writing it.
+
+    The dialog shows this before the admin commits, because a yearly deposit
+    touches twelve months of a fee register and "I typed 36,000" does not by
+    itself say which twelve. `replaced` is the part that most needs showing: a
+    deposit lands on months that may already carry an entry, and overwriting
+    one has to be the admin's decision rather than a surprise.
+    """
+    student = _owned_student(db, school_id, data["student_id"])
+    months = plan_months(data["start_month"], data["plan"])
+    parts = split_total(data["amount"], len(months))
+    taken = {
+        row.month
+        for row in db.query(StudentFee)
+        .filter(
+            StudentFee.student_id == student.student_id,
+            StudentFee.month.in_(months),
+        )
+        .all()
+    }
+    return {
+        "student_id": student.student_id,
+        "start_month": months[0],
+        "plan": data["plan"],
+        "total": _amount(data["amount"]),
+        "months": [
+            {"month": m, "amount": a, "replaced": m in taken}
+            for m, a in zip(months, parts)
+        ],
+        "created": len(months) - len(taken),
+        "replaced": len(taken),
+    }
+
+
+def deposit_fee(db: Session, school_id: int, data: dict) -> dict:
+    """Record one fee deposit across the months its plan covers.
+
+    A deposit is not a new kind of record: it is the ordinary per-month fee
+    row, written once per covered month. That is deliberate. The grid reads a
+    month at a time, the outstanding count counts months with no entry, and a
+    report has to be able to say what a month cost. Spreading the payment over
+    months keeps all three answering correctly without a second code path, and
+    leaves the split visible instead of hiding it behind a lump sum.
+
+    Months that already have an entry are replaced, the same as correcting one
+    by hand. A month keeps its own remark unless the deposit carries one, so
+    recording a yearly payment never silently erases what someone wrote about
+    a particular month.
+    """
+    plan = plan_fee_deposit(db, school_id, data)
+    student_id = plan["student_id"]
+    # A remark belongs to the payment, so a deposit that carries one writes it
+    # to every month it covers. Without one, each month keeps whatever was
+    # written about that month already: a yearly payment is a statement about
+    # the period, not a licence to erase a sentence about one month inside it.
+    note = data["note"] if "note" in data else None
+    # One date for the whole deposit: the money moved once, so every covered
+    # month shows the day it was actually handed over.
+    paid_on = data.get("paid_on") or date.today()
+
+    rows = []
+    for entry in plan["months"]:
+        existing = (
+            db.query(StudentFee)
+            .filter(
+                StudentFee.student_id == student_id,
+                StudentFee.month == entry["month"],
+            )
+            .first()
+        )
+        if existing:
+            existing.amount = entry["amount"]
+            existing.school_id = school_id
+            if note:
+                existing.note = note
+            row = existing
+        else:
+            row = StudentFee(
+                school_id=school_id,
+                student_id=student_id,
+                month=entry["month"],
+                amount=entry["amount"],
+                paid_on=paid_on,
+                note=note,
+            )
+            db.add(row)
+        rows.append(row)
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return plan
 
 
 def delete_salary(db: Session, school_id: int, staff_id: int, month: str) -> None:

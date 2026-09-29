@@ -44,6 +44,31 @@ class FeeCreate(BaseModel):
         return _validate_month(v)
 
 
+class FeeDeposit(BaseModel):
+    """One fee payment covering a plan's worth of months.
+
+    `amount` is the TOTAL handed over, not a monthly rate: a parent gives the
+    office one cheque for the quarter, and that is the number that exists. The
+    service splits it across the months and reports back what each month gets,
+    so the ledger never has to guess.
+    """
+
+    student_id: int
+    start_month: str
+    # Not a Literal: the plan table lives with the arithmetic in the repository,
+    # and a plan this schema does not know about is rejected there with the
+    # list of valid ones rather than as an opaque enum error.
+    plan: str
+    amount: float = Field(ge=0)
+    paid_on: date | None = None
+    note: str | None = Field(default=None, max_length=200)
+
+    @field_validator("start_month")
+    @classmethod
+    def check_start_month(cls, v):
+        return _validate_month(v)
+
+
 class SalaryEntry(BaseModel):
     """One recorded payment, as stored."""
 
@@ -88,6 +113,44 @@ class FeeRow(BaseModel):
     class_name: str | None = None
     amounts: dict[str, float]
     paid_on: dict[str, str | None] = Field(default_factory=dict)
+    notes: dict[str, str | None] = Field(default_factory=dict)
+
+
+class FeePlan(BaseModel):
+    """One selectable deposit period, in months."""
+
+    plan: str
+    months: int
+    label: str
+
+
+class FeePlans(BaseModel):
+    plans: list[FeePlan]
+
+
+class DepositedMonth(BaseModel):
+    """One month a deposit lands on, and what it will carry."""
+
+    month: str
+    amount: float
+    # True when the month already had an entry and this deposit replaces it.
+    replaced: bool
+
+
+class FeeDepositEntry(BaseModel):
+    """What a deposit wrote, month by month.
+
+    Returned by both the preview and the write, so what the admin was shown
+    before committing is the same shape as what actually happened.
+    """
+
+    student_id: int
+    start_month: str
+    plan: str
+    total: float
+    months: list[DepositedMonth]
+    created: int
+    replaced: int
 
 
 class SalarySheet(BaseModel):
