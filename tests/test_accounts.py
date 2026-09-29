@@ -198,6 +198,60 @@ class AccountsSheetTests(unittest.TestCase):
         meera = next(r for r in row["rows"] if r["staff_id"] == 10)
         self.assertEqual(meera["amounts"], {"2026-09": 45000.0})
         self.assertEqual(meera["paid_on"], {"2026-09": "2026-09-28"})
+        self.assertEqual(meera["notes"], {"2026-09": "September payroll"})
+
+    def test_a_month_with_no_payment_has_no_note_to_show(self):
+        # The grid renders a remark beside every month, but a remark belongs to
+        # a payment. An unpaid month must not surface a stray note, and a staff
+        # member with no payments at all must carry an empty map, not a missing
+        # one -- the client treats absent as "nothing recorded" and the
+        # difference is invisible either way, so keep the map present.
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000},
+        )
+        sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
+        meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
+        self.assertEqual(meera["notes"], {"2026-09": None})
+        arun = next(r for r in sheet["rows"] if r["staff_id"] == 11)
+        self.assertEqual(arun["notes"], {})
+
+    def test_a_remark_can_be_added_or_edited_without_touching_the_figure(self):
+        # The admin corrects a remark weeks later, long after the payroll ran.
+        # Re-recording the salary is how the note is stored, so the amount and
+        # the paid date must both survive the edit untouched -- a remark is not
+        # a second payment.
+        accounts_repo.record_salary(
+            self.db, 1,
+            {"staff_id": 10, "month": "2026-09", "amount": 45000,
+             "paid_on": date(2026, 9, 28)},
+        )
+        accounts_repo.record_salary(
+            self.db, 1,
+            {"staff_id": 10, "month": "2026-09", "amount": 45000,
+             "note": "includes arrears"},
+        )
+        meera = next(r for r in
+                     accounts_repo.salary_sheet(self.db, 1, self.months)["rows"]
+                     if r["staff_id"] == 10)
+        self.assertEqual(meera["notes"], {"2026-09": "includes arrears"})
+        self.assertEqual(meera["amounts"], {"2026-09": 45000.0})
+        self.assertEqual(meera["paid_on"], {"2026-09": "2026-09-28"})
+
+    def test_clearing_a_remark_leaves_the_payment_in_place(self):
+        # An empty remark is an edit, not a deletion: the money is still owed
+        # and still shown, it just has nothing written beside it.
+        accounts_repo.record_salary(
+            self.db, 1,
+            {"staff_id": 10, "month": "2026-09", "amount": 45000, "note": "draft"},
+        )
+        accounts_repo.record_salary(
+            self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000},
+        )
+        meera = next(r for r in
+                     accounts_repo.salary_sheet(self.db, 1, self.months)["rows"]
+                     if r["staff_id"] == 10)
+        self.assertEqual(meera["notes"], {"2026-09": None})
+        self.assertEqual(meera["amounts"], {"2026-09": 45000.0})
 
     def test_the_paid_date_travels_with_its_own_month(self):
         # paid_on is a parallel sparse map to amounts: only months that carry a

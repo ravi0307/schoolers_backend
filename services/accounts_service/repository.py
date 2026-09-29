@@ -72,11 +72,13 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
     )
     by_staff: dict[int, dict[str, float]] = {}
     paid_by_staff: dict[int, dict[str, str | None]] = {}
+    notes_by_staff: dict[int, dict[str, str | None]] = {}
     for pay in payments:
         by_staff.setdefault(pay.staff_id, {})[pay.month] = _amount(pay.amount)
         paid_by_staff.setdefault(pay.staff_id, {})[pay.month] = (
             pay.paid_on.isoformat() if pay.paid_on else None
         )
+        notes_by_staff.setdefault(pay.staff_id, {})[pay.month] = pay.note
 
     rows = [
         {
@@ -85,6 +87,7 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
             "designation": s.role_title or s.role,
             "amounts": by_staff.get(s.staff_id, {}),
             "paid_on": paid_by_staff.get(s.staff_id, {}),
+            "notes": notes_by_staff.get(s.staff_id, {}),
         }
         for s in staff
     ]
