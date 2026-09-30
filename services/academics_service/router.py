@@ -159,20 +159,24 @@ def list_holidays(
     return repo.list_holidays(db, school_id)
 
 
-@router.post("/holidays", response_model=HolidayRead, status_code=201)
+@router.post("/holidays", response_model=list[HolidayRead], status_code=201)
 def create_holiday(
     payload: HolidayCreate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    """Add one named holiday on one date."""
-    return repo.create_holiday(
-        db, school_id, payload.occasion, payload.holiday_date
+    """Add one named holiday, on a single day or across a span of them.
+
+    Returns every day created, so a caller that asked for a range can confirm
+    exactly how wide the break ended up. A one-day request still returns one row.
+    """
+    return repo.create_holiday_range(
+        db, school_id, payload.occasion, payload.holiday_date, payload.end_date
     )
 
 
-@router.patch("/holidays/{holiday_id}", response_model=HolidayRead)
+@router.patch("/holidays/{holiday_id}", response_model=list[HolidayRead])
 def update_holiday(
     holiday_id: int,
     payload: HolidayUpdate,
@@ -180,13 +184,16 @@ def update_holiday(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    """Reschedule or rename a holiday. Scoped to the caller's own school, so
-    another school's holiday_id is a 404 rather than an edit."""
+    """Reschedule or rename a holiday, along with the rest of its break.
+
+    Scoped to the caller's own school, so another school's holiday_id is a 404
+    rather than an edit. Returns the days the break now occupies.
+    """
     holiday = repo.get_holiday(db, school_id, holiday_id)
     if holiday is None:
         raise NotFoundError("Holiday not found")
-    return repo.update_holiday(
-        db, holiday, payload.occasion, payload.holiday_date
+    return repo.update_holiday_range(
+        db, holiday, payload.occasion, payload.holiday_date, payload.end_date
     )
 
 
@@ -197,9 +204,9 @@ def delete_holiday(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    """Remove a holiday."""
+    """Remove a holiday and every other day of the same break."""
     holiday = repo.get_holiday(db, school_id, holiday_id)
     if holiday is None:
         raise NotFoundError("Holiday not found")
-    repo.delete_holiday(db, holiday)
+    repo.delete_holiday_group(db, holiday)
     return Response(status_code=204)
