@@ -407,6 +407,11 @@ class Broadcast(AuditColumnsMixin, Base):
     scope = Column(String(10), nullable=False)
     role_name = Column(String(100), nullable=False)
     sender_name = Column(String(100), nullable=False, server_default="")
+    # Who authored this, as a user id. sender_name is only a label and cannot
+    # answer "is this mine?": two admins both post as "Admin", and one person's
+    # name can change after the fact. NULL for rows written before this column
+    # existed, and for seed data with no author.
+    sender_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     message = Column(Text, nullable=False)
     created_at = Column(
         DateTime,

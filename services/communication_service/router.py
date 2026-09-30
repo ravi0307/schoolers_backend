@@ -27,7 +27,7 @@ def create_broadcast(
     data = payload.model_dump()
     data["role_name"] = role_name
     data["sender_name"] = sender_name
-    return repo.create_broadcast(db, school_id, data)
+    return repo.create_broadcast(db, school_id, data, sender_user_id=current_user.user_id)
 
 
 @router.get("/broadcasts", response_model=list[BroadcastRead])
@@ -50,9 +50,11 @@ def update_broadcast(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    # Only a school admin may edit a broadcast — there is no per-broadcast
-    # creator column, so teachers/pilots must not be able to rewrite messages
-    # they didn't author.
+    # Only a school admin may edit a broadcast, and not only their own: an admin
+    # correcting a colleague's typo is a real job. Broadcasts now record their
+    # author (sender_user_id), so this could be narrowed to the author, but that
+    # is a permissions decision rather than a bug fix. Teachers and pilots stay
+    # out either way -- they cannot rewrite a message, including their own.
     return repo.update_broadcast_message(
         db,
         school_id,
