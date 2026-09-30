@@ -40,6 +40,10 @@ class BroadcastRead(BaseModel):
     scope: str
     role_name: str
     sender_name: str
+    # The author's user id. Null on rows written before authorship was recorded,
+    # so a client that needs to tell its own messages from everyone else's must
+    # have a fallback rather than treating null as "not mine".
+    sender_user_id: int | None = None
     message: str
     created_at: datetime
 

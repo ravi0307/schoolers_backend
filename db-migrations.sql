@@ -76,6 +76,18 @@ END $$;
 ALTER TABLE IF EXISTS schoolers.broadcasts
     ADD COLUMN IF NOT EXISTS sender_name VARCHAR(100) NOT NULL DEFAULT '';
 
+-- Who wrote each broadcast. sender_name cannot answer "is this mine?": two
+-- admins both post as "Admin", so a client comparing names files one admin's
+-- messages under another's (or, when the name it holds differs from the label
+-- the server stored, under nobody's, which is every message ending up in
+-- Received). Existing rows stay NULL -- they predate authorship and are not
+-- guessed at, since guessing wrong is the bug being fixed.
+ALTER TABLE IF EXISTS schoolers.broadcasts
+    ADD COLUMN IF NOT EXISTS sender_user_id INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS broadcasts_sender_user_idx
+    ON schoolers.broadcasts (sender_user_id);
+
 ALTER TABLE IF EXISTS schoolers.broadcasts
     ALTER COLUMN created_at SET DEFAULT timezone('Asia/Kolkata', now());
 

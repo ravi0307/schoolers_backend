@@ -27,7 +27,7 @@ from common.models import (
     TeacherClassSubject,
 )
 import services.communication_service.repository as repo
-from services.communication_service.schemas import BroadcastCreate
+from services.communication_service.schemas import BroadcastCreate, BroadcastRead
 
 TABLES = [
     "staff",
@@ -302,6 +302,113 @@ class BroadcastDeliveryTests(unittest.TestCase):
         ]:
             seen = self._list(role, user_id=user_id, linked_person_id=linked_person_id)
             self.assertIn("Sports day assembly", seen)
+
+
+class BroadcastAuthorshipTests(unittest.TestCase):
+    """Who wrote a broadcast, as a user id rather than a name.
+
+    The admin and teacher broadcast pages split their history into Posted and
+    Received. They used to do that by comparing the sender's display name against
+    the signed-in user's, which filed *every* message under Received whenever the
+    two strings differed -- and the server derives sender_name from the Staff
+    record (falling back to the literal "Admin"), while the client compared its
+    own account name. Two admins both post as "Admin", so the label cannot
+    separate them at all.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine("sqlite://")
+        Base.metadata.create_all(
+            cls.engine,
+            tables=[Base.metadata.tables[name] for name in TABLES],
+        )
+        cls.Session = sessionmaker(bind=cls.engine, autoflush=False, future=True)
+
+    def setUp(self):
+        self.db: Session = self.Session()
+        for name in TABLES:
+            self.db.execute(Base.metadata.tables[name].delete())
+        self.db.commit()
+        self.db.add(
+            Staff(staff_id=2, school_id=1, name="T. Eacher", role="Teacher",
+                  person_type="teacher", role_title="Teacher", phone="000")
+        )
+        self.db.add(
+            Staff(staff_id=3, school_id=1, name="T. Eacher", role="Teacher",
+                  person_type="teacher", role_title="Teacher", phone="000")
+        )
+        self.db.commit()
+
+    def tearDown(self):
+        self.db.rollback()
+        self.db.close()
+
+    # created_at is passed explicitly throughout: its server default calls
+    # timezone(), which SQLite does not have, and these tests run on SQLite.
+    CREATED_AT = datetime(2026, 9, 5, 9, 0, 0)
+
+    def _create(self, sender_user_id, message="Notice"):
+        return repo.create_broadcast(
+            self.db,
+            school_id=1,
+            data={
+                "scope": "school",
+                # Both admins post under the same label. Only the id tells them
+                # apart, which is the whole point of storing it.
+                "role_name": "Admin",
+                "sender_name": "Admin",
+                "message": message,
+                "created_at": self.CREATED_AT,
+            },
+            sender_user_id=sender_user_id,
+        )
+
+    def test_a_broadcast_records_the_author_it_was_given(self):
+        row = self._create(322, "Mine")
+        self.assertEqual(row.sender_user_id, 322)
+        self.db.expire_all()
+        self.assertEqual(self.db.get(Broadcast, row.broadcast_id).sender_user_id, 322)
+
+    def test_two_authors_are_distinguishable_though_their_names_match(self):
+        mine = self._create(322, "Mine")
+        theirs = self._create(323, "Theirs")
+        self.assertNotEqual(mine.sender_user_id, theirs.sender_user_id)
+        # The label is identical, so a client reading only sender_name cannot
+        # tell these two apart -- which is what broke the split.
+        self.assertEqual(mine.sender_name, theirs.sender_name)
+
+    def test_authorship_is_optional_so_older_and_seeded_rows_still_write(self):
+        row = repo.create_broadcast(
+            self.db,
+            school_id=1,
+            data={"scope": "school", "role_name": "Admin", "sender_name": "Admin",
+                  "message": "Seed row", "created_at": self.CREATED_AT},
+        )
+        self.assertIsNone(row.sender_user_id)
+
+    def test_the_column_does_not_leak_into_the_client_payload(self):
+        # The client must not be able to claim authorship of someone else's
+        # message by sending the field itself.
+        payload = BroadcastCreate(scope="school", message="Forged")
+        self.assertNotIn("sender_user_id", payload.model_dump())
+        row = repo.create_broadcast(
+            self.db,
+            school_id=1,
+            data={**payload.model_dump(), "role_name": "Admin", "sender_name": "Admin",
+                  "created_at": self.CREATED_AT},
+            sender_user_id=322,
+        )
+        self.assertEqual(row.sender_user_id, 322, "the id comes from the session, not the payload")
+
+    def test_the_read_schema_carries_the_author(self):
+        self.assertIn("sender_user_id", BroadcastRead.model_fields)
+        # Nullable, so a row without an author still serialises rather than 500ing
+        # a client that is asking for its whole history.
+        row = self._create(322, "Mine")
+        self.assertEqual(BroadcastRead.model_validate(row).sender_user_id, 322)
+        row.sender_user_id = None
+        self.assertIsNone(BroadcastRead.model_validate(row).sender_user_id)
 
 
 if __name__ == "__main__":
