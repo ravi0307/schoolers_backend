@@ -12,6 +12,10 @@ Two defects are pinned here:
    would light up every Saturday forever, which is the recurring-template bug
    this feature was rewritten to avoid.
 
+3. A holiday may be entered as a single day or as an inclusive span of days.
+   The span is stored one row per day, so a multi-day break reaches the timetable
+   without the timetable knowing anything about ranges.
+
 Also covers the week arithmetic both services share, since a mismatch between
 the API's Monday and the browser's Monday would highlight the wrong column.
 """
@@ -24,7 +28,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from common.models import Base, Holiday, Period, SchoolClass, Subject, TimetableEntry
 from common.holidays import holidays_in_range, list_holidays
 from common.week import DAY_ABBREVIATIONS, monday_of, week_dates
-from common.exceptions import ConflictError
+from common.exceptions import AppError, ConflictError
 from services.timetable_service.schemas import TimetableEntryUpdate
 import services.timetable_service.repository as timetable_repo
 import services.academics_service.repository as academics_repo
@@ -256,6 +260,321 @@ class HolidayRangeLookupTests(_InMemoryDb, unittest.TestCase):
         self.assertEqual([h.occasion for h in list_holidays(self.db, 1)], ["A", "B"])
 
 
+class HolidayRangeCreationTests(_InMemoryDb, unittest.TestCase):
+    def test_one_day_without_an_end_date_creates_a_single_row(self):
+        # The common case must stay a single row, not a one-element range, so
+        # nothing downstream learns to expect a list where there was one value.
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali", date(2026, 11, 8)
+        )
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0].holiday_date, date(2026, 11, 8))
+
+    def test_an_end_date_equal_to_the_start_creates_a_single_row(self):
+        # Picking the same calendar day twice is a one-day holiday, not a
+        # request for a two-day span that happens to repeat a date.
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali", date(2026, 11, 8), date(2026, 11, 8)
+        )
+        self.assertEqual(len(created), 1)
+
+    def test_a_range_creates_one_row_per_day_including_both_ends(self):
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 11)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in created],
+            [
+                date(2026, 11, 8),
+                date(2026, 11, 9),
+                date(2026, 11, 10),
+                date(2026, 11, 11),
+            ],
+        )
+        self.assertTrue(all(h.occasion == "Diwali Break" for h in created))
+
+    def test_a_range_spanning_a_weekend_includes_the_weekend_days(self):
+        # Sat/Sun are closed days like any other here, and the school week runs
+        # seven days, so dropping them would silently shorten the break.
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Long Weekend", date(2026, 11, 7), date(2026, 11, 9)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in created],
+            [date(2026, 11, 7), date(2026, 11, 8), date(2026, 11, 9)],
+        )
+
+    def test_a_range_crossing_a_month_boundary_covers_both_months(self):
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Year End", date(2026, 12, 30), date(2027, 1, 2)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in created],
+            [
+                date(2026, 12, 30),
+                date(2026, 12, 31),
+                date(2027, 1, 1),
+                date(2027, 1, 2),
+            ],
+        )
+
+    def test_a_range_crossing_a_leap_day_includes_it(self):
+        created = academics_repo.create_holiday_range(
+            self.db, 1, "Spring Break", date(2028, 2, 28), date(2028, 3, 1)
+        )
+        self.assertIn(date(2028, 2, 29), [h.holiday_date for h in created])
+
+    def test_a_range_in_another_school_does_not_touch_this_one(self):
+        academics_repo.create_holiday_range(
+            self.db, 1, "Diwali", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        academics_repo.create_holiday_range(
+            self.db, 2, "Festival", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        self.assertEqual(
+            len(academics_repo.list_holidays(self.db, 1)), 3
+        )
+        self.assertEqual(
+            len(academics_repo.list_holidays(self.db, 2)), 3
+        )
+
+
+class HolidayRangeConflictTests(_InMemoryDb, unittest.TestCase):
+    def test_a_range_overlapping_an_existing_holiday_is_refused_whole(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 5))
+        with self.assertRaises(ConflictError):
+            academics_repo.create_holiday_range(
+                self.db, 1, "Break", date(2026, 3, 4), date(2026, 3, 7)
+            )
+        # Nothing from the refused range may be written: a half-applied break
+        # would leave the school open on a day the admin believed was shut.
+        self.assertEqual(
+            [h.occasion for h in academics_repo.list_holidays(self.db, 1)], ["Holi"]
+        )
+
+    def test_a_range_whose_only_conflict_is_its_first_day_is_refused(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 4))
+        with self.assertRaises(ConflictError):
+            academics_repo.create_holiday_range(
+                self.db, 1, "Break", date(2026, 3, 4), date(2026, 3, 6)
+            )
+        self.assertEqual(len(academics_repo.list_holidays(self.db, 1)), 1)
+
+    def test_a_range_whose_only_conflict_is_its_last_day_is_refused(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 6))
+        with self.assertRaises(ConflictError):
+            academics_repo.create_holiday_range(
+                self.db, 1, "Break", date(2026, 3, 4), date(2026, 3, 6)
+            )
+        self.assertEqual(len(academics_repo.list_holidays(self.db, 1)), 1)
+
+    def test_a_range_touching_the_day_before_an_existing_holiday_is_allowed(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 5))
+        academics_repo.create_holiday_range(
+            self.db, 1, "Break", date(2026, 3, 3), date(2026, 3, 4)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in academics_repo.list_holidays(self.db, 1)],
+            [date(2026, 3, 3), date(2026, 3, 4), date(2026, 3, 5)],
+        )
+
+    def test_the_refusal_message_names_the_offending_dates(self):
+        # A term break can be dozens of days wide; "that date" would leave the
+        # admin hunting for which one is wrong.
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 5))
+        with self.assertRaises(ConflictError) as caught:
+            academics_repo.create_holiday_range(
+                self.db, 1, "Break", date(2026, 3, 4), date(2026, 3, 6)
+            )
+        self.assertIn("2026-03-05", str(caught.exception))
+
+    def test_a_reversed_range_is_rejected_rather_than_silently_reordered(self):
+        # Reordering for the user would hide which of their two picks was wrong.
+        with self.assertRaises(AppError):
+            academics_repo.create_holiday_range(
+                self.db, 1, "Break", date(2026, 3, 7), date(2026, 3, 4)
+            )
+        self.assertEqual(academics_repo.list_holidays(self.db, 1), [])
+
+
+class HolidayGroupTests(_InMemoryDb, unittest.TestCase):
+    def _break(self):
+        return academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+
+    def test_consecutive_days_of_one_occasion_are_one_group(self):
+        rows = self._break()
+        group = academics_repo.holiday_group(self.db, rows[1])
+        self.assertEqual(
+            [h.holiday_date for h in group],
+            [date(2026, 11, 8), date(2026, 11, 9), date(2026, 11, 10)],
+        )
+
+    def test_any_day_of_a_break_reaches_the_whole_break(self):
+        rows = self._break()
+        self.assertEqual(len(academics_repo.holiday_group(self.db, rows[2])), 3)
+
+    def test_a_gap_starts_a_separate_group(self):
+        # Grouping across a gap would invent a closure on the missing day.
+        academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 9)
+        )
+        later = academics_repo.create_holiday(self.db, 1, "Diwali Break", date(2026, 11, 12))
+        self.assertEqual(len(academics_repo.holiday_group(self.db, later)), 1)
+
+    def test_a_different_occasion_next_door_is_not_joined(self):
+        # Two festivals side by side are two entries, and merging them would
+        # hide one of the names behind the other.
+        academics_repo.create_holiday(self.db, 1, "Diwali", date(2026, 11, 8))
+        academics_repo.create_holiday(self.db, 1, "Ganesh Chaturthi", date(2026, 11, 9))
+        first = academics_repo.list_holidays(self.db, 1)[0]
+        self.assertEqual(len(academics_repo.holiday_group(self.db, first)), 1)
+
+    def test_a_group_never_reaches_into_another_school(self):
+        other = academics_repo.create_holiday_range(
+            self.db, 2, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        self.assertEqual(len(academics_repo.holiday_group(self.db, other[0])), 3)
+
+
+class HolidayRangeUpdateTests(_InMemoryDb, unittest.TestCase):
+    def _break(self):
+        return academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+
+    def test_renaming_a_break_renames_every_day_of_it(self):
+        rows = self._break()
+        academics_repo.update_holiday_range(self.db, rows[0], "Deepavali", None, None)
+        self.assertEqual(
+            [h.occasion for h in academics_repo.list_holidays(self.db, 1)],
+            ["Deepavali"] * 3,
+        )
+
+    def test_extending_a_break_adds_the_new_days(self):
+        rows = self._break()
+        updated = academics_repo.update_holiday_range(
+            self.db, rows[0], None, None, date(2026, 11, 12)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in updated],
+            [
+                date(2026, 11, 8),
+                date(2026, 11, 9),
+                date(2026, 11, 10),
+                date(2026, 11, 11),
+                date(2026, 11, 12),
+            ],
+        )
+
+    def test_shortening_a_break_removes_the_dropped_days(self):
+        rows = self._break()
+        academics_repo.update_holiday_range(
+            self.db, rows[0], None, None, date(2026, 11, 8)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in academics_repo.list_holidays(self.db, 1)],
+            [date(2026, 11, 8)],
+        )
+
+    def test_moving_a_break_without_restating_the_end_keeps_its_length(self):
+        # Shifting a break by one day must not collapse it to a single day.
+        rows = self._break()
+        updated = academics_repo.update_holiday_range(
+            self.db, rows[0], None, date(2026, 11, 15), None
+        )
+        self.assertEqual(
+            [h.holiday_date for h in updated],
+            [
+                date(2026, 11, 15),
+                date(2026, 11, 16),
+                date(2026, 11, 17),
+            ],
+        )
+
+    def test_moving_and_resizing_a_break_together_uses_both(self):
+        rows = self._break()
+        updated = academics_repo.update_holiday_range(
+            self.db, rows[0], None, date(2026, 11, 15), date(2026, 11, 16)
+        )
+        self.assertEqual(
+            [h.holiday_date for h in updated],
+            [date(2026, 11, 15), date(2026, 11, 16)],
+        )
+
+    def test_a_move_onto_another_holiday_is_refused_and_leaves_the_break_intact(self):
+        rows = self._break()
+        academics_repo.create_holiday(self.db, 1, "Ganesh Chaturthi", date(2026, 11, 16))
+        with self.assertRaises(ConflictError):
+            academics_repo.update_holiday_range(
+                self.db, rows[0], None, date(2026, 11, 15), None
+            )
+        # The refusal must not leave the break half-shifted.
+        self.assertEqual(
+            [h.holiday_date for h in academics_repo.list_holidays(self.db, 1)],
+            [
+                date(2026, 11, 8),
+                date(2026, 11, 9),
+                date(2026, 11, 10),
+                date(2026, 11, 16),
+            ],
+        )
+
+    def test_updating_a_break_does_not_conflict_with_its_own_days(self):
+        # A resize that overlaps the break's existing span is normal editing,
+        # not a collision with another holiday.
+        rows = self._break()
+        academics_repo.update_holiday_range(
+            self.db, rows[0], None, None, date(2026, 11, 14)
+        )
+        self.assertEqual(len(academics_repo.list_holidays(self.db, 1)), 7)
+
+    def test_an_edit_touching_any_day_of_a_break_rewrites_the_whole_break(self):
+        rows = self._break()
+        academics_repo.update_holiday_range(self.db, rows[2], "Deepavali", None, None)
+        self.assertEqual(
+            [h.occasion for h in academics_repo.list_holidays(self.db, 1)],
+            ["Deepavali"] * 3,
+        )
+
+
+class HolidayGroupDeleteTests(_InMemoryDb, unittest.TestCase):
+    def test_removing_a_break_removes_all_of_its_days(self):
+        rows = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        removed = academics_repo.delete_holiday_group(self.db, rows[1])
+        self.assertEqual(removed, 3)
+        self.assertEqual(academics_repo.list_holidays(self.db, 1), [])
+
+    def test_removing_a_break_leaves_other_holidays_alone(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 3, 4))
+        rows = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        academics_repo.delete_holiday_group(self.db, rows[0])
+        self.assertEqual(
+            [h.occasion for h in academics_repo.list_holidays(self.db, 1)], ["Holi"]
+        )
+
+    def test_removing_a_break_leaves_an_adjacent_different_holiday_alone(self):
+        academics_repo.create_holiday(self.db, 1, "Holi", date(2026, 11, 7))
+        rows = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali Break", date(2026, 11, 8), date(2026, 11, 10)
+        )
+        academics_repo.delete_holiday_group(self.db, rows[0])
+        self.assertEqual(
+            [h.occasion for h in academics_repo.list_holidays(self.db, 1)], ["Holi"]
+        )
+
+    def test_removing_a_single_day_holiday_still_removes_exactly_one_row(self):
+        rows = academics_repo.create_holiday_range(
+            self.db, 1, "Diwali", date(2026, 11, 8), date(2026, 11, 8)
+        )
+        self.assertEqual(academics_repo.delete_holiday_group(self.db, rows[0]), 1)
+
+
 class TimetableWeekViewTests(_InMemoryDb, unittest.TestCase):
     def _add_timetable(self):
         self.db.add_all(
@@ -350,6 +669,71 @@ class TimetableWeekViewTests(_InMemoryDb, unittest.TestCase):
     def test_get_class_week_ignores_another_schools_holidays(self):
         self._add_timetable()
         academics_repo.create_holiday(self.db, 2, "Festival", date(2026, 9, 23))
+        week = timetable_repo.get_class_week(self.db, 1, 1, WEEK_START)
+        self.assertTrue(all(d["is_holiday"] is False for d in week["days"]))
+
+    def test_a_holiday_range_reddens_every_day_of_it_in_one_week(self):
+        # The point of storing a range one row per day: the timetable resolves
+        # holidays by date, so a three-day break lights three columns with no
+        # range awareness in this service at all.
+        self._add_timetable()
+        academics_repo.create_holiday_range(
+            self.db, 1, "Gandhi Jayanti Break", date(2026, 9, 21), date(2026, 9, 23)
+        )
+        week = timetable_repo.get_class_week(self.db, 1, 1, WEEK_START)
+        flagged = {d["day_of_week"]: d["holiday_name"] for d in week["days"] if d["is_holiday"]}
+        self.assertEqual(
+            flagged,
+            {
+                "Mon": "Gandhi Jayanti Break",
+                "Tue": "Gandhi Jayanti Break",
+                "Wed": "Gandhi Jayanti Break",
+            },
+        )
+
+    def test_a_range_only_reddens_the_days_it_actually_covers(self):
+        self._add_timetable()
+        academics_repo.create_holiday_range(
+            self.db, 1, "Short Break", date(2026, 9, 22), date(2026, 9, 23)
+        )
+        week = timetable_repo.get_class_week(self.db, 1, 1, WEEK_START)
+        self.assertEqual(
+            [d["day_of_week"] for d in week["days"] if d["is_holiday"]],
+            ["Tue", "Wed"],
+        )
+
+    def test_a_range_spanning_two_weeks_shows_up_in_each_of_them(self):
+        # A break longer than a week must be visible from either week, since
+        # the timetable only ever renders seven days at a time.
+        self._add_timetable()
+        academics_repo.create_holiday_range(
+            self.db, 1, "Long Break", date(2026, 9, 24), date(2026, 10, 2)
+        )
+        this_week = timetable_repo.get_class_week(self.db, 1, 1, WEEK_START)
+        next_week = timetable_repo.get_class_week(self.db, 1, 1, date(2026, 9, 28))
+        self.assertEqual(
+            [d["day_of_week"] for d in this_week["days"] if d["is_holiday"]],
+            ["Thu", "Fri", "Sat", "Sun"],
+        )
+        # The second week runs 28 Sep - 4 Oct, so it carries the rest of the
+        # break through to its final day.
+        self.assertEqual(
+            [d["date"] for d in next_week["days"] if d["is_holiday"]],
+            [
+                date(2026, 9, 28),
+                date(2026, 9, 29),
+                date(2026, 9, 30),
+                date(2026, 10, 1),
+                date(2026, 10, 2),
+            ],
+        )
+
+    def test_removing_a_range_clears_the_timetable_in_every_affected_week(self):
+        self._add_timetable()
+        rows = academics_repo.create_holiday_range(
+            self.db, 1, "Gandhi Jayanti Break", date(2026, 9, 21), date(2026, 9, 23)
+        )
+        academics_repo.delete_holiday_group(self.db, rows[1])
         week = timetable_repo.get_class_week(self.db, 1, 1, WEEK_START)
         self.assertTrue(all(d["is_holiday"] is False for d in week["days"]))
 

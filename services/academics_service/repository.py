@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -6,8 +6,12 @@ from sqlalchemy.orm import Session
 from common.models import (
     SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
 )
-from common.holidays import list_holidays as list_holiday_rows
-from common.exceptions import ConflictError, NotFoundError
+from common.holidays import (
+    expand_holiday_range,
+    group_consecutive_holidays,
+    list_holidays as list_holiday_rows,
+)
+from common.exceptions import AppError, ConflictError, NotFoundError
 
 
 def list_classes(db: Session, school_id: int) -> list[SchoolClass]:
@@ -201,24 +205,111 @@ def holiday_date_taken(
     return query.first() is not None
 
 
+def taken_dates_in_range(
+    db: Session, school_id: int, days: list[date], exclude_ids: set[int] | None = None
+) -> list[date]:
+    """Which of ``days`` the school already has a holiday on, in order.
+
+    Takes the whole candidate list rather than one date so an overlapping range
+    can be refused as a unit instead of half-applied.
+    """
+    if not days:
+        return []
+    query = db.query(Holiday.holiday_date).filter(
+        Holiday.school_id == school_id, Holiday.holiday_date.in_(days)
+    )
+    if exclude_ids:
+        query = query.filter(Holiday.holiday_id.notin_(exclude_ids))
+    taken = {row for row, in query.all()}
+    return [day for day in days if day in taken]
+
+
+def _describe_taken(days: list[date]) -> str:
+    """Name the conflicting days so the admin knows which part to change.
+
+    Long ranges are common for a term break, and "this school already has a
+    holiday on that date" would send the admin hunting for which one.
+    """
+    shown = ", ".join(day.isoformat() for day in days[:5])
+    if len(days) > 5:
+        shown += f" and {len(days) - 5} more"
+    return f"These dates already have a holiday: {shown}"
+
+
 def create_holiday(
     db: Session, school_id: int, occasion: str, holiday_date: date
 ) -> Holiday:
-    if holiday_date_taken(db, school_id, holiday_date):
-        raise ConflictError(
-            f"This school already has a holiday on {holiday_date.isoformat()}"
-        )
-    holiday = Holiday(school_id=school_id, occasion=occasion, holiday_date=holiday_date)
-    db.add(holiday)
+    return create_holiday_range(db, school_id, occasion, holiday_date, holiday_date)[0]
+
+
+def create_holiday_range(
+    db: Session,
+    school_id: int,
+    occasion: str,
+    holiday_date: date,
+    end_date: date | None = None,
+) -> list[Holiday]:
+    """Record ``occasion`` on every day from ``holiday_date`` to ``end_date``.
+
+    Stored one row per day because that is what the timetable resolves against,
+    so a multi-day break needs no timetable change to take effect.
+
+    All or nothing: if any day in the span is already a holiday the whole request
+    is refused. Writing the free days around a taken one would leave the school
+    open on a day the admin believed was shut, which is the worse failure.
+    """
+    try:
+        days = expand_holiday_range(holiday_date, end_date)
+    except ValueError as error:
+        raise AppError(str(error), status_code=400) from error
+    taken = taken_dates_in_range(db, school_id, days)
+    if taken:
+        raise ConflictError(_describe_taken(taken))
+
+    holidays = [
+        Holiday(school_id=school_id, occasion=occasion, holiday_date=day) for day in days
+    ]
+    db.add_all(holidays)
     db.commit()
-    db.refresh(holiday)
-    return holiday
+    for holiday in holidays:
+        db.refresh(holiday)
+    return holidays
+
+
+def holiday_group(db: Session, holiday: Holiday) -> list[Holiday]:
+    """The run of consecutive days sharing ``holiday``'s occasion, earliest first.
+
+    This is the unit an admin means by "that holiday": one break that happens to
+    occupy several rows. A gap ends the run, so a break added later next to an
+    existing one stays separate instead of silently swallowing a school day.
+
+    The run is found by grouping the school's matching rows rather than by
+    windowing around the date, because a break can be any length and a fixed
+    window would stop one day short of its end.
+    """
+    candidates = (
+        db.query(Holiday)
+        .filter(
+            Holiday.school_id == holiday.school_id,
+            Holiday.occasion == holiday.occasion,
+        )
+        .order_by(Holiday.holiday_date)
+        .all()
+    )
+    for group in group_consecutive_holidays(candidates):
+        if any(row.holiday_id == holiday.holiday_id for row in group):
+            return group
+    return [holiday]
 
 
 def update_holiday(
     db: Session, holiday: Holiday, occasion: str | None, holiday_date: date | None
 ) -> Holiday:
-    """Apply a partial update. Passing None for a field leaves it unchanged."""
+    """Apply a partial update to a single-day holiday.
+
+    Kept for single rows and existing callers; the portal edits a whole run via
+    ``update_holiday_range``.
+    """
     if holiday_date is not None and holiday_date != holiday.holiday_date:
         if holiday_date_taken(
             db, holiday.school_id, holiday_date, exclude_id=holiday.holiday_id
@@ -234,6 +325,60 @@ def update_holiday(
     return holiday
 
 
+def update_holiday_range(
+    db: Session,
+    holiday: Holiday,
+    occasion: str | None,
+    holiday_date: date | None,
+    end_date: date | None = None,
+) -> list[Holiday]:
+    """Rename and/or reschedule a whole break, returning its new rows.
+
+    The run is deleted and rewritten as the requested span rather than shifted in
+    place. Moving a break by hand, day by day, would let it overlap itself partway
+    through and needs a case per interior day; rewriting it keeps the span
+    atomic, and the old rows go regardless of the conflict check below so a
+    refusal never leaves the break half-shifted.
+    """
+    group = holiday_group(db, holiday)
+    school_id = holiday.school_id
+    current_first = group[0].holiday_date
+    current_last = group[-1].holiday_date
+
+    first = holiday_date if holiday_date is not None else current_first
+    if end_date is not None:
+        last = end_date
+    elif holiday_date is not None:
+        # A move that does not restate the span keeps its length, so shifting a
+        # break by a day does not silently collapse it to a single day.
+        last = first + timedelta(days=(current_last - current_first).days)
+    else:
+        last = current_last
+
+    try:
+        days = expand_holiday_range(first, last)
+    except ValueError as error:
+        raise AppError(str(error), status_code=400) from error
+
+    exclude_ids = {row.holiday_id for row in group}
+    taken = taken_dates_in_range(db, school_id, days, exclude_ids=exclude_ids)
+    if taken:
+        raise ConflictError(_describe_taken(taken))
+
+    for row in group:
+        db.delete(row)
+    db.flush()
+    name = occasion if occasion is not None else holiday.occasion
+    replacement = [
+        Holiday(school_id=school_id, occasion=name, holiday_date=day) for day in days
+    ]
+    db.add_all(replacement)
+    db.commit()
+    for row in replacement:
+        db.refresh(row)
+    return replacement
+
+
 def delete_holiday(db: Session, holiday: Holiday) -> None:
     """Remove the holiday outright.
 
@@ -242,5 +387,19 @@ def delete_holiday(db: Session, holiday: Holiday) -> None:
     references, so "removing" it should actually remove it.
     """
     db.delete(holiday)
+    db.commit()
+
+
+def delete_holiday_group(db: Session, holiday: Holiday) -> int:
+    """Remove every day of the break ``holiday`` belongs to; return the count.
+
+    Removing one row of a five-day break would leave four behind and read as a
+    bug, so "remove" means the whole run.
+    """
+    group = holiday_group(db, holiday)
+    for row in group:
+        db.delete(row)
+    db.commit()
+    return len(group)
     db.commit()
 
