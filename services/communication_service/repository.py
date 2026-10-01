@@ -19,7 +19,9 @@ ALLOWED_BROADCAST_SCOPES = {
 }
 
 
-def create_broadcast(db: Session, school_id: int, data: dict) -> Broadcast:
+def create_broadcast(
+    db: Session, school_id: int, data: dict, sender_user_id: int | None = None
+) -> Broadcast:
     class_id = data.get("class_id")
     if class_id is not None:
         target_class = (
@@ -48,7 +50,10 @@ def create_broadcast(db: Session, school_id: int, data: dict) -> Broadcast:
         if not target_route:
             raise NotFoundError("Route not found for this school")
 
-    b = Broadcast(school_id=school_id, **data)
+    # Stamped from the authenticated user rather than accepted from the payload,
+    # for the same reason sender_name is: the client must not decide who a
+    # broadcast belongs to.
+    b = Broadcast(school_id=school_id, sender_user_id=sender_user_id, **data)
     db.add(b)
     db.commit()
     db.refresh(b)

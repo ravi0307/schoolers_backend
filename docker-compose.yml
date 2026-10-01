@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      SERVICE_HOSTS: '{"auth":"http://auth_service:8001","schools":"http://schools_service:8002","academics":"http://academics_service:8003","people":"http://people_service:8004","attendance":"http://attendance_service:8005","marks":"http://marks_service:8006","timetable":"http://timetable_service:8007","transport":"http://transport_service:8008","leave":"http://leave_service:8009","media":"http://media_service:8016","communication":"http://communication_service:8010","barter":"http://barter_service:8011","activities":"http://activities_service:8012","website":"http://website_service:8013","notifications":"http://notifications_service:8014","reports":"http://reports_service:8015"}'
+      SERVICE_HOSTS: '{"auth":"http://auth_service:8001","schools":"http://schools_service:8002","academics":"http://academics_service:8003","people":"http://people_service:8004","attendance":"http://attendance_service:8005","marks":"http://marks_service:8006","timetable":"http://timetable_service:8007","transport":"http://transport_service:8008","leave":"http://leave_service:8009","media":"http://media_service:8016","communication":"http://communication_service:8010","barter":"http://barter_service:8011","activities":"http://activities_service:8012","website":"http://website_service:8013","notifications":"http://notifications_service:8014","reports":"http://reports_service:8015","accounts":"http://accounts_service:8017"}'
     depends_on:
       - auth_service
       - schools_service
@@ -35,6 +35,7 @@ services:
       - notifications_service
       - reports_service
       - media_service
+      - accounts_service
     restart: unless-stopped
 
   auth_service:
@@ -100,3 +101,7 @@ services:
   media_service:
     <<: *service_defaults
     build: { context: ., dockerfile: services/media_service/Dockerfile }
+
+  accounts_service:
+    <<: *service_defaults
+    build: { context: ., dockerfile: services/accounts_service/Dockerfile }

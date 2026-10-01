@@ -336,6 +336,34 @@ def get_stop_group(db: Session, route_id: int, name: str) -> dict | None:
     return _stop_group(stops) if stops else None
 
 
+def _group_stops_by_name(stops: list[RouteStop]) -> list[dict]:
+    """Collapse a route's pickup/drop stop rows into one entry per stop name."""
+    groups: dict[str, list[RouteStop]] = {}
+    for stop in stops:
+        groups.setdefault(stop.name, []).append(stop)
+    return [_stop_group(group) for group in groups.values()]
+
+
+def stops_for_routes(db: Session, route_ids: set[int]) -> dict[int, list[dict]]:
+    """Stop schedule for several routes in a single query.
+
+    The parent pick/drop snapshot needs the stops for every route its children
+    ride, so this batches them rather than issuing a query per child.
+    """
+    if not route_ids:
+        return {}
+    rows = (
+        db.query(RouteStop)
+        .filter(RouteStop.route_id.in_(route_ids))
+        .order_by(RouteStop.route_id, RouteStop.stop_order, RouteStop.stop_id)
+        .all()
+    )
+    by_route: dict[int, list[RouteStop]] = {}
+    for row in rows:
+        by_route.setdefault(row.route_id, []).append(row)
+    return {rid: _group_stops_by_name(stops) for rid, stops in by_route.items()}
+
+
 def list_stops(db: Session, route_id: int) -> list[dict]:
     stops = (
         db.query(RouteStop)
@@ -343,10 +371,7 @@ def list_stops(db: Session, route_id: int) -> list[dict]:
         .order_by(RouteStop.stop_order, RouteStop.stop_id)
         .all()
     )
-    groups: dict[str, list[RouteStop]] = {}
-    for stop in stops:
-        groups.setdefault(stop.name, []).append(stop)
-    return [_stop_group(group) for group in groups.values()]
+    return _group_stops_by_name(stops)
 
 
 def get_stop(db: Session, stop_id: int) -> RouteStop | None:
@@ -521,6 +546,9 @@ def list_children_pickdrop(db: Session, school_id: int, parent_id: int) -> list[
         .order_by(Student.name)
         .all()
     )
+    stops_by_route = stops_for_routes(
+        db, {info["route_id"] for info in assigned.values() if info["route_id"]}
+    )
     result = []
     for student in students:
         route = assigned.get(student.student_id)
@@ -534,6 +562,9 @@ def list_children_pickdrop(db: Session, school_id: int, parent_id: int) -> list[
                 "vehicle": route["vehicle"] if route else None,
                 "driver_name": route["driver_name"] if route else None,
                 "status": route["status"] if route else "not_assigned",
+                # Empty for an unassigned child, so the client can tell "no
+                # route" apart from "route with no stops configured".
+                "stops": stops_by_route.get(route["route_id"], []) if route else [],
             }
         )
     return result

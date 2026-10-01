@@ -1,9 +1,11 @@
-from datetime import datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
-from common.models import TimetableEntry, Holiday, Period, SchoolClass, Staff, Subject
+from common.models import TimetableEntry, Period, SchoolClass, Staff, Subject
 from common.exceptions import NotFoundError
+from common.holidays import holidays_in_range
+from common.week import monday_of, week_dates
 
 
 def subject_in_school(db: Session, school_id: int, subject_id: int) -> bool:
@@ -35,8 +37,57 @@ def _parse_period_times(period_time: str) -> tuple[time | None, time | None]:
         return None, None
 
 
-def get_class_timetable(db: Session, class_id: int) -> list[TimetableEntry]:
-    return db.query(TimetableEntry).filter(TimetableEntry.class_id == class_id).all()
+def get_class_in_school(db: Session, class_id: int, school_id: int) -> SchoolClass | None:
+    """The class, but only if it belongs to the caller's school."""
+    return db.query(SchoolClass).filter(
+        SchoolClass.class_id == class_id,
+        SchoolClass.school_id == school_id,
+        SchoolClass.is_active.is_(True),
+    ).first()
+
+
+def get_class_timetable(db: Session, class_id: int, school_id: int | None = None) -> list[TimetableEntry]:
+    query = db.query(TimetableEntry).filter(TimetableEntry.class_id == class_id)
+    if school_id is not None:
+        query = query.filter(TimetableEntry.school_id == school_id)
+    return query.all()
+
+
+def get_class_week(
+    db: Session,
+    class_id: int,
+    school_id: int,
+    week_start: date | None = None,
+) -> dict:
+    """Resolve a class's recurring timetable against one calendar week.
+
+    ``week_start`` may be any day inside the week; it is normalised to that
+    week's Monday. Holidays are named, dated rows, so a column is only red when
+    one of the week's actual dates matches a holiday — a date outside the
+    displayed week never highlights anything.
+    """
+    start = monday_of(week_start or date.today())
+    entries = get_class_timetable(db, class_id, school_id)
+    holidays = holidays_in_range(db, school_id, start, start + timedelta(days=6))
+    days = []
+    for abbreviation, day_date in week_dates(start):
+        occasion = holidays.get(day_date)
+        days.append(
+            {
+                "day_of_week": abbreviation,
+                "date": day_date,
+                "is_holiday": occasion is not None,
+                "holiday_name": occasion,
+                "entries": [e for e in entries if e.day_of_week == abbreviation],
+            }
+        )
+    return {
+        "class_id": class_id,
+        "school_id": school_id,
+        "week_start": start,
+        "week_end": start + timedelta(days=6),
+        "days": days,
+    }
 
 
 def get_entry(db: Session, entry_id: int, school_id: int | None = None) -> TimetableEntry | None:
@@ -111,6 +162,7 @@ def update_entry(
     period_start_time,
     period_end_time,
     school_id: int,
+    is_holiday_override: bool | None = None,
 ) -> TimetableEntry:
     if subject_id is not None:
         if not subject_in_school(db, school_id, subject_id):
@@ -124,13 +176,12 @@ def update_entry(
         entry.period_start_time = period_start_time
     if period_end_time is not None:
         entry.period_end_time = period_end_time
-    # If this day is a school holiday, editing a period marks it as an
-    # explicit override (an "extra class" scheduled despite the holiday).
-    holiday = db.query(Holiday).filter(
-        Holiday.school_id == school_id, Holiday.day_of_week == entry.day_of_week
-    ).first()
-    if holiday and holiday.is_holiday:
-        entry.is_holiday_override = True
+    # The override flag is set explicitly by the caller, not derived here.
+    # It used to be inferred from "is this weekday a recurring holiday?", but
+    # holidays are now specific dates while an entry is a weekday template with
+    # no date, so there is nothing to compare and any guess would be wrong.
+    if is_holiday_override is not None:
+        entry.is_holiday_override = is_holiday_override
     db.commit()
     db.refresh(entry)
     return entry

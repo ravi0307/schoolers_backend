@@ -74,6 +74,7 @@ class Settings(BaseSettings):
         "website": "http://127.0.0.1:8013",
         "notifications": "http://127.0.0.1:8014",
         "reports": "http://127.0.0.1:8015",
+        "accounts": "http://127.0.0.1:8017",
     }
 
 

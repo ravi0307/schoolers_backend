@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
-    UniqueConstraint, CheckConstraint, func, text, JSON
+    Numeric, UniqueConstraint, CheckConstraint, func, text, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -118,14 +118,25 @@ class Period(AuditColumnsMixin, Base):
 
 
 class Holiday(AuditColumnsMixin, Base):
+    """A single named holiday on a single calendar date.
+
+    This is deliberately *not* a recurring weekday flag: "we are closed every
+    Saturday" and "Diwali on 8 November" are different facts, and a table can
+    only answer one of them at a time. Timetable entries stay a recurring
+    weekday template, so a dated holiday is resolved against the real dates of
+    whichever week is being displayed.
+    """
+
     __tablename__ = "holidays"
 
     holiday_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    day_of_week = Column(String(3), nullable=False)
-    is_holiday = Column(Boolean, nullable=False, default=False)
+    occasion = Column(String(120), nullable=False)
+    holiday_date = Column(Date, nullable=False)
 
-    __table_args__ = (UniqueConstraint("school_id", "day_of_week"),)
+    # A school cannot have two holidays on the same date; the timetable would
+    # otherwise have to pick one arbitrarily when highlighting that column.
+    __table_args__ = (UniqueConstraint("school_id", "holiday_date"),)
 
 
 # ============================================================================
@@ -396,6 +407,11 @@ class Broadcast(AuditColumnsMixin, Base):
     scope = Column(String(10), nullable=False)
     role_name = Column(String(100), nullable=False)
     sender_name = Column(String(100), nullable=False, server_default="")
+    # Who authored this, as a user id. sender_name is only a label and cannot
+    # answer "is this mine?": two admins both post as "Admin", and one person's
+    # name can change after the fact. NULL for rows written before this column
+    # existed, and for seed data with no author.
+    sender_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     message = Column(Text, nullable=False)
     created_at = Column(
         DateTime,
@@ -497,7 +513,54 @@ class WebsiteTestimonial(AuditColumnsMixin, Base):
 
 
 # ============================================================================
-# 10. PLATFORM USERS / AUTH
+# 12. ACCOUNTS
+# ============================================================================
+# One row per person per calendar month. `month` is a 'YYYY-MM' string rather
+# than a date because the admin view is a six-column month grid, and a month
+# bucket has no meaningful day. The unique constraints make a second payment
+# for the same month an overwrite rather than a duplicate row, which is what
+# the grid expects: one figure per cell.
+#
+# Both tables keep their own school_id even though staff and students are
+# already school-scoped. It is denormalised on purpose: the accounts read is a
+# single grouped query filtered by school, and it makes the ownership check on
+# write explicit rather than something a join has to be trusted for.
+
+class StaffSalary(AuditColumnsMixin, Base):
+    __tablename__ = "staff_salaries"
+
+    salary_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    staff_id = Column(Integer, ForeignKey("staff.staff_id", ondelete="CASCADE"), nullable=False)
+    month = Column(String(7), nullable=False)
+    # Numeric, not Float: money does not belong in binary floating point.
+    amount = Column(Numeric(12, 2), nullable=False)
+    paid_on = Column(Date)
+    note = Column(String(200))
+
+    __table_args__ = (
+        UniqueConstraint("staff_id", "month"),
+    )
+
+
+class StudentFee(AuditColumnsMixin, Base):
+    __tablename__ = "student_fees"
+
+    fee_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    month = Column(String(7), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    paid_on = Column(Date)
+    note = Column(String(200))
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "month"),
+    )
+
+
+# ============================================================================
+# 13. PLATFORM USERS / AUTH
 # ============================================================================
 
 class User(AuditColumnsMixin, Base):
