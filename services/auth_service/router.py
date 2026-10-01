@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import get_current_user, CurrentUser
-from common.models import School
-from common.exceptions import AppError
+from common.models import School, User
+from common.exceptions import AppError, UnauthorizedError
 import service
 from schemas import (
     LoginRequest, TokenResponse, RefreshRequest, RefreshResponse,
     ForgotPasswordRequest, ForgotPasswordVerifyRequest,
     ForgotPasswordResetRequest, ForgotPasswordResponse,
+    ChangePasswordRequest, ChangePasswordResponse,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -141,6 +142,11 @@ def me(
     so a teacher, pilot or parent cannot read it there. This is the one
     endpoint every authenticated role can reach, so the branding travels
     with the session instead of forcing a widened permission.
+
+    It also carries the caller's own username, email and display name, which
+    is what the profile page shows. Those come from the session's user_id
+    rather than from any request parameter, so a caller cannot read anyone
+    else's account details here.
     """
     school_name = None
     school_logo_url = None
@@ -149,6 +155,16 @@ def me(
         if school is not None:
             school_name = school.name
             school_logo_url = school.logo_url
+
+    username = None
+    email = None
+    display_name = None
+    user = db.query(User).filter(User.user_id == current_user.user_id).first()
+    if user is not None:
+        username = user.username
+        email = service.account_email_address(db, user)
+        display_name = service.display_name_for(db, user.role, user.linked_person_id)
+
     return {
         "user_id": current_user.user_id,
         "role": current_user.role,
@@ -156,4 +172,26 @@ def me(
         "linked_person_id": current_user.linked_person_id,
         "school_name": school_name,
         "school_logo_url": school_logo_url,
+        "username": username,
+        "email": email,
+        "display_name": display_name or username,
     }
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Let a signed-in user rotate their own password.
+
+    Separate from the anonymous forgot-password flow: this one requires both a
+    valid access token and the current password, so a leaked token alone cannot
+    change the credential.
+    """
+    user = db.query(User).filter(User.user_id == current_user.user_id).first()
+    if user is None:
+        raise UnauthorizedError("User no longer exists")
+    service.change_password(db, user, payload.current_password, payload.new_password)
+    return {"message": "Your password has been changed."}

@@ -173,6 +173,35 @@ class StaffReportAttendance(BaseModel):
     recent: list[StaffAttendanceDay] = []
 
 
+class StaffSelfAttendance(StaffReportAttendance):
+    """The same counters, plus an uncapped day list.
+
+    `days` is every marked day rather than the admin report's 30-day `recent`,
+    narrowed to `month` when one is given. Because the counters are scoped the
+    same way as the list, the percentage always describes the rows on screen --
+    with no filter that is the whole register, and with one it is that month.
+    """
+    month: str | None = None
+    days: list[StaffAttendanceDay] = []
+
+
+class StaffSelfStaff(BaseModel):
+    """Just enough identity to label the section; the profile already shows
+    the caller's own name, role and email from /auth/me."""
+    staff_id: int
+    name: str
+    role: str
+    role_title: str | None = None
+    person_type: str
+    designation: str | None = None
+
+
+class StaffSelfSummary(BaseModel):
+    staff: StaffSelfStaff
+    salary: ReportSalary
+    attendance: StaffSelfAttendance
+
+
 class StaffReport(BaseModel):
     staff: ReportStaff
     salary: ReportSalary

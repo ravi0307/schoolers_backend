@@ -283,6 +283,155 @@ def _recent_months(count: int, today: date | None = None) -> list[str]:
     return list(reversed(months))
 
 
+def _month_anchor(end: str | None) -> date | None:
+    """Turn a 'YYYY-MM' page anchor into the date _recent_months counts back
+    from, or None to mean "the current month".
+
+    Same contract as the accounts grid's month_window(end=...), so the two
+    sheets cannot disagree about what "the last six months" means.
+    """
+    if not end:
+        return None
+    return date(int(end[:4]), int(end[5:7]), 1)
+
+
+def _attendance_days(
+    db: Session,
+    school_id: int,
+    staff_id: int,
+    month: str | None,
+) -> list[dict]:
+    """Every marked day, newest first, optionally narrowed to one 'YYYY-MM'.
+
+    Unlike the admin report's `recent` list this is not capped, because a person
+    reading their own register wants their whole history rather than a 30-day
+    window. `month` filters server-side rather than in the client so an
+    unfiltered history is never shipped to the browser just to be discarded.
+
+    Scoped by school_id as well as staff_id, matching the salary read: a stray
+    row written against another school must not surface here.
+    """
+    q = db.query(
+        StaffAttendance.date, StaffAttendance.status,
+        StaffAttendance.check_in, StaffAttendance.check_out,
+    ).filter(
+        StaffAttendance.staff_id == staff_id,
+        StaffAttendance.school_id == school_id,
+    )
+    if month:
+        year, mon = int(month[:4]), int(month[5:7])
+        q = q.filter(
+            StaffAttendance.date >= date(year, mon, 1),
+            StaffAttendance.date < date(year + (mon == 12), mon % 12 + 1, 1),
+        )
+    return [
+        {
+            "date": str(day),
+            "status": status,
+            "check_in": str(check_in) if check_in else None,
+            "check_out": str(check_out) if check_out else None,
+        }
+        for day, status, check_in, check_out in (
+            q.order_by(StaffAttendance.date.desc()).all()
+        )
+    ]
+
+
+def _attendance_counts(db: Session, school_id: int, staff_id: int, month: str | None) -> dict:
+    """Present/absent/leave/half-day tallies over the whole register, or over
+    one month when `month` is given.
+
+    Counts are always scoped the same way as the day list beside them, so the
+    percentage on screen always describes the rows the user can actually see.
+    That is the difference from the admin report, whose counters span everything
+    while its list shows only the last 30 days.
+    """
+    q = db.query(StaffAttendance.status, func.count()).filter(
+        StaffAttendance.staff_id == staff_id,
+        StaffAttendance.school_id == school_id,
+    )
+    if month:
+        year, mon = int(month[:4]), int(month[5:7])
+        q = q.filter(
+            StaffAttendance.date >= date(year, mon, 1),
+            StaffAttendance.date < date(year + (mon == 12), mon % 12 + 1, 1),
+        )
+    counts = dict(q.group_by(StaffAttendance.status).all())
+
+    present = counts.get("Present", 0)
+    absent = counts.get("Absent", 0)
+    on_leave = counts.get("On leave", 0)
+    half_day = counts.get("Half day", 0)
+    # The column is constrained to those four statuses, but an older row with
+    # anything else still counts as a marked day rather than vanishing.
+    marked = present + absent + on_leave + half_day + sum(
+        n for status, n in counts.items()
+        if status not in ("Present", "Absent", "On leave", "Half day")
+    )
+    return {
+        "present": present,
+        "absent": absent,
+        "on_leave": on_leave,
+        "half_day": half_day,
+        "marked_days": marked,
+        # None, never 0, when nothing was ever marked.
+        "percentage": round(present * 100.0 / marked, 1) if marked else None,
+    }
+
+
+def staff_self_summary(
+    db: Session,
+    school_id: int,
+    staff_id: int,
+    months: int = DEFAULT_SALARY_MONTHS,
+    salary_end: str | None = None,
+    attendance_month: str | None = None,
+) -> dict | None:
+    """One staff member's own salary and attendance, for their profile page.
+
+    Same shape as the admin-facing `staff_report` so the profile can reuse the
+    existing helpers, with two deliberate differences: the attendance day list
+    is uncapped and month-filterable, and the salary window can be paged with
+    an explicit anchor. `note` is carried through untouched, since the remark an
+    admin wrote against a salary payment is part of the pay record the staff
+    member is asking to see.
+    """
+    staff = _staff_or_none(db, school_id, staff_id)
+    if staff is None:
+        return None
+
+    salary = _salary(db, school_id, staff_id, months, _month_anchor(salary_end))
+    attendance = _attendance_counts(db, school_id, staff.staff_id, attendance_month)
+    days = _attendance_days(db, school_id, staff.staff_id, attendance_month)
+
+    span = (
+        db.query(func.min(StaffAttendance.date), func.max(StaffAttendance.date))
+        .filter(StaffAttendance.staff_id == staff.staff_id)
+        .one()
+    )
+    first_day, last_day = span
+
+    attendance.update({
+        "from_date": str(first_day) if first_day else None,
+        "to_date": str(last_day) if last_day else None,
+        "month": attendance_month,
+        "days": days,
+    })
+
+    return {
+        "staff": {
+            "staff_id": staff.staff_id,
+            "name": staff.name,
+            "role": staff.role,
+            "role_title": staff.role_title,
+            "person_type": staff.person_type,
+            "designation": staff.role_title or staff.role,
+        },
+        "salary": salary,
+        "attendance": attendance,
+    }
+
+
 def _staff_or_none(db: Session, school_id: int, staff_id: int):
     """The staff member, but only if they belong to the caller's school.
 

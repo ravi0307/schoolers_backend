@@ -29,6 +29,34 @@ class RefreshResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class ChangePasswordRequest(BaseModel):
+    """Self-service password change for a signed-in user.
+
+    Distinct from the forgot-password flow: that one is anonymous and gated on
+    an emailed OTP, while this one requires the caller to already hold a valid
+    access token *and* to re-enter their current password, so it can never be
+    used to take over an account whose session token was stolen.
+    """
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_within_bcrypt_limit(cls, value: str) -> str:
+        validate_password_byte_length(value)
+        return value
+
+    @model_validator(mode="after")
+    def new_password_must_differ(self):
+        if self.current_password == self.new_password:
+            raise ValueError("Choose a new password that is different from your current one.")
+        return self
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
+
+
 class ForgotPasswordIdentifierRequest(BaseModel):
     """Accept one account identifier: a username or email address."""
     identifier: str | None = Field(default=None, min_length=1, max_length=120)

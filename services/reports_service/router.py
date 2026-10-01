@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from common.database import get_db
@@ -10,9 +10,15 @@ from schemas import (
     ClassAttendanceTrendPoint,
     StudentReport,
     StaffReport,
+    StaffSelfSummary,
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+# Roles whose account links to a Staff row, so a "my own" report exists for
+# them. Parent and master are absent on purpose: a parent links to a Parent row
+# and a master to nothing, so neither has attendance or salary to read.
+SELF_ROLES = ("admin", "teacher", "staff", "pilot")
 
 
 @router.get("/school/{school_id}/overview", response_model=SchoolOverview)
@@ -54,6 +60,50 @@ def student_report(
     if report is None:
         raise NotFoundError("Student not found")
     return report
+
+
+@router.get("/staff/me", response_model=StaffSelfSummary)
+def my_staff_summary(
+    months: int = Query(repo.DEFAULT_SALARY_MONTHS, ge=1, le=24),
+    salary_end: str | None = Query(
+        None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Anchor month for the salary window, YYYY-MM. Defaults to the current month.",
+    ),
+    attendance_month: str | None = Query(
+        None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Narrow the attendance history to one month, YYYY-MM. Omit for the whole register.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role(*SELF_ROLES)),
+):
+    """The caller's own salary and attendance, for their profile page.
+
+    There is no staff id in the path or the query, so this cannot be pointed at
+    anyone else: the row is resolved from current_user.linked_person_id, the
+    same scoping the staff attendance endpoint already applies. GET
+    /reports/staff/{staff_id} stays admin-only for reading other people.
+
+    An account with no linked staff row is refused rather than answered with an
+    empty summary, since a blank panel would read as "you have no attendance"
+    when the truth is that there is no staff record to read.
+    """
+    if current_user.school_id is None:
+        raise ForbiddenError("No school is associated with this account")
+    if not current_user.linked_person_id:
+        raise ForbiddenError("This account isn't linked to a staff record")
+
+    summary = repo.staff_self_summary(
+        db, current_user.school_id, current_user.linked_person_id,
+        months, salary_end, attendance_month,
+    )
+    if summary is None:
+        # The session points at a staff row that is not in this school, which
+        # means the record moved. Answering 403 keeps it as "not yours" rather
+        # than a 404 that invites probing for ids.
+        raise ForbiddenError("This account isn't linked to a staff record")
+    return summary
 
 
 @router.get("/staff/{staff_id}", response_model=StaffReport)
