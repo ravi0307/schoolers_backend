@@ -46,8 +46,13 @@ class AuthMeSchoolBrandingTests(unittest.TestCase):
         # a bound method, and self would be passed as the db argument.
         cls.me = staticmethod(auth_router.me)
         cls.engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+        # The users table is needed because /auth/me also resolves the caller's
+        # own username, email and name from the session's user_id. These tests
+        # create no user rows, so those fields come back null and the branding
+        # assertions below are unaffected.
         Base.metadata.create_all(
-            cls.engine, tables=[Base.metadata.tables["schools"]]
+            cls.engine,
+            tables=[Base.metadata.tables["schools"], Base.metadata.tables["users"]],
         )
         cls.Session = sessionmaker(bind=cls.engine, autoflush=False, future=True)
         db = cls.Session()

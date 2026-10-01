@@ -98,6 +98,66 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     return None
 
 
+def display_name_for(db: Session, role: str, linked_person_id: int | None) -> str | None:
+    """The human name of whoever holds an account, or None.
+
+    The users table stores no name of its own, so it is resolved from the
+    linked person row. Which table that is depends on the role, and
+    linked_person_id is only unique within its own table, so the role decides
+    the lookup. Students have no accounts and masters have no linked person, so
+    both fall through to None and the caller falls back to the username.
+    """
+    if linked_person_id is None:
+        return None
+    if role in ("teacher", "staff", "admin", "pilot"):
+        person = db.query(Staff).filter(Staff.staff_id == linked_person_id).first()
+        return person.name if person else None
+    if role == "parent":
+        person = db.query(Parent).filter(Parent.parent_id == linked_person_id).first()
+        return person.name if person else None
+    return None
+
+
+def account_email_address(db: Session, user: User) -> str | None:
+    """The address on file for an account, preferring users.email.
+
+    A user row may carry its own email, but staff and parent rows also hold
+    one, and some accounts are created without a users.email. Prefer the one
+    on the account itself so the profile shows what the account actually uses,
+    then fall back to the linked person. Admin accounts resolve to their
+    school's primary email, matching user_email_address().
+    """
+    if user.email:
+        return user.email
+    if user.role == "admin":
+        school = db.query(School).filter(School.school_id == user.school_id).first()
+        return school.primary_email if school else None
+    if user.role in ("teacher", "staff", "pilot"):
+        person = db.query(Staff).filter(Staff.staff_id == user.linked_person_id).first()
+        return person.email if person else None
+    if user.role == "parent":
+        person = db.query(Parent).filter(Parent.parent_id == user.linked_person_id).first()
+        return person.email if person else None
+    return None
+
+
+def change_password(db: Session, user: User, current_password: str, new_password: str) -> None:
+    """Replace a signed-in user's own password.
+
+    The current password must verify first, so possession of a valid access
+    token alone is not enough to rotate the credential. Any outstanding reset
+    OTP is cleared at the same time, otherwise a code issued before the change
+    could still be redeemed afterwards.
+    """
+    if not verify_password(current_password, user.password_hash):
+        raise UnauthorizedError("Current password is incorrect")
+    user.password_hash = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    db.add(user)
+    db.commit()
+
+
 def user_email_address(db: Session, user: User) -> str | None:
     """Resolve a deliverable email address for an account, or None.
 
