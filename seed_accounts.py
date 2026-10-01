@@ -34,11 +34,19 @@ def _paid_on(month: str) -> date:
     return date(int(month[:4]), int(month[5:7]), 28)
 
 
-def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6):
+def seed(engine, salary=DEFAULT_SALARY, fee=DEFAULT_FEE, force=False, months=6, today=None):
+    """Seed the grid for the ``months`` ending ``today``.
+
+    ``today`` defaults to the real current date, which is what a demo seed
+    wants. It is a parameter so a test can pin the window: deriving the window
+    from the clock makes the result move every month, and a test that asserted
+    against a fixed window then failed on the first of each new month while the
+    code under test was fine.
+    """
     Session = sessionmaker(bind=engine, autoflush=False, future=True)
     db = Session()
     try:
-        window = accounts_repo.recent_months(months)
+        window = accounts_repo.recent_months(months, today)
         salaries = fees = skipped = 0
 
         staff = (

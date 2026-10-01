@@ -55,7 +55,11 @@ class SeedAccountsTests(unittest.TestCase):
         )
         self.db.commit()
         self.db.close()
-        self.window = accounts_repo.recent_months(6, date(2026, 9, 15))
+        # Pinned so the seed has a fixed window to fill: anchored to the real
+        # clock it would shift every month and the assertions below would start
+        # failing on the 1st of each new month, with nothing wrong in the seed.
+        self.today = date(2026, 9, 15)
+        self.window = accounts_repo.recent_months(6, self.today)
 
     def _read(self, table):
         db: Session = sessionmaker(bind=self.engine, future=True)()
@@ -67,7 +71,7 @@ class SeedAccountsTests(unittest.TestCase):
     # ---- happy path ----
 
     def test_seeds_every_active_person_for_every_month_in_the_window(self):
-        _win, salaries, fees, skipped = seed_accounts.seed(self.engine)
+        _win, salaries, fees, skipped = seed_accounts.seed(self.engine, today=self.today)
         # 3 active staff x 6 months, 2 active students x 6 months.
         self.assertEqual(salaries, 18)
         self.assertEqual(fees, 12)
@@ -76,19 +80,19 @@ class SeedAccountsTests(unittest.TestCase):
         self.assertEqual(len(self._read(StudentFee)), 12)
 
     def test_skips_inactive_staff_and_students(self):
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         staff_ids = {r.staff_id for r in self._read(StaffSalary)}
         student_ids = {r.student_id for r in self._read(StudentFee)}
         self.assertNotIn(13, staff_ids, "departed staff must not be paid")
         self.assertNotIn(201, student_ids, "withdrawn students must not be billed")
 
     def test_uses_the_default_amounts(self):
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         self.assertTrue(all(float(r.amount) == 10000.0 for r in self._read(StaffSalary)))
         self.assertTrue(all(float(r.amount) == 4000.0 for r in self._read(StudentFee)))
 
     def test_amounts_are_overridable(self):
-        seed_accounts.seed(self.engine, salary=25000, fee=7500)
+        seed_accounts.seed(self.engine, salary=25000, fee=7500, today=self.today)
         self.assertTrue(all(float(r.amount) == 25000.0 for r in self._read(StaffSalary)))
         self.assertTrue(all(float(r.amount) == 7500.0 for r in self._read(StudentFee)))
 
@@ -96,7 +100,7 @@ class SeedAccountsTests(unittest.TestCase):
         # The school_id is denormalised onto the payment. If the seed ever
         # stamped the wrong school, that school's admin would see another
         # school's payroll on their grid.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         for row in self._read(StaffSalary):
             self.assertEqual(row.school_id, 1 if row.staff_id in (10, 11) else 2)
         for row in self._read(StudentFee):
@@ -106,7 +110,7 @@ class SeedAccountsTests(unittest.TestCase):
         # The whole point of calling recent_months rather than re-deriving the
         # six months here: a seed on its own calendar would eventually leave
         # the newest grid column empty.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         salary_months = {r.month for r in self._read(StaffSalary)}
         self.assertEqual(salary_months, set(self.window))
 
@@ -114,7 +118,7 @@ class SeedAccountsTests(unittest.TestCase):
         # The grids show "paid on" next to every figure, so a fresh demo seed
         # must not leave those dates blank. The 28th of the payment's own
         # month is a neutral, believable payday.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         for row in self._read(StaffSalary):
             self.assertEqual(str(row.paid_on), row.month + "-28")
         for row in self._read(StudentFee):
@@ -123,14 +127,14 @@ class SeedAccountsTests(unittest.TestCase):
     def test_rerunning_keeps_an_existing_paid_date(self):
         # The paid date is real history: re-running the demo seed must not
         # rewrite it back to the synthetic 28th.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db: Session = sessionmaker(bind=self.engine, future=True)()
         row = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
         row.paid_on = date(2026, 9, 15)
         db.commit()
         db.close()
 
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db = sessionmaker(bind=self.engine, future=True)()
         try:
             again = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
@@ -141,7 +145,7 @@ class SeedAccountsTests(unittest.TestCase):
     def test_the_seeded_grid_reports_no_outstanding_months(self):
         # End to end through the same read the API uses, so "seeded" means the
         # admin actually sees a full grid rather than a half-empty one.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db: Session = sessionmaker(bind=self.engine, future=True)()
         try:
             sheet = accounts_repo.salary_sheet(db, 1, self.window)
@@ -158,8 +162,8 @@ class SeedAccountsTests(unittest.TestCase):
     # ---- idempotency: the property that matters most ----
 
     def test_rerunning_writes_nothing_new(self):
-        seed_accounts.seed(self.engine)
-        _win, salaries, fees, skipped = seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
+        _win, salaries, fees, skipped = seed_accounts.seed(self.engine, today=self.today)
         self.assertEqual(salaries, 0)
         self.assertEqual(fees, 0)
         self.assertEqual(skipped, 30)
@@ -169,14 +173,14 @@ class SeedAccountsTests(unittest.TestCase):
     def test_rerunning_does_not_overwrite_a_corrected_amount(self):
         # An admin who fixes a typo must survive someone re-running the demo
         # seed. Overwriting silently is the failure this guards against.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db: Session = sessionmaker(bind=self.engine, future=True)()
         row = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
         row.amount = 31000
         db.commit()
         db.close()
 
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db = sessionmaker(bind=self.engine, future=True)()
         try:
             again = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
@@ -185,14 +189,14 @@ class SeedAccountsTests(unittest.TestCase):
             db.close()
 
     def test_force_overwrites_when_asked_explicitly(self):
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db: Session = sessionmaker(bind=self.engine, future=True)()
         row = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
         row.amount = 31000
         db.commit()
         db.close()
 
-        seed_accounts.seed(self.engine, force=True)
+        seed_accounts.seed(self.engine, force=True, today=self.today)
         db = sessionmaker(bind=self.engine, future=True)()
         try:
             again = db.query(StaffSalary).filter(StaffSalary.staff_id == 10).first()
@@ -201,14 +205,14 @@ class SeedAccountsTests(unittest.TestCase):
             db.close()
 
     def test_force_does_not_duplicate_rows(self):
-        seed_accounts.seed(self.engine)
-        seed_accounts.seed(self.engine, force=True)
+        seed_accounts.seed(self.engine, today=self.today)
+        seed_accounts.seed(self.engine, force=True, today=self.today)
         self.assertEqual(len(self._read(StaffSalary)), 18)
         self.assertEqual(len(self._read(StudentFee)), 12)
 
     def test_partially_seeded_school_only_gains_what_is_missing(self):
         # A school that already has real history keeps it and gains the rest.
-        seed_accounts.seed(self.engine)
+        seed_accounts.seed(self.engine, today=self.today)
         db: Session = sessionmaker(bind=self.engine, future=True)()
         db.query(StaffSalary).filter(
             StaffSalary.staff_id == 10, StaffSalary.month == self.window[0]
@@ -216,7 +220,7 @@ class SeedAccountsTests(unittest.TestCase):
         db.commit()
         db.close()
 
-        _win, salaries, fees, _skipped = seed_accounts.seed(self.engine)
+        _win, salaries, fees, _skipped = seed_accounts.seed(self.engine, today=self.today)
         self.assertEqual(salaries, 1, "only the one missing month should be written")
         self.assertEqual(fees, 0)
         self.assertEqual(len(self._read(StaffSalary)), 18)
@@ -228,7 +232,7 @@ class SeedAccountsTests(unittest.TestCase):
         db.commit()
         db.close()
 
-        _win, salaries, fees, skipped = seed_accounts.seed(self.engine)
+        _win, salaries, fees, skipped = seed_accounts.seed(self.engine, today=self.today)
         self.assertEqual((salaries, fees, skipped), (0, 0, 0))
 
 
@@ -241,8 +245,11 @@ class SeedWindowTests(unittest.TestCase):
         self.assertEqual(len(accounts_repo.recent_months(6)), 6)
 
     def test_a_wider_window_is_honoured(self):
+        # The window still comes from the API helper rather than any month
+        # arithmetic of the seed's own. `today` is passed through, so the call
+        # keeps its (months, today) shape instead of re-deriving either.
         source = open(seed_accounts.__file__).read()
-        self.assertIn("accounts_repo.recent_months(months)", source)
+        self.assertIn("accounts_repo.recent_months(months, today)", source)
 
 
 if __name__ == "__main__":
