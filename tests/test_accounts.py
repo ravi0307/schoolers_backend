@@ -9,6 +9,8 @@ import importlib
 import unittest
 from datetime import date
 
+from decimal import Decimal
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -128,6 +130,31 @@ class AccountsSheetTests(unittest.TestCase):
         sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
         meera = next(r for r in sheet["rows"] if r["staff_id"] == 10)
         self.assertEqual(meera["amounts"]["2026-08"], 45000.55)
+
+    def test_total_paid_avoids_float_accumulation_error(self):
+        """Summing amounts that are not exactly representable in binary float
+        (e.g. 0.1) can drift: 0.1×6 = 0.6000000000000001 in float.  The fix
+        sums Decimal paise as integers, then converts once."""
+        # 6 payments of 0.10 rupees each across different months.
+        for month in ("2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"):
+            accounts_repo.record_salary(
+                self.db, 1,
+                {"staff_id": 10, "month": month, "amount": Decimal("0.10")},
+            )
+        sheet = accounts_repo.salary_sheet(self.db, 1, self.months)
+        # Old float sum would have produced 0.6000000000000001
+        self.assertEqual(sheet["total_paid"], 0.6)
+
+    def test_fee_total_avoids_float_accumulation_error(self):
+        """Same test for student fees: 6 payments of 0.10 = 0.60 exactly."""
+        for month in ("2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"):
+            accounts_repo.record_fee(
+                self.db, 1,
+                {"student_id": 100, "month": month, "amount": Decimal("0.10")},
+            )
+        sheet = accounts_repo.fee_sheet(self.db, 1, self.months)
+        riya = next(r for r in sheet["rows"] if r["student_id"] == 100)
+        self.assertEqual(sheet["total_collected"], 0.6)
 
     def test_salary_sheet_never_shows_another_schools_staff(self):
         accounts_repo.record_salary(self.db, 1, {"staff_id": 10, "month": "2026-09", "amount": 45000})

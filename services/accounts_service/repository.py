@@ -155,7 +155,9 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
     return {
         "months": months,
         "rows": rows,
-        "total_paid": sum(sum(r["amounts"].values()) for r in rows),
+        # Sum Decimal amounts from DB to avoid float accumulation error,
+        # then convert to float at the end for JSON serialization.
+        "total_paid": sum(int(p.amount * 100) for p in payments) / 100.0,
         # A month is outstanding for a person when nothing was recorded for it.
         "total_outstanding_months": sum(
             len(months) - len(r["amounts"]) for r in rows
@@ -201,7 +203,9 @@ def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
     return {
         "months": months,
         "rows": rows,
-        "total_collected": sum(sum(r["amounts"].values()) for r in rows),
+        # Sum Decimal amounts from DB to avoid float accumulation error,
+        # then convert to float at the end for JSON serialization.
+        "total_collected": sum(int(p.amount * 100) for p in payments) / 100.0,
         "outstanding_count": sum(
             1 for r in rows if len(r["amounts"]) < len(months)
         ),
