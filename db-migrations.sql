@@ -415,6 +415,18 @@ ALTER TABLE IF EXISTS schoolers.media
     ADD COLUMN IF NOT EXISTS file_url VARCHAR(255),
     ADD COLUMN IF NOT EXISTS media_kind VARCHAR(10);
 
+-- Who uploaded each gallery item. Staff may only edit or remove media they
+-- uploaded, which needs a user id to compare against: posted_by is a display
+-- label, so two teachers sharing a name (or a renamed teacher) would make a
+-- name comparison attribute one person's upload to another. Existing rows stay
+-- NULL -- they predate authorship and are deliberately not guessed at, so they
+-- remain admin-only.
+ALTER TABLE IF EXISTS schoolers.media
+    ADD COLUMN IF NOT EXISTS uploader_user_id INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS media_uploader_user_idx
+    ON schoolers.media (uploader_user_id);
+
 -- Master portal: school admin's name, used to generate the school login.
 ALTER TABLE IF EXISTS schoolers.schools
     ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),
