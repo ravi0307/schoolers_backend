@@ -84,6 +84,46 @@ class BackendContractTests(unittest.TestCase):
                     f"{service_name} router has no HTTP endpoints",
                 )
 
+    def test_every_service_enables_gzip_compression(self):
+        for service_name in sorted(EXPECTED_SERVICES):
+            main_source = (
+                SERVICE_ROOT / service_name / "main.py"
+            ).read_text(encoding="utf-8")
+            tree = ast.parse(main_source)
+            gzip_middleware_imported = any(
+                isinstance(node, ast.ImportFrom)
+                and node.module == "fastapi.middleware.gzip"
+                and any(alias.name == "GZipMiddleware" for alias in node.names)
+                for node in ast.walk(tree)
+            )
+            gzip_middleware_configured = any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "app"
+                and node.func.attr == "add_middleware"
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "GZipMiddleware"
+                and any(
+                    keyword.arg == "minimum_size"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value == 500
+                    for keyword in node.keywords
+                )
+                for node in ast.walk(tree)
+            )
+
+            with self.subTest(service=service_name):
+                self.assertTrue(
+                    gzip_middleware_imported,
+                    "main.py must import FastAPI's GZipMiddleware",
+                )
+                self.assertTrue(
+                    gzip_middleware_configured,
+                    "app must enable GZipMiddleware with minimum_size=500",
+                )
+
     def test_shared_models_define_database_tables(self):
         source = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
         tree = ast.parse(source)

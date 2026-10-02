@@ -3,6 +3,7 @@ Schoolers Media Service — standalone microservice.
 Reads all configuration from the single shared common/.env via common.config.
 """
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from common.config import settings
@@ -11,6 +12,7 @@ from common.exception_handlers import register_exception_handlers
 from router import router
 
 app = FastAPI(title="Schoolers Media Service", debug=settings.DEBUG)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
     CORSMiddleware,
