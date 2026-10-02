@@ -45,6 +45,14 @@ class NotificationType(str, Enum):
     general = "General"
 
 
+class TicketStatus(str, Enum):
+    open = "Open"
+    in_progress = "In progress"
+    assigned = "Assigned"
+    completed = "Completed"
+    cancelled = "Cancelled"
+
+
 class RouteStatus(str, Enum):
     on_route = "On route"
     scheduled = "Scheduled"

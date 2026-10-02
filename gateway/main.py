@@ -54,6 +54,7 @@ ROUTE_MAP = {
     "notifications": "notifications",
     "reports": "reports",
     "accounts": "accounts",
+    "support": "support",
 }
 
 # Service-to-service calls must use the Compose network directly, not host

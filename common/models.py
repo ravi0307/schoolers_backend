@@ -641,6 +641,80 @@ class StaffAttendance(AuditColumnsMixin, Base):
     )
 
 
+# ============================================================================
+# SUPPORT / HELP DESK
+# ============================================================================
+
+class SupportTicket(AuditColumnsMixin, Base):
+    """An issue a school admin raises for the master admin to handle.
+
+    A ticket belongs to exactly one school and is opened by an admin of that
+    school. The master admin sees every school's tickets; an admin only ever
+    sees their own school's. The conversation itself lives on
+    SupportTicketMessage, so the ticket row stays a small, listable summary.
+
+    `created_by_name` is denormalised at open time (matching leave_requests):
+    the display name is resolved from the linked staff row server-side, so a
+    ticket keeps reading sensibly even if the account is later removed.
+    """
+
+    __tablename__ = "support_tickets"
+
+    ticket_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    created_by_name = Column(String(100), nullable=False)
+    subject = Column(String(200), nullable=False)
+    status = Column(String(20), nullable=False, default="Open", server_default="Open")
+    created_at = Column(DateTime, server_default=func.now())
+
+    messages = relationship(
+        "SupportTicketMessage",
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="SupportTicketMessage.created_at",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('Open','In progress','Assigned','Completed','Cancelled')",
+            name="support_tickets_status_check",
+        ),
+    )
+
+
+class SupportTicketMessage(AuditColumnsMixin, Base):
+    """One turn in a ticket's conversation, including the opening message.
+
+    `author_role` is the account role that wrote it ('admin' or 'master'), so
+    the thread reads as two parties rather than as a pile of bodies. The name
+    is denormalised for the same reason as the ticket's `created_by_name`.
+
+    `attachments` is a JSON list of URL strings minted by the existing upload
+    endpoints; support stores references only and never owns the files.
+    """
+
+    __tablename__ = "support_ticket_messages"
+
+    message_id = Column(Integer, primary_key=True)
+    ticket_id = Column(Integer, ForeignKey("support_tickets.ticket_id", ondelete="CASCADE"), nullable=False)
+    author_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    author_role = Column(String(20), nullable=False)
+    author_name = Column(String(100), nullable=False)
+    body = Column(Text, nullable=False)
+    attachments = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, server_default=func.now())
+
+    ticket = relationship("SupportTicket", back_populates="messages")
+
+    __table_args__ = (
+        CheckConstraint(
+            "author_role IN ('admin','master')",
+            name="support_ticket_messages_role_check",
+        ),
+    )
+
+
 # Register the audit stamper so every process importing the models configures
 # the modified_by/modified_at listener before the first flush.
 import common.audit  # noqa: E402,F401
