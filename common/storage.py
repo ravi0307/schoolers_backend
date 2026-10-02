@@ -122,5 +122,30 @@ def resolve_upload_path(filename: str) -> Path:
     return path
 
 
+def delete_stored_media(file_url: str | None) -> bool:
+    """Remove the file behind a gallery row that no longer references it.
+
+    Only handles paths this service minted (/api/v1/media/files/{filename}) and
+    never raises: the row is already committed by the time cleanup runs, so a
+    missing or unremovable file must not fail the request and leave the caller
+    thinking the edit failed. Returns whether a file was actually removed.
+    """
+    if not file_url:
+        return False
+    prefix = "/api/v1/media/files/"
+    if not file_url.startswith(prefix):
+        return False
+    filename = file_url[len(prefix):]
+    try:
+        path = resolve_upload_path(filename)
+    except FileNotFoundError:
+        return False
+    try:
+        path.unlink()
+    except OSError:
+        return False
+    return True
+
+
 def media_type_for_filename(filename: str) -> str | None:
     return EXTENSION_TO_MEDIA_TYPE.get(Path(filename).suffix.lower())

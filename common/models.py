@@ -429,6 +429,11 @@ class Media(AuditColumnsMixin, Base):
     title = Column(String(150), nullable=False)
     posted_by = Column(String(100), nullable=False)
     icon = Column(String(10))
+    # Who uploaded this, as a user id. posted_by is only a display label and
+    # cannot answer "is this mine?": two teachers can share a name, and a name
+    # can change after the upload. NULL for rows written before this column
+    # existed -- those stay admin-only rather than being guessed at.
+    uploader_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     # Gallery media file. file_url is the API path to the stored file; kind is
     # either "image" or "video" (NULL for legacy text-only album rows).
     file_url = Column(String(255))
