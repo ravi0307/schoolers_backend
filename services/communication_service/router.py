@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from common.database import get_db
@@ -17,7 +17,7 @@ def create_broadcast(
     payload: BroadcastCreate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin", "pilot")),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "pilot", "staff")),
 ):
     if payload.scope not in repo.ALLOWED_BROADCAST_SCOPES.get(current_user.role, set()):
         raise ForbiddenError(
@@ -37,7 +37,7 @@ def list_broadcasts(
     route_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "pilot")),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "pilot", "staff")),
 ):
     return repo.list_broadcasts(db, school_id, current_user, scope, class_id, route_id)
 
@@ -48,17 +48,29 @@ def update_broadcast(
     payload: BroadcastUpdate,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
+    current_user: CurrentUser = Depends(require_role("admin", "staff")),
 ):
-    # Only a school admin may edit a broadcast, and not only their own: an admin
-    # correcting a colleague's typo is a real job. Broadcasts now record their
-    # author (sender_user_id), so this could be narrowed to the author, but that
-    # is a permissions decision rather than a bug fix. Teachers and pilots stay
-    # out either way -- they cannot rewrite a message, including their own.
+    # An admin may edit any broadcast in their school, including a colleague's.
+    # Staff may edit only the ones they posted; the repository enforces that by
+    # comparing the row's recorded author against the signed-in user. Teachers
+    # and pilots stay out either way -- they cannot rewrite a message, including
+    # their own.
     return repo.update_broadcast_message(
         db,
         school_id,
         broadcast_id,
         payload.message,
         payload.created_at,
+        current_user,
     )
+
+
+@router.delete("/broadcasts/{broadcast_id}", status_code=204)
+def delete_broadcast(
+    broadcast_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin", "staff")),
+):
+    repo.delete_broadcast(db, school_id, broadcast_id, current_user)
+    return Response(status_code=204)

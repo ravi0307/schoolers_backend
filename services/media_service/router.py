@@ -37,7 +37,7 @@ async def upload_media(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "staff")),
 ):
     content_type = file.content_type or ""
     data = await file.read()
@@ -67,7 +67,7 @@ def list_media(
     class_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "staff")),
 ):
     return repo.list_media(db, school_id, class_id)
 
@@ -90,7 +90,7 @@ async def update_media(
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "staff")),
 ):
     """Edit gallery metadata, optionally replacing the file.
 
@@ -140,7 +140,7 @@ def delete_media(
     media_id: int,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "staff")),
 ):
     # Soft delete, so the file is intentionally left on disk: an admin can still
     # restore or inspect the entry, and unreferenced files are a storage-cleanup

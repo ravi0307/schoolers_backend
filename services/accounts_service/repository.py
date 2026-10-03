@@ -1,13 +1,15 @@
 """Accounts: staff salaries and student fees, read as a month grid.
 
-Both sheets are "every active person of the school x the last N months", so
-they are built as a LEFT JOIN from the person to their payments. People with
-no payments in the window still appear, with an empty `amounts` map -- the
-admin needs to see who has not been paid, which is the whole point of the
-page, so an inner join would hide exactly the rows that matter.
+Both sheets are "every active person of the school x the last N months". They
+load people and grouped payments separately, streaming both query results;
+payments are folded directly into the response rows instead of materializing
+several intermediate maps. People with no payments in the window still appear,
+with an empty `amounts` map -- the admin needs to see who has not been paid,
+which is the whole point of the page.
 """
 from datetime import date
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.exceptions import AppError, NotFoundError
@@ -120,44 +122,51 @@ def split_total(total: float, months: int) -> list[float]:
 
 
 def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
-    staff = (
+    staff_query = (
         db.query(Staff)
         .filter(Staff.school_id == school_id, Staff.is_active.is_(True))
         .order_by(Staff.name)
-        .all()
+        .yield_per(100)
     )
-    payments = (
-        db.query(StaffSalary)
-        .filter(StaffSalary.school_id == school_id, StaffSalary.month.in_(months))
-        .all()
-    )
-    by_staff: dict[int, dict[str, float]] = {}
-    paid_by_staff: dict[int, dict[str, str | None]] = {}
-    notes_by_staff: dict[int, dict[str, str | None]] = {}
-    for pay in payments:
-        by_staff.setdefault(pay.staff_id, {})[pay.month] = _amount(pay.amount)
-        paid_by_staff.setdefault(pay.staff_id, {})[pay.month] = (
-            pay.paid_on.isoformat() if pay.paid_on else None
-        )
-        notes_by_staff.setdefault(pay.staff_id, {})[pay.month] = pay.note
-
-    rows = [
-        {
-            "staff_id": s.staff_id,
-            "staff_name": s.name,
-            "designation": s.role_title or s.role,
-            "amounts": by_staff.get(s.staff_id, {}),
-            "paid_on": paid_by_staff.get(s.staff_id, {}),
-            "notes": notes_by_staff.get(s.staff_id, {}),
+    rows = []
+    rows_by_staff: dict[int, dict] = {}
+    for staff in staff_query:
+        row = {
+            "staff_id": staff.staff_id,
+            "staff_name": staff.name,
+            "designation": staff.role_title or staff.role,
+            "amounts": {},
+            "paid_on": {},
+            "notes": {},
         }
-        for s in staff
-    ]
+        rows.append(row)
+        rows_by_staff[staff.staff_id] = row
+
+    payments = (
+        db.query(
+            StaffSalary.staff_id,
+            StaffSalary.month,
+            func.sum(StaffSalary.amount).label("amount"),
+            func.max(StaffSalary.paid_on).label("paid_on"),
+            func.max(StaffSalary.note).label("note"),
+        )
+        .filter(StaffSalary.school_id == school_id, StaffSalary.month.in_(months))
+        .group_by(StaffSalary.staff_id, StaffSalary.month)
+        .yield_per(100)
+    )
+    total_paid_paise = 0
+    for staff_id, month, amount, paid_on, note in payments:
+        total_paid_paise += int(amount * 100)
+        row = rows_by_staff.get(staff_id)
+        if row is not None:
+            row["amounts"][month] = _amount(amount)
+            row["paid_on"][month] = paid_on.isoformat() if paid_on else None
+            row["notes"][month] = note
+
     return {
         "months": months,
         "rows": rows,
-        # Sum Decimal amounts from DB to avoid float accumulation error,
-        # then convert to float at the end for JSON serialization.
-        "total_paid": sum(int(p.amount * 100) for p in payments) / 100.0,
+        "total_paid": total_paid_paise / 100.0,
         # A month is outstanding for a person when nothing was recorded for it.
         "total_outstanding_months": sum(
             len(months) - len(r["amounts"]) for r in rows
@@ -166,46 +175,53 @@ def salary_sheet(db: Session, school_id: int, months: list[str]) -> dict:
 
 
 def fee_sheet(db: Session, school_id: int, months: list[str]) -> dict:
-    students = (
+    students_query = (
         db.query(Student, SchoolClass)
         .outerjoin(SchoolClass, SchoolClass.class_id == Student.class_id)
         .filter(Student.school_id == school_id, Student.is_active.is_(True))
         .order_by(Student.name)
-        .all()
+        .yield_per(100)
     )
-    payments = (
-        db.query(StudentFee)
-        .filter(StudentFee.school_id == school_id, StudentFee.month.in_(months))
-        .all()
-    )
-    by_student: dict[int, dict[str, float]] = {}
-    paid_by_student: dict[int, dict[str, str | None]] = {}
-    notes_by_student: dict[int, dict[str, str | None]] = {}
-    for pay in payments:
-        by_student.setdefault(pay.student_id, {})[pay.month] = _amount(pay.amount)
-        paid_by_student.setdefault(pay.student_id, {})[pay.month] = (
-            pay.paid_on.isoformat() if pay.paid_on else None
-        )
-        notes_by_student.setdefault(pay.student_id, {})[pay.month] = pay.note
-
-    rows = [
-        {
-            "student_id": s.student_id,
-            "student_name": s.name,
-            "admission_no": s.admission_no,
+    rows = []
+    rows_by_student: dict[int, dict] = {}
+    for student, klass in students_query:
+        row = {
+            "student_id": student.student_id,
+            "student_name": student.name,
+            "admission_no": student.admission_no,
             "class_name": klass.name if klass else None,
-            "amounts": by_student.get(s.student_id, {}),
-            "paid_on": paid_by_student.get(s.student_id, {}),
-            "notes": notes_by_student.get(s.student_id, {}),
+            "amounts": {},
+            "paid_on": {},
+            "notes": {},
         }
-        for s, klass in students
-    ]
+        rows.append(row)
+        rows_by_student[student.student_id] = row
+
+    payments = (
+        db.query(
+            StudentFee.student_id,
+            StudentFee.month,
+            func.sum(StudentFee.amount).label("amount"),
+            func.max(StudentFee.paid_on).label("paid_on"),
+            func.max(StudentFee.note).label("note"),
+        )
+        .filter(StudentFee.school_id == school_id, StudentFee.month.in_(months))
+        .group_by(StudentFee.student_id, StudentFee.month)
+        .yield_per(100)
+    )
+    total_collected_paise = 0
+    for student_id, month, amount, paid_on, note in payments:
+        total_collected_paise += int(amount * 100)
+        row = rows_by_student.get(student_id)
+        if row is not None:
+            row["amounts"][month] = _amount(amount)
+            row["paid_on"][month] = paid_on.isoformat() if paid_on else None
+            row["notes"][month] = note
+
     return {
         "months": months,
         "rows": rows,
-        # Sum Decimal amounts from DB to avoid float accumulation error,
-        # then convert to float at the end for JSON serialization.
-        "total_collected": sum(int(p.amount * 100) for p in payments) / 100.0,
+        "total_collected": total_collected_paise / 100.0,
         "outstanding_count": sum(
             1 for r in rows if len(r["amounts"]) < len(months)
         ),
@@ -291,6 +307,27 @@ def record_salary(db: Session, school_id: int, data: dict) -> dict:
         "note": row.note,
     }
 
+
+
+def student_fee_history(db: Session, school_id: int, student_id: int) -> list[dict]:
+    """One student's recorded deposits, scoped to the caller's school."""
+    student = _owned_student(db, school_id, student_id)
+    rows = (
+        db.query(StudentFee)
+        .filter(StudentFee.school_id == school_id, StudentFee.student_id == student.student_id)
+        .order_by(StudentFee.month.desc())
+        .all()
+    )
+    return [
+        {
+            "student_id": row.student_id,
+            "month": row.month,
+            "amount": _amount(row.amount),
+            "paid_on": row.paid_on,
+            "note": row.note,
+        }
+        for row in rows
+    ]
 
 def record_fee(db: Session, school_id: int, data: dict) -> dict:
     """Record (or overwrite) one student's fee for one month."""

@@ -18,7 +18,7 @@ router = APIRouter(tags=["academics"])
 def list_classes(
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "staff")),
 ):
     return repo.list_classes(db, school_id)
 

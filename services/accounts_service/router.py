@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.exceptions import ForbiddenError
+from common.models import Parent, ParentStudent, Student
 import repository as repo
 from schemas import (
     FeeCreate, FeeDeposit, FeeDepositEntry, FeeEntry, FeePlan, FeePlans, FeeSheet,
@@ -48,6 +50,33 @@ def fee_sheet(
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     return repo.fee_sheet(db, school_id, repo.month_window(months, end))
+
+
+@router.get("/accounts/fees/student/{student_id}", response_model=list[FeeEntry])
+def student_fee_history(
+    student_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "admin")),
+):
+    """Return deposited fees for one child, after verifying parent ownership."""
+    if current_user.role == "parent":
+        linked = (
+            db.query(ParentStudent.id)
+            .join(Parent, Parent.parent_id == ParentStudent.parent_id)
+            .join(Student, Student.student_id == ParentStudent.student_id)
+            .filter(
+                ParentStudent.parent_id == current_user.linked_person_id,
+                Parent.school_id == school_id,
+                Parent.is_active.is_(True),
+                ParentStudent.student_id == student_id,
+                Student.school_id == school_id,
+            )
+            .first()
+        )
+        if not linked:
+            raise ForbiddenError("You can only view fee history for your own children")
+    return repo.student_fee_history(db, school_id, student_id)
 
 
 @router.post("/accounts/salaries", response_model=SalaryEntry, status_code=201)

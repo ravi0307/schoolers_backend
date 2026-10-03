@@ -116,7 +116,7 @@ def get_pilot(
 def list_routes(
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("parent", "admin", "pilot")),
+    current_user: CurrentUser = Depends(require_role("parent", "admin", "pilot", "staff")),
 ):
     return repo.list_routes(db, school_id)
 

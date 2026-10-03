@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
-from common.exceptions import NotFoundError
+from common.exceptions import ForbiddenError, NotFoundError
 from common.models import (
     Base,
     Broadcast,
@@ -129,6 +129,14 @@ class BroadcastDeliveryTests(unittest.TestCase):
     def test_admin_sees_every_broadcast_in_school(self):
         self.assertEqual(
             self._list("admin"),
+            {"School-wide", "Class 1 note", "Class 75 note", "Route 1 delay", "Route 51 delay", "Pilot notice"},
+        )
+
+    def test_staff_sees_every_broadcast_in_school(self):
+        # Staff run the front desk, so the whole school feed is theirs, the same
+        # slice an admin gets -- not a scoped one.
+        self.assertEqual(
+            self._list("staff"),
             {"School-wide", "Class 1 note", "Class 75 note", "Route 1 delay", "Route 51 delay", "Pilot notice"},
         )
 
@@ -409,6 +417,68 @@ class BroadcastAuthorshipTests(unittest.TestCase):
         self.assertEqual(BroadcastRead.model_validate(row).sender_user_id, 322)
         row.sender_user_id = None
         self.assertIsNone(BroadcastRead.model_validate(row).sender_user_id)
+
+    def _update(self, row, user, message="Edited"):
+        return repo.update_broadcast_message(
+            self.db,
+            school_id=1,
+            broadcast_id=row.broadcast_id,
+            message=message,
+            created_at=None,
+            current_user=user,
+        )
+
+    def test_admin_may_edit_any_broadcast(self):
+        row = self._create(322, "Mine")
+        admin = CurrentUser(user_id=999, role="admin", school_id=1, linked_person_id=None)
+        self.assertEqual(self._update(row, admin).message, "Edited")
+
+    def test_staff_may_edit_their_own_broadcast(self):
+        row = self._create(322, "Mine")
+        staff = CurrentUser(user_id=322, role="staff", school_id=1, linked_person_id=2)
+        self.assertEqual(self._update(row, staff).message, "Edited")
+
+    def test_staff_may_not_edit_a_colleagues_broadcast(self):
+        row = self._create(322, "Mine")
+        colleague = CurrentUser(user_id=323, role="staff", school_id=1, linked_person_id=3)
+        with self.assertRaises(ForbiddenError):
+            self._update(row, colleague)
+
+    def test_staff_may_not_edit_an_unattributed_broadcast(self):
+        # sender_user_id is NULL on rows written before authorship was recorded.
+        # Staff cannot claim them, so they must not be treated as anyone's own.
+        row = repo.create_broadcast(
+            self.db,
+            school_id=1,
+            data={"scope": "school", "role_name": "Staff", "sender_name": "F. Desk",
+                  "message": "Legacy", "created_at": self.CREATED_AT},
+        )
+        staff = CurrentUser(user_id=322, role="staff", school_id=1, linked_person_id=2)
+        with self.assertRaises(ForbiddenError):
+            self._update(row, staff)
+
+
+    def _delete(self, row, user):
+        return repo.delete_broadcast(
+            self.db, school_id=1, broadcast_id=row.broadcast_id, current_user=user
+        )
+
+    def test_admin_may_delete_any_broadcast_in_their_school(self):
+        row = self._create(322, "Mine")
+        admin = CurrentUser(user_id=999, role="admin", school_id=1, linked_person_id=None)
+        self.assertFalse(self._delete(row, admin).is_active)
+
+    def test_staff_may_delete_their_own_broadcast(self):
+        row = self._create(322, "Mine")
+        staff = CurrentUser(user_id=322, role="staff", school_id=1, linked_person_id=2)
+        self.assertFalse(self._delete(row, staff).is_active)
+
+    def test_staff_may_not_delete_a_colleagues_broadcast(self):
+        row = self._create(322, "Mine")
+        colleague = CurrentUser(user_id=323, role="staff", school_id=1, linked_person_id=3)
+        with self.assertRaises(ForbiddenError):
+            self._delete(row, colleague)
+
 
 
 if __name__ == "__main__":
