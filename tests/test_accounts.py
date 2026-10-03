@@ -23,9 +23,31 @@ from common.models import (
 import services.accounts_service.repository as accounts_repo
 
 SERVICE_DIR = Path(__file__).resolve().parents[1] / "services" / "accounts_service"
+
+# Each service uses top-level imports such as `from schemas import ...`.
+# Load this router with its service directory temporarily available, then
+# restore global import state so test discovery cannot leak its schemas into
+# another service's tests.
 import sys
-sys.path.insert(0, str(SERVICE_DIR))
-import router as accounts_router
+_service_path = str(SERVICE_DIR)
+_saved_service_modules = {
+    name: sys.modules.pop(name, None) for name in ("schemas", "repository")
+}
+sys.path.insert(0, _service_path)
+try:
+    _router_spec = importlib.util.spec_from_file_location(
+        "accounts_service_test_router", SERVICE_DIR / "router.py"
+    )
+    accounts_router = importlib.util.module_from_spec(_router_spec)
+    sys.modules[_router_spec.name] = accounts_router
+    _router_spec.loader.exec_module(accounts_router)
+finally:
+    sys.path.remove(_service_path)
+    sys.modules.pop("schemas", None)
+    sys.modules.pop("repository", None)
+    for _name, _module in _saved_service_modules.items():
+        if _module is not None:
+            sys.modules[_name] = _module
 
 TABLES = [
     "schools", "users", "classes", "staff", "students", "parents", "parent_student",
