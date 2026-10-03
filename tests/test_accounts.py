@@ -8,18 +8,49 @@ one school can never record money against another school's people.
 import importlib
 import unittest
 from datetime import date
+from pathlib import Path
 
 from decimal import Decimal
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from common.exceptions import AppError, NotFoundError
-from common.models import Base, School, SchoolClass, Staff, Student, StudentFee, User
+from common.dependencies import CurrentUser
+from common.exceptions import AppError, ForbiddenError, NotFoundError
+from common.models import (
+    Base, Parent, ParentStudent, School, SchoolClass, Staff, Student, StudentFee, User,
+)
 import services.accounts_service.repository as accounts_repo
 
+SERVICE_DIR = Path(__file__).resolve().parents[1] / "services" / "accounts_service"
+
+# Each service uses top-level imports such as `from schemas import ...`.
+# Load this router with its service directory temporarily available, then
+# restore global import state so test discovery cannot leak its schemas into
+# another service's tests.
+import sys
+_service_path = str(SERVICE_DIR)
+_saved_service_modules = {
+    name: sys.modules.pop(name, None) for name in ("schemas", "repository")
+}
+sys.path.insert(0, _service_path)
+try:
+    _router_spec = importlib.util.spec_from_file_location(
+        "accounts_service_test_router", SERVICE_DIR / "router.py"
+    )
+    accounts_router = importlib.util.module_from_spec(_router_spec)
+    sys.modules[_router_spec.name] = accounts_router
+    _router_spec.loader.exec_module(accounts_router)
+finally:
+    sys.path.remove(_service_path)
+    sys.modules.pop("schemas", None)
+    sys.modules.pop("repository", None)
+    for _name, _module in _saved_service_modules.items():
+        if _module is not None:
+            sys.modules[_name] = _module
+
 TABLES = [
-    "schools", "users", "classes", "staff", "students",
+    "schools", "users", "classes", "staff", "students", "parents", "parent_student",
     "staff_salaries", "student_fees",
 ]
 
@@ -83,6 +114,8 @@ class AccountsSheetTests(unittest.TestCase):
                 Student(student_id=100, school_id=1, class_id=1, admission_no="A100", name="Riya"),
                 Student(student_id=101, school_id=1, class_id=1, admission_no="A101", name="Kabir"),
                 Student(student_id=200, school_id=2, class_id=2, admission_no="B200", name="Other School Kid"),
+                Parent(parent_id=7, school_id=1, name="Parent One", phone="000"),
+                ParentStudent(parent_id=7, student_id=100),
             ]
         )
         self.db.commit()
@@ -90,6 +123,29 @@ class AccountsSheetTests(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
+
+    def test_parent_fee_history_is_registered_as_get_route(self):
+        route = next(
+            route for route in accounts_router.router.routes
+            if route.path == "/accounts/fees/student/{student_id}"
+        )
+        self.assertIn("GET", route.methods)
+
+    def test_parent_fee_history_only_returns_a_linked_child_in_its_school(self):
+        self.db.add_all([
+            StudentFee(school_id=1, student_id=100, month="2026-08", amount=Decimal("25.00")),
+            StudentFee(school_id=1, student_id=100, month="2026-09", amount=Decimal("30.00")),
+            StudentFee(school_id=1, student_id=101, month="2026-09", amount=Decimal("99.00")),
+        ])
+        self.db.commit()
+        parent = CurrentUser(user_id=70, role="parent", school_id=1, linked_person_id=7)
+        history = accounts_router.student_fee_history(100, self.db, 1, parent)
+        self.assertEqual([row["month"] for row in history], ["2026-09", "2026-08"])
+        self.assertTrue(all(row["student_id"] == 100 for row in history))
+        with self.assertRaises(ForbiddenError):
+            accounts_router.student_fee_history(101, self.db, 1, parent)
+        with self.assertRaises(ForbiddenError):
+            accounts_router.student_fee_history(200, self.db, 1, parent)
 
     # ---- salaries ----
 

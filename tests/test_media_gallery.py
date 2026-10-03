@@ -460,19 +460,19 @@ class MediaRouterContractTests(unittest.TestCase):
 
     def test_role_guards_are_pinned_per_endpoint(self):
         upload_roles, upload_scope = self._dep_roles(self._route_by("post", ""))
-        self.assertEqual(upload_roles, {("teacher", "admin")})
+        self.assertEqual(upload_roles, {("teacher", "admin", "staff")})
         self.assertTrue(upload_scope)
 
         list_roles, list_scope = self._dep_roles(self._route_by("get", ""))
-        self.assertEqual(list_roles, {("parent", "teacher", "admin")})
+        self.assertEqual(list_roles, {("parent", "teacher", "admin", "staff")})
         self.assertTrue(list_scope)
 
         delete_roles, delete_scope = self._dep_roles(self._route_by("delete", "/{media_id}"))
-        self.assertEqual(delete_roles, {("teacher", "admin")})
+        self.assertEqual(delete_roles, {("teacher", "admin", "staff")})
         self.assertTrue(delete_scope)
 
         update_roles, update_scope = self._dep_roles(self._route_by("patch", "/{media_id}"))
-        self.assertEqual(update_roles, {("teacher", "admin")})
+        self.assertEqual(update_roles, {("teacher", "admin", "staff")})
         self.assertTrue(update_scope)
 
     def test_parent_is_excluded_from_writes(self):

@@ -212,6 +212,9 @@ class BroadcastAuthorizationTests(unittest.TestCase):
         self.assertEqual(self.POLICY["teacher"], {"school", "class"})
         self.assertEqual(self.POLICY["pilot"], {"school", "route"})
         self.assertEqual(self.POLICY["admin"], {"school", "class", "route", "pilot"})
+        # Staff run the front desk and transport desk, so they address every
+        # audience an admin can -- but only admins and staff get the full set.
+        self.assertEqual(self.POLICY["staff"], {"school", "class", "route", "pilot"})
         self.assertNotIn("pilot", self.POLICY["teacher"])
         self.assertNotIn("class", self.POLICY["pilot"])
         self.assertNotIn("route", self.POLICY["teacher"])
@@ -248,6 +251,7 @@ class BroadcastSenderIdentityTests(unittest.TestCase):
             Staff(staff_id=3, school_id=1, name="T. Eacher", role="Teacher",
                    person_type="teacher", phone="1"),
             Staff(staff_id=7, school_id=1, name="P. One", role="Pilot", person_type="pilot", phone="1"),
+            Staff(staff_id=8, school_id=1, name="F. Desk", role="Staff", person_type="staff", phone="1"),
             Pilot(pilot_id=1, staff_id=7),
         ])
         self.db.commit()
@@ -268,6 +272,15 @@ class BroadcastSenderIdentityTests(unittest.TestCase):
     def test_pilot_identity_is_derived(self):
         user = CurrentUser(user_id=7, role="pilot", school_id=1, linked_person_id=7)
         self.assertEqual(comm_repo.resolve_sender_identity(self.db, user), ("Pilot", "P. One"))
+
+    def test_staff_identity_is_derived(self):
+        user = CurrentUser(user_id=8, role="staff", school_id=1, linked_person_id=8)
+        self.assertEqual(comm_repo.resolve_sender_identity(self.db, user), ("Staff", "F. Desk"))
+
+    def test_unlinked_staff_is_rejected(self):
+        user = CurrentUser(user_id=8, role="staff", school_id=1, linked_person_id=None)
+        with self.assertRaises(ForbiddenError):
+            comm_repo.resolve_sender_identity(self.db, user)
 
     def test_admin_identity_uses_staff_record_or_falls_back(self):
         linked = CurrentUser(user_id=9, role="admin", school_id=1, linked_person_id=5)

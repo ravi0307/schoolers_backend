@@ -11,10 +11,14 @@ from common.models import Media, Staff
 def resolve_poster_name(db: Session, current_user: CurrentUser) -> str:
     """Derive the gallery poster's display name from the authenticated user
     rather than trusting client-supplied values."""
-    if current_user.role == "teacher":
+    # Teachers and staff post under their own name, so an account that isn't
+    # linked to a live staff row must not be allowed to upload.
+    if current_user.role in ("teacher", "staff"):
         if not current_user.linked_person_id:
-            raise ForbiddenError("This teacher account isn't linked to a staff record")
-        teacher = (
+            raise ForbiddenError(
+                f"This {current_user.role} account isn't linked to a staff record"
+            )
+        person = (
             db.query(Staff)
             .filter(
                 Staff.staff_id == current_user.linked_person_id,
@@ -22,9 +26,9 @@ def resolve_poster_name(db: Session, current_user: CurrentUser) -> str:
             )
             .first()
         )
-        if not teacher:
-            raise ForbiddenError("Teacher record not found")
-        return teacher.name
+        if not person:
+            raise ForbiddenError("Staff record not found")
+        return person.name
 
     if current_user.linked_person_id:
         staff = (

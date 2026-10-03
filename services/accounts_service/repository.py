@@ -308,6 +308,27 @@ def record_salary(db: Session, school_id: int, data: dict) -> dict:
     }
 
 
+
+def student_fee_history(db: Session, school_id: int, student_id: int) -> list[dict]:
+    """One student's recorded deposits, scoped to the caller's school."""
+    student = _owned_student(db, school_id, student_id)
+    rows = (
+        db.query(StudentFee)
+        .filter(StudentFee.school_id == school_id, StudentFee.student_id == student.student_id)
+        .order_by(StudentFee.month.desc())
+        .all()
+    )
+    return [
+        {
+            "student_id": row.student_id,
+            "month": row.month,
+            "amount": _amount(row.amount),
+            "paid_on": row.paid_on,
+            "note": row.note,
+        }
+        for row in rows
+    ]
+
 def record_fee(db: Session, school_id: int, data: dict) -> dict:
     """Record (or overwrite) one student's fee for one month."""
     student = _owned_student(db, school_id, data["student_id"])

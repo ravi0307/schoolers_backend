@@ -22,9 +22,23 @@ _GENERIC_INVALID_RESET_MESSAGE = "Invalid or expired reset token."
 
 
 def authenticate(db: Session, username: str, password: str) -> User:
-    user = db.query(User).filter(User.username == username, User.is_active.is_(True)).first()
+    # Use password recovery's normalized username/email lookup. Staff can sign in
+    # with the email address maintained on their linked staff row.
+    user = find_user_by_identifier(db, username)
     if not user or not verify_password(password, user.password_hash):
         raise UnauthorizedError("Invalid username or password")
+    if user.role in ("teacher", "staff", "pilot"):
+        person = (
+            db.query(Staff)
+            .filter(
+                Staff.staff_id == user.linked_person_id,
+                Staff.school_id == user.school_id,
+                Staff.is_active.is_(True),
+            )
+            .first()
+        )
+        if not person:
+            raise UnauthorizedError("Invalid username or password")
     user.last_login = datetime.now(timezone.utc)
     db.commit()
     return user

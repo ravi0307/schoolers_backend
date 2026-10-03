@@ -16,6 +16,9 @@ __pycache__/
 services/*/uploads/
 uploads/
 
+# Database backups (never commit dumps)
+backups/
+
 # OS/editor files
 .DS_Store
 .idea/
