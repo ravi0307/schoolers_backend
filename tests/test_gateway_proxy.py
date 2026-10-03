@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gateway.main import (  # noqa: E402
+from gateway.proxy_headers import (  # noqa: E402
     HOP_BY_HOP_HEADERS,
     RESPONSE_STRIP_HEADERS,
     forward_headers_from,
