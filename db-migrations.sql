@@ -731,3 +731,55 @@ CREATE INDEX IF NOT EXISTS staff_salaries_school_month_idx
     ON schoolers.staff_salaries (school_id, month);
 CREATE INDEX IF NOT EXISTS student_fees_school_month_idx
     ON schoolers.student_fees (school_id, month);
+
+-- ============================================================================
+-- SUPPORT: admin-raised tickets to the master admin, with a message thread
+-- ============================================================================
+-- A school admin raises an issue about the portal and the master admin works
+-- it. The ticket is the listable summary (school, subject, status); the
+-- conversation lives on support_ticket_messages so a ticket carries its whole
+-- trail without the list query dragging every body along.
+--
+-- created_by_name / author_name are denormalised for the same reason
+-- leave_requests.requester_name is: the display name lives on the linked staff
+-- row and is resolved server-side, and a ticket should stay readable even if
+-- that account is later removed. attachments is a JSON list of URLs minted by
+-- the existing upload endpoints -- support stores references, never files.
+
+CREATE TABLE IF NOT EXISTS schoolers.support_tickets (
+    ticket_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    created_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    created_by_name VARCHAR(100) NOT NULL,
+    subject VARCHAR(200) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Open',
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT support_tickets_status_check
+        CHECK (status IN ('Open','In progress','Assigned','Completed','Cancelled'))
+);
+
+CREATE TABLE IF NOT EXISTS schoolers.support_ticket_messages (
+    message_id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES schoolers.support_tickets(ticket_id) ON DELETE CASCADE,
+    author_user_id INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    author_role VARCHAR(20) NOT NULL,
+    author_name VARCHAR(100) NOT NULL,
+    body TEXT NOT NULL,
+    attachments JSON NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT support_ticket_messages_role_check
+        CHECK (author_role IN ('admin','master'))
+);
+
+-- The admin queue filters school + status and orders newest-first; the master
+-- inbox filters status alone across every school. One index per read path.
+CREATE INDEX IF NOT EXISTS support_tickets_school_status_idx
+    ON schoolers.support_tickets (school_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS support_tickets_status_idx
+    ON schoolers.support_tickets (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS support_ticket_messages_ticket_idx
+    ON schoolers.support_ticket_messages (ticket_id, created_at);

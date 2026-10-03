@@ -21,6 +21,7 @@ EXPECTED_SERVICES = {
     "people_service",
     "reports_service",
     "schools_service",
+    "support_service",
     "timetable_service",
     "transport_service",
     "website_service",
@@ -174,6 +175,7 @@ class BackendContractTests(unittest.TestCase):
             "media",
             "website",
             "public",
+            "support",
         }
         self.assertTrue(expected_keys.issubset(route_map))
 
@@ -403,6 +405,8 @@ class BackendContractTests(unittest.TestCase):
             "broadcasts_set_created_at_ist",
             "period_time TYPE VARCHAR(31)",
             "updated_by_user",
+            "support_tickets",
+            "support_ticket_messages",
         )
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
@@ -413,6 +417,35 @@ class BackendContractTests(unittest.TestCase):
         schema = (ROOT / "services" / "media_service" / "schemas.py").read_text(encoding="utf-8")
         self.assertIn("created_at", schema)
         self.assertIn("MediaRead", schema)
+
+    def test_support_ticket_contract(self):
+        """Admin-raised support tickets: master-only status, school-scoped reads."""
+        enums = (ROOT / "common" / "enums.py").read_text(encoding="utf-8")
+        models = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
+        router = (
+            ROOT / "services" / "support_service" / "router.py"
+        ).read_text(encoding="utf-8")
+        gateway = (ROOT / "gateway" / "main.py").read_text(encoding="utf-8")
+        config = (ROOT / "common" / "config.py").read_text(encoding="utf-8")
+
+        # The five states the master can move a ticket through.
+        self.assertIn("class TicketStatus", enums)
+        for status in ("Open", "In progress", "Assigned", "Completed", "Cancelled"):
+            self.assertIn(f'"{status}"', enums)
+
+        for table in ("support_tickets", "support_ticket_messages"):
+            self.assertIn(f'"{table}"', models)
+
+        # Raising a ticket is an admin action; moving its status is the master's.
+        self.assertIn('prefix="/support"', router)
+        self.assertIn('require_role("admin")', router)
+        self.assertIn('require_role("master")', router)
+        self.assertIn('"/tickets/{ticket_id}/status"', router)
+        self.assertIn('"/tickets/{ticket_id}/messages"', router)
+
+        # The gateway must route /support traffic to the new service.
+        self.assertIn('"support": "support"', gateway)
+        self.assertIn('"support": "http://127.0.0.1:8018"', config)
 
     def test_database_init_and_migration_files_are_present(self):
         for filename in ("db-init-schema.sql", "db-migrations.sql"):

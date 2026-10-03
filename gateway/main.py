@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from common.config import settings
+from gateway.proxy_headers import forward_headers_from, response_headers_from
 
 app = FastAPI(title="Schoolers API Gateway", debug=settings.DEBUG)
 
@@ -54,17 +55,12 @@ ROUTE_MAP = {
     "notifications": "notifications",
     "reports": "reports",
     "accounts": "accounts",
+    "support": "support",
 }
 
 # Service-to-service calls must use the Compose network directly, not host
 # proxy settings inherited by the container.
 client = httpx.AsyncClient(timeout=30.0, trust_env=False)
-
-HOP_BY_HOP_HEADERS = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-    "te", "trailers", "transfer-encoding", "upgrade", "content-length", "host",
-}
-
 
 @app.get("/health")
 async def health():
@@ -102,9 +98,7 @@ async def proxy(full_path: str, request: Request):
     target_url = f"{target_base}/api/v1/{upstream_path}"
 
     body = await request.body()
-    forward_headers = {
-        k: v for k, v in request.headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
-    }
+    forward_headers = forward_headers_from(request.headers)
 
     try:
         upstream = await client.request(
@@ -121,9 +115,7 @@ async def proxy(full_path: str, request: Request):
             media_type="application/json",
         )
 
-    response_headers = {
-        k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
-    }
+    response_headers = response_headers_from(upstream.headers)
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
