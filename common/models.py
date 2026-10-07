@@ -313,6 +313,143 @@ class RouteStudent(AuditColumnsMixin, Base):
 
 
 # ============================================================================
+# 4b. TRANSPORT / ROUTES - HISTORICAL TRIP DATA
+# ============================================================================
+
+class Trip(AuditColumnsMixin, Base):
+    """A single route run on a specific calendar date - an immutable historical
+    record of one trip instance.
+
+    A trip is created once for (route, trip_date, direction) and then never
+    updated. All configuration fields are snapshots taken at creation time so
+    that a later route/pilot/vehicle change cannot rewrite history: changing a
+    route's current vehicle must not make an old trip appear to have used the
+    new vehicle.
+
+    Immutable snapshots captured at creation:
+      - vehicle:       Route.vehicle as a plain string (that is the value the
+                       parent pick/drop payloads display; the separate
+                       `vehicles` catalog is unrelated and references no route).
+      - pilot_id:      the pilots.pilot_id of the driver assigned to the route
+                       at creation (NULL if the route had no driver), used for
+                       "who drove this date" filtering.
+      - driver_name:   the driver's Staff.name at creation, snapshot separately
+                       so renaming/deactivating/deleting a staff member cannot
+                       rewrite who drove. Deleting a staff row also cascades to
+                       its pilots row, which would NULL pilot_id; the name
+                       survives for display.
+
+    The trip lifecycle mirrors a real-day run:
+        scheduled  -> in_progress  -> completed
+                       |                ^
+                       v                |
+                     cancelled -+--------+  (reopened, goes back to in_progress)
+
+    A cancelled run is reopened on the SAME row rather than creating a second
+    trip, which is why the (route, trip_date, direction) uniqueness holds even
+    across cancellations. The `status` on a trip is deliberately independent of
+    RouteStudent.status: a trip can be completed while a student's route row
+    still shows 'pending' until the pilot catches up.
+
+    direction is 'pickup' (the boarding run of the day by convention) or 'drop'
+    (the returning run). This mirrors the transport domain's own vocabulary
+    (RouteStop.stop_type pickup/drop, pickup_time/drop_time) - there is no
+    morning/evening concept in the application.
+    """
+
+    __tablename__ = "trips"
+
+    trip_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    route_id = Column(Integer, ForeignKey("routes.route_id", ondelete="CASCADE"), nullable=False)
+    trip_date = Column(Date, nullable=False)
+    direction = Column(String(10), nullable=False, default="pickup")  # 'pickup' | 'drop'
+    pilot_id = Column(Integer, ForeignKey("pilots.pilot_id", ondelete="SET NULL"))
+    driver_name = Column(String(100))  # snapshot of the driver's staff name at creation
+    vehicle = Column(String(60), nullable=False)  # snapshot of Route.vehicle at creation
+    status = Column(String(15), nullable=False, default="scheduled")
+    started_at = Column(DateTime)
+    ended_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
+    cancelled_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    cancellation_reason = Column(String(255))
+    reopened_at = Column(DateTime)
+    reopened_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    reopen_reason = Column(String(255))
+    created_at = Column(DateTime, server_default=func.now())
+
+    students = relationship(
+        "TripStudent",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+        order_by="TripStudent.created_at",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("route_id", "trip_date", "direction"),
+        CheckConstraint("direction IN ('pickup','drop')", name="trips_direction_check"),
+        CheckConstraint(
+            "status IN ('scheduled','in_progress','completed','cancelled')",
+            name="trips_status_check",
+        ),
+    )
+
+
+class TripStudent(AuditColumnsMixin, Base):
+    """One participation row per student on a trip.
+
+    Records the boarding and drop outcomes for that specific child on that
+    specific trip, together with the actual times. The two legs are tracked
+    independently: a child may be picked (boarding_status 'picked') and later
+    have no drop recorded (drop_status 'drop_not_recorded'), or never be picked
+    at all ('did_not_board'). This is why `drop_at` is nullable even when
+    `boarding_at` was recorded: history must be able to say "child was picked
+    up but the driver never recorded a drop".
+
+    The historical outcome is what matters here - it must not move merely
+    because RouteStudent.status is overwritten the next day. If a pilot updates
+    a student's live route status on a later date, the trip_student rows from
+    prior trips remain exactly as they were recorded.
+
+    boarding_stop_id / drop_stop_id are optional and are recorded ONLY when the
+    pilot explicitly selects a stop: RouteStudent has no stop assignment, so
+    nothing sane can be derived and no fabrication is attempted.
+
+    boarding_status values use the live model's own word for a boarding:
+    'picked' (RouteStudent.status pending/picked/dropped), plus the new
+    negative outcome 'did_not_board'. drop_status uses 'dropped' plus
+    'drop_not_recorded'.
+    """
+
+    __tablename__ = "trip_students"
+
+    trip_student_id = Column(Integer, primary_key=True)
+    trip_id = Column(Integer, ForeignKey("trips.trip_id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    boarding_status = Column(String(10), nullable=False, default="pending")  # pending | picked | did_not_board
+    boarding_at = Column(DateTime)
+    boarding_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"))
+    drop_status = Column(String(10), nullable=False, default="pending")  # pending | dropped | drop_not_recorded
+    drop_at = Column(DateTime)
+    drop_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"))
+    created_at = Column(DateTime, server_default=func.now())
+
+    trip = relationship("Trip", back_populates="students")
+
+    __table_args__ = (
+        UniqueConstraint("trip_id", "student_id"),
+        CheckConstraint(
+            "boarding_status IN ('pending','picked','did_not_board')",
+            name="trip_students_boarding_status_check",
+        ),
+        CheckConstraint(
+            "drop_status IN ('pending','dropped','drop_not_recorded')",
+            name="trip_students_drop_status_check",
+        ),
+    )
+
+
+# ============================================================================
 # 5. TIMETABLE
 # ============================================================================
 
