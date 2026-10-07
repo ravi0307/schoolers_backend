@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from common.config import settings
 from common.exception_handlers import register_exception_handlers
 
-from router import router
+from router import router, trips_router
 
 app = FastAPI(title="Schoolers Transport Service", debug=settings.DEBUG)
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -32,3 +32,4 @@ def health():
 
 API_PREFIX = "/api/v1"
 app.include_router(router, prefix=API_PREFIX)
+app.include_router(trips_router, prefix=API_PREFIX)

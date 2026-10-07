@@ -43,6 +43,7 @@ ROUTE_MAP = {
     "marks": "marks",
     "timetable": "timetable",
     "routes": "transport",
+    "trips": "transport",
     "vehicles": "transport",
     "pilots": "transport",
     "leave": "leave",
