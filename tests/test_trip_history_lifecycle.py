@@ -30,7 +30,8 @@ Design rules under test:
 import ast
 import sys
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta
+from itertools import product
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
@@ -652,3 +653,158 @@ class TripLifecycleTests(unittest.TestCase):
         trip = self._create(route_id=2, by=self.pilot2)
         self.assertEqual(trip["pilot_id"], 2)
         self.assertEqual(trip["driver_name"], "Suresh")
+
+    # --- Phase 4 hardening: forged client inputs ---------------------------
+
+    def test_client_cannot_forge_actor_identity(self):
+        from services.transport_service.schemas import TripCancel
+
+        forged = TripCancel(cancellation_reason="Rain", cancelled_by=999, reopened_by=888)
+        dumped = forged.model_dump()
+        self.assertNotIn("cancelled_by", dumped, "actor identity must come from the token")
+        self.assertNotIn("reopened_by", dumped, "actor identity must come from the token")
+
+        trip = self._started_trip()
+        self.router.cancel_trip(
+            trip_id=trip["trip_id"], payload=forged,
+            db=self.db, school_id=1, current_user=self.admin1,
+        )
+        stored = self._db_trip(trip["trip_id"])
+        self.assertEqual(stored.cancelled_by, 1)  # the authenticated admin, not 999
+
+    def test_client_cannot_forge_timestamps_on_create(self):
+        from services.transport_service.schemas import TripCreate
+
+        forged = TripCreate(
+            route_id=1, trip_date=date(2026, 9, 1),
+            started_at=datetime(2000, 1, 1, 0, 0), boarding_at=datetime(2000, 1, 1, 0, 0),
+        )
+        dumped = forged.model_dump()
+        self.assertNotIn("started_at", dumped)
+        self.assertNotIn("boarding_at", dumped)
+        detail = self.router.create_trip(
+            payload=forged, db=self.db, school_id=1, current_user=self.admin1,
+        )
+        self.assertIsNone(self._db_trip(detail["trip_id"]).started_at,
+                          "a client cannot stamp a 'started' time onto a brand-new trip")
+
+    def test_client_cannot_forge_timestamps_on_outcome(self):
+        from services.transport_service.schemas import TripStudentUpdate
+
+        forged = TripStudentUpdate(
+            boarding_status="picked",
+            boarding_at=datetime(2000, 1, 1, 0, 0), drop_at=datetime(2000, 1, 1, 0, 0),
+        )
+        dumped = forged.model_dump()
+        self.assertNotIn("boarding_at", dumped, "timestamps are recorded server-side")
+        self.assertNotIn("drop_at", dumped)
+        trip = self._started_trip()
+        row = self.router.update_trip_student(
+            trip_id=trip["trip_id"], student_id=101, payload=forged,
+            db=self.db, school_id=1, current_user=self.admin1,
+        )
+        self.assertGreater(row["boarding_at"], datetime(2024, 1, 1),
+                           "boarding_at must be the server's recording time, not a forged value")
+        self.assertIsNone(row["drop_at"], "untouched leg must stay un-stamped")
+
+    # --- Phase 4/6 hardening: the full lifecycle matrix --------------------
+
+    def test_full_lifecycle_matrix_is_exactly_the_documented_set(self):
+        import repository
+
+        allowed = {
+            ("scheduled", "in_progress"),
+            ("in_progress", "completed"),
+            ("scheduled", "cancelled"),
+            ("in_progress", "cancelled"),
+            ("cancelled", "in_progress"),
+        }
+        statuses = ["scheduled", "in_progress", "cancelled", "completed"]
+        day = iter(range(1, 999))
+        for previous, target in product(statuses, repeat=2):
+            trip = Trip(
+                school_id=1, route_id=1,
+                trip_date=date(2026, 1, 1) + timedelta(days=next(day)),
+                direction="pickup", status=previous,
+                pilot_id=1, driver_name="Ramesh", vehicle="KA-01-AB-1234",
+            )
+            self.db.add(trip)
+            self.db.commit()
+            if (previous, target) in allowed:
+                result = repository.apply_transition(self.db, trip, target, actor=1)
+                self.assertEqual(result.status, target, f"{previous} -> {target} must succeed")
+            else:
+                if previous == target:
+                    continue  # self-transitions are never in the matrix
+                with self.assertRaises(AppError, msg=f"{previous} -> {target} must be rejected"):
+                    repository.apply_transition(self.db, trip, target, actor=1)
+
+    # --- Phase 5 hardening: historical integrity, remaining edges ---------
+
+    def test_staff_name_change_does_not_rewrite_trip_snapshot(self):
+        trip = self._create(route_id=1)
+        self.assertEqual(trip["driver_name"], "Ramesh")
+        self.db.query(Staff).filter(Staff.staff_id == 1).one().name = "Renamed Driver"
+        self.db.commit()
+        route = self.db.query(Route).filter(Route.route_id == 1).one()
+        self.assertEqual(route.driver_name, "Renamed Driver", "the live route reflects the rename")
+        detail = self.router.get_trip_detail(
+            db=self.db, school_id=1, trip_id=trip["trip_id"], current_user=self.admin1,
+        )
+        self.assertEqual(detail["driver_name"], "Ramesh", "the trip keeps its historical driver")
+
+    def test_pilot_deactivation_revokes_ownership_but_keeps_history(self):
+        trip = self._started_trip(route_id=1)
+        self.db.query(Staff).filter(Staff.staff_id == 1).update({"is_active": False})
+        self.db.query(Pilot).filter(Pilot.pilot_id == 1).update({"is_active": False})
+        self.db.commit()
+        with self.assertRaises(ForbiddenError):
+            self._complete(trip["trip_id"], by=self.pilot1)
+        with self.assertRaises(ForbiddenError):
+            self._cancel(trip["trip_id"], by=self.pilot1)
+        detail = self.router.get_trip_detail(
+            db=self.db, school_id=1, trip_id=trip["trip_id"], current_user=self.admin1,
+        )
+        self.assertEqual(detail["pilot_id"], 1, "the historical driver is unchanged")
+        self.assertEqual(detail["driver_name"], "Ramesh")
+
+    def test_routestudent_status_change_does_not_alter_trip_snapshot(self):
+        from services.transport_service.schemas import RouteStudentStatusUpdate
+
+        trip = self._started_trip(route_id=1)
+        self.router.update_pickup_drop_status(
+            route_id=1, student_id=101,
+            payload=RouteStudentStatusUpdate(status="picked"),
+            db=self.db, current_user=self.pilot1,
+        )
+        live = self.db.query(RouteStudent).filter(
+            RouteStudent.route_id == 1, RouteStudent.student_id == 101
+        ).one()
+        self.assertEqual(live.status, "picked", "the live route row is updated")
+        historical = self.db.query(TripStudent).filter(
+            TripStudent.trip_id == trip["trip_id"], TripStudent.student_id == 101
+        ).one()
+        self.assertEqual(historical.boarding_status, "pending",
+                         "the historical snapshot is immune to the live status change")
+
+    def test_multiple_dates_remain_separate_historical_records(self):
+        first = self._create(trip_date=date(2026, 9, 1))
+        second = self._create(trip_date=date(2026, 9, 2))
+        self.assertNotEqual(first["trip_id"], second["trip_id"])
+        ids = [r["trip_id"] for r in self.router.list_trips(
+            db=self.db, school_id=1, current_user=self.admin1,
+        )]
+        self.assertIn(first["trip_id"], ids)
+        self.assertIn(second["trip_id"], ids)
+        dates = {row[0] for row in
+                 self.db.query(Trip.trip_date).filter(
+                     Trip.trip_id.in_([first["trip_id"], second["trip_id"]])
+                 ).all()}
+        self.assertEqual(dates, {date(2026, 9, 1), date(2026, 9, 2)})
+
+    def test_pickup_and_drop_same_day_are_distinct_trips(self):
+        pickup = self._create(direction="pickup")
+        drop = self._create(direction="drop")
+        self.assertNotEqual(pickup["trip_id"], drop["trip_id"])
+        self.assertEqual(self._db_trip(pickup["trip_id"]).direction, "pickup")
+        self.assertEqual(self._db_trip(drop["trip_id"]).direction, "drop")

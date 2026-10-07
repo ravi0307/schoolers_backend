@@ -542,11 +542,13 @@ class TripHistoryApiTests(unittest.TestCase):
                     "{} must guard current_user with {}".format(node.name, guard),
                 )
 
-    def test_mine_is_registered_before_wildcard_detail(self):
+    def test_mine_and_children_are_registered_before_wildcard_detail(self):
         paths = self._trips_router_decorator_paths(ROUTER_SOURCE.read_text())
-        self.assertIn("/mine", paths)
+        for literal in ("/mine", "/children/{student_id}"):
+            self.assertIn(literal, paths)
         self.assertIn("/{trip_id}", paths)
         self.assertLess(paths.index("/mine"), paths.index("/{trip_id}"))
+        self.assertLess(paths.index("/children/{student_id}"), paths.index("/{trip_id}"))
 
     def test_gateway_routes_trips_to_transport(self):
         import gateway.main as gateway_main
