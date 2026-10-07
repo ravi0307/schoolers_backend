@@ -289,6 +289,33 @@ class ParentTripRead(TripSummaryRead):
     drop_stop_name: str | None = None
 
 
+class PilotStudentRead(BaseModel):
+    """One student's historical TripStudent snapshot on a pilot's own trip."""
+
+    student_id: int
+    student_name: str
+    boarding_status: str  # 'pending' | 'picked' | 'did_not_board'
+    boarding_at: datetime | None = None
+    boarding_stop_id: int | None = None
+    boarding_stop_name: str | None = None
+    drop_status: str  # 'pending' | 'dropped' | 'drop_not_recorded'
+    drop_at: datetime | None = None
+    drop_stop_id: int | None = None
+    drop_stop_name: str | None = None
+
+
+class PilotTripDetailRead(TripSummaryRead):
+    """Detail of ONE of the pilot's own trips plus its historical TripStudent
+    roster. Adds the trip's cancellation/reopen context a pilot needs but keeps
+    Admin-only audit fields (cancelled_by/reopened_by) and the server-computed
+    outcome_summary out of the pilot response."""
+
+    cancellation_reason: str | None = None
+    reopened_at: datetime | None = None
+    reopen_reason: str | None = None
+    students: list[PilotStudentRead] = Field(default_factory=list)
+
+
 class TripCreate(BaseModel):
     """Create the day's trip for a route.
 

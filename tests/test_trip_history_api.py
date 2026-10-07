@@ -5,6 +5,7 @@ Covers the read-only history endpoints in transport_service:
   GET  /api/v1/trips                        admin history list + filters
   GET  /api/v1/trips/{trip_id}              admin trip detail (404 cross-school)
   GET  /api/v1/trips/mine                   pilot history (identity from JWT only)
+  GET  /api/v1/trips/mine/{trip_id}         pilot detail of one OWN trip + roster
   GET  /api/v1/trips/children/{student_id}  parent history for one owned child
 
 Runs against in-memory SQLite with foreign-key enforcement on (same harness as
@@ -29,6 +30,7 @@ from common.models import (
     Pilot,
     Route,
     RouteStop,
+    RouteStudent,
     School,
     SchoolClass,
     Staff,
@@ -395,6 +397,129 @@ class TripHistoryApiTests(unittest.TestCase):
         rows = self.router.my_trips(db=self.db, school_id=2, current_user=user)
         self.assertEqual([r["trip_id"] for r in rows], [7])
 
+    # --- Pilot /trips/mine/{trip_id} ---------------------------------------
+
+    def test_pilot_reads_own_trip_detail(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=5, current_user=self._pilot_staff(2),
+        )
+        self.assertEqual(detail["status"], "completed")
+        self.assertEqual(detail["trip_date"], date(2026, 9, 4))
+        self.assertEqual(detail["route_name"], "Route B")
+        self.assertEqual(detail["direction"], "pickup")
+        self.assertEqual(detail["driver_name"], "Suresh")
+        self.assertEqual(detail["vehicle"], "KA-01-CD-5678")
+
+    def test_pilot_trip_detail_includes_roster_and_names(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1),
+        )
+        self.assertEqual([s["student_name"] for s in detail["students"]], ["Aarav Rao", "Anika Rao"])
+        self.assertEqual(detail["students"][0]["student_id"], 101)
+        self.assertEqual(detail["students"][1]["student_id"], 102)
+
+    def test_pilot_trip_detail_has_historical_boarding_outcomes(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1),
+        )
+        aarav, anika = detail["students"]
+        self.assertEqual(aarav["boarding_status"], "picked")
+        self.assertEqual(aarav["boarding_at"], datetime(2026, 9, 1, 7, 40))
+        self.assertEqual(aarav["boarding_stop_id"], 1)
+        self.assertEqual(aarav["boarding_stop_name"], "Koramangala")
+        self.assertEqual(anika["boarding_status"], "did_not_board")
+        self.assertIsNone(anika["boarding_at"])
+
+    def test_pilot_trip_detail_has_historical_drop_outcomes(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1),
+        )
+        aarav, anika = detail["students"]
+        self.assertEqual(aarav["drop_status"], "dropped")
+        self.assertEqual(aarav["drop_at"], datetime(2026, 9, 1, 8, 35))
+        self.assertEqual(aarav["drop_stop_name"], "Indiranagar")
+        self.assertEqual(anika["drop_status"], "pending")
+        self.assertIsNone(anika["drop_at"])
+
+    def test_pilot_trip_detail_validates_against_response_schema(self):
+        from services.transport_service.schemas import PilotTripDetailRead
+
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1),
+        )
+        model = PilotTripDetailRead(**detail)
+        self.assertEqual(len(model.students), 2)
+        self.assertEqual(model.students[0].boarding_status, "picked")
+
+    def test_pilot_cannot_read_another_pilots_trip(self):
+        with self.assertRaises(ForbiddenError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=5, current_user=self._pilot_staff(1))
+        with self.assertRaises(ForbiddenError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(2))
+
+    def test_pilot_cannot_read_cross_school_trip(self):
+        with self.assertRaises(NotFoundError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=7, current_user=self._pilot_staff(1))
+        with self.assertRaises(NotFoundError):
+            self.router.my_trip_detail(db=self.db, school_id=2, trip_id=1, current_user=self._pilot3_school2())
+
+    def test_pilot_trip_detail_has_no_identity_query_params(self):
+        source = ROUTER_SOURCE.read_text()
+        signature = source.split("def my_trip_detail(", 1)[1].split("):", 1)[0]
+        for param in ("pilot_id", "route_id"):
+            self.assertNotIn(param, signature,
+                             "ownership must be resolved from the JWT only, never the query string")
+
+    def test_pilot_unknown_trip_is_not_found(self):
+        with self.assertRaises(NotFoundError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=999, current_user=self._pilot_staff(1))
+
+    def test_pilot_reassignment_revokes_old_trip_read(self):
+        self.db.query(Staff).filter(Staff.staff_id == 1).update({"is_active": False})
+        self.db.query(Pilot).filter(Pilot.pilot_id == 1).update({"is_active": False})
+        self.db.commit()
+        with self.assertRaises(ForbiddenError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1))
+
+    def test_pilot_trip_detail_uses_tripstudent_not_routestudent(self):
+        self.db.add(RouteStudent(route_id=1, student_id=101, status="dropped"))
+        self.db.commit()
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._pilot_staff(1),
+        )
+        self.assertEqual(detail["students"][0]["boarding_status"], "picked",
+                         "the historical TripStudent record must remain authoritative "
+                         "even when the live RouteStudent.status says 'dropped'")
+
+    def test_empty_roster_trip_returns_empty_students(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=8, current_user=self._pilot_staff(1),
+        )
+        self.assertEqual(detail["status"], "scheduled")
+        self.assertEqual(detail["students"], [])
+
+    def test_pilot_trip_detail_has_cancel_context_not_admin_audit(self):
+        detail = self.router.my_trip_detail(
+            db=self.db, school_id=1, trip_id=4, current_user=self._pilot_staff(1),
+        )
+        self.assertEqual(detail["status"], "cancelled")
+        self.assertEqual(detail["cancellation_reason"], "Rain")
+        self.assertNotIn("cancelled_by", detail, "admin audit actor must stay out of the pilot response")
+        self.assertNotIn("outcome_summary", detail, "the admin badge string is not a pilot field")
+
+    def test_admin_detail_contract_unchanged(self):
+        detail = self.router.get_trip_detail(
+            db=self.db, school_id=1, trip_id=1, current_user=self._admin1(),
+        )
+        self.assertIn("outcome_summary", detail)
+        self.assertIn("cancelled_by", detail)
+        self.assertNotIn("boarding_stop_name", detail["students"][0],
+                         "admin detail must not have been swapped for the pilot schema")
+
+    def test_parent_cannot_read_trip_detail(self):
+        with self.assertRaises(ForbiddenError):
+            self.router.my_trip_detail(db=self.db, school_id=1, trip_id=1, current_user=self._parent(10))
+
     # --- Parent /trips/children/{student_id} ------------------------------
 
     def test_parent_sees_own_childs_completed_trips(self):
@@ -530,6 +655,7 @@ class TripHistoryApiTests(unittest.TestCase):
         expected = {
             "list_trips": "admin",
             "my_trips": "pilot",
+            "my_trip_detail": "pilot",
             "parent_child_trips": "parent",
             "get_trip_detail": "admin",
         }
@@ -544,11 +670,12 @@ class TripHistoryApiTests(unittest.TestCase):
 
     def test_mine_and_children_are_registered_before_wildcard_detail(self):
         paths = self._trips_router_decorator_paths(ROUTER_SOURCE.read_text())
-        for literal in ("/mine", "/children/{student_id}"):
+        for literal in ("/mine", "/mine/{trip_id}", "/children/{student_id}"):
             self.assertIn(literal, paths)
         self.assertIn("/{trip_id}", paths)
         self.assertLess(paths.index("/mine"), paths.index("/{trip_id}"))
         self.assertLess(paths.index("/children/{student_id}"), paths.index("/{trip_id}"))
+        self.assertLess(paths.index("/mine"), paths.index("/mine/{trip_id}"))
 
     def test_gateway_routes_trips_to_transport(self):
         import gateway.main as gateway_main

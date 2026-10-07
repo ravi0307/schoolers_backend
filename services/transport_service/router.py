@@ -14,6 +14,7 @@ from schemas import (
     RouteCreate, RouteUpdate, RouteRead, StopCreate, StopUpdate, StopRead,
     RouteStudentRead, RouteStudentStatusUpdate, ParentPickDropRead,
     AdminTripDetailRead, AdminTripRead, ParentTripRead, TripSummaryRead,
+    PilotTripDetailRead,
     TripCancel, TripCreate, TripReopen, TripStudentRead, TripStudentUpdate,
 )
 
@@ -313,6 +314,24 @@ def my_trips(
     if staff_id is None:
         return []
     return repo.list_pilot_trips(db, school_id, staff_id, from_date, to_date)
+
+
+@trips_router.get("/mine/{trip_id}", response_model=PilotTripDetailRead)
+def my_trip_detail(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("pilot")),
+):
+    """Detail of ONE of the pilot's own trips, including the historical
+    TripStudent roster/outcomes. Identity comes only from the JWT (linked staff
+    row -> pilot); no pilot_id/route_id/school_id is accepted from the client.
+    Another pilot's same-school trip is 403; a cross-school trip is 404, the
+    same isolation used by every other transport read."""
+    detail = repo.get_pilot_trip_detail(db, school_id, trip_id, current_user)
+    if detail is None:
+        raise NotFoundError("Trip not found")
+    return detail
 
 
 @trips_router.get("/children/{student_id}", response_model=list[ParentTripRead])

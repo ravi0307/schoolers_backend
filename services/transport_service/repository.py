@@ -785,6 +785,51 @@ def list_pilot_trips(
     return [_trip_summary_row(trip, route) for trip, route in rows]
 
 
+def _trip_students_with_stop_names(db: Session, trip_id: int) -> list[dict]:
+    """The trip's historical roster (already joined to Student in one query)
+    plus batch-resolved stop names. No per-student or per-stop N+1."""
+    students = _trip_students(db, trip_id)
+    stop_names = _stop_names(
+        db,
+        [row.get("boarding_stop_id") for row in students]
+        + [row.get("drop_stop_id") for row in students],
+    )
+    for row in students:
+        row["boarding_stop_name"] = stop_names.get(row.get("boarding_stop_id"))
+        row["drop_stop_name"] = stop_names.get(row.get("drop_stop_id"))
+    return students
+
+
+def get_pilot_trip_detail(
+    db: Session,
+    school_id: int,
+    trip_id: int,
+    current_user: CurrentUser,
+) -> dict | None:
+    """Detail of ONE of the pilot's OWN trips, roster and all.
+
+    The same isolation as every other transport read: a trip outside the
+    caller's school is 404 (does not exist here), while a same-school trip the
+    pilot does not currently drive is refused by the shared authorization
+    helper. Identity is derived only from the caller's linked staff record.
+    """
+    trip = _get_trip(db, school_id, trip_id)
+    if trip is None:
+        return None
+    _authorize_trip(db, trip, current_user)
+    route = db.query(Route).filter(Route.route_id == trip.route_id).first()
+    detail = _trip_summary_row(trip, route)
+    detail.update(
+        {
+            "cancellation_reason": trip.cancellation_reason,
+            "reopened_at": trip.reopened_at,
+            "reopen_reason": trip.reopen_reason,
+            "students": _trip_students_with_stop_names(db, trip.trip_id),
+        }
+    )
+    return detail
+
+
 def _stop_names(db: Session, stop_ids) -> dict[int, str]:
     stop_ids = {sid for sid in stop_ids if sid is not None}
     if not stop_ids:
