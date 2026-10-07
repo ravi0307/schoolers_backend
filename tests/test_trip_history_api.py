@@ -492,12 +492,24 @@ class TripHistoryApiTests(unittest.TestCase):
         rows = self.router.list_trips(db=self.db, school_id=1, route_id=1, current_user=self._admin1())
         self.assertGreater(len(rows), 0)
 
-    # --- Guard rails (read-only phase) ------------------------------------
+    # --- Guard rails (read-only phase + phase-3 write surface) ------------
 
-    def test_trips_router_is_get_only(self):
+    def test_trips_router_surface_is_exactly_get_plus_lifecycle_writes(self):
+        """GET-only guard from Phase 2, extended for Phase 3: PUT/DELETE stay
+        forbidden and the write surface is exactly the lifecycle endpoints."""
         source = ROUTER_SOURCE.read_text()
-        for method in ("post", "put", "patch", "delete"):
+        for method in ("put", "delete"):
             self.assertNotIn("trips_router.{}(".format(method), source)
+        expected_writes = {
+            ("trips_router.post", '""'),
+            ("trips_router.post", '"/{trip_id}/start"'),
+            ("trips_router.post", '"/{trip_id}/complete"'),
+            ("trips_router.post", '"/{trip_id}/cancel"'),
+            ("trips_router.post", '"/{trip_id}/reopen"'),
+            ("trips_router.patch", '"/{trip_id}/students/{student_id}"'),
+        }
+        for verb, path in sorted(expected_writes):
+            self.assertIn("{}({}".format(verb, path), source)
 
     def _trips_router_decorator_paths(self, source):
         tree = ast.parse(source)

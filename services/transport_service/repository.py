@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from common.dependencies import CurrentUser
 from common.models import (
     Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent,
     Staff, Student, Trip, TripStudent, User, Vehicle,
@@ -855,3 +858,275 @@ def list_child_completed_trips(
         )
         result.append(row)
     return result
+
+
+# ============================================================================
+# TRIP LIFECYCLE (WRITE) — Phase 3
+# ============================================================================
+#
+# The trip lifecycle mirrors a real-day run (see the Trip model docstring):
+#
+#     scheduled ──► in_progress ──► completed
+#        │              │
+#        │              ▼
+#        └──► cancelled ◄── (reopened/admin, returns to in_progress)
+#
+# Implemented centrally in `apply_transition` so routers never duplicate the
+# state checks. All timestamps are server time; the client cannot supply them.
+# ============================================================================
+
+# The one authoritative transition matrix.
+_LIFECYCLE_TRANSITIONS = {
+    "scheduled": {"in_progress", "cancelled"},   # start / cancel a planned run
+    "in_progress": {"completed", "cancelled"},   # finish / abort a live run
+    "cancelled": {"in_progress"},                # reopen (admin only)
+    "completed": set(),
+}
+
+# Migration matrix for the two legs of a TripStudent row. A child's boarding is
+# fixed once recorded: pending -> picked / did_not_board, and nothing further.
+_BOARDING_TRANSITIONS = {"pending": {"picked", "did_not_board"}}
+_DROP_TRANSITIONS = {"pending": {"dropped", "drop_not_recorded"}}
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _get_trip(db: Session, school_id: int, trip_id: int) -> Trip | None:
+    return (
+        db.query(Trip)
+        .filter(Trip.school_id == school_id, Trip.trip_id == trip_id)
+        .first()
+    )
+
+
+def resolve_pilot(db: Session, school_id: int, staff_id: int | None) -> Pilot | None:
+    """JWT linked_person_id -> Staff -> Pilot, scoped to one school and active only."""
+    if staff_id is None:
+        return None
+    return (
+        db.query(Pilot)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(
+            Staff.school_id == school_id,
+            Pilot.staff_id == staff_id,
+            Pilot.is_active.is_(True),
+            Staff.is_active.is_(True),
+        )
+        .first()
+    )
+
+
+def _authorize_trip(db: Session, trip: Trip, current_user: CurrentUser, allow_pilot: bool = True) -> None:
+    """Admin may act on any in-school trip; a pilot only on a trip of their own
+    currently-assigned route. Ownership checks BOTH the snapshot pilot_id (who
+    was driving when the trip was created) and the live route assignment, so a
+    reassigned driver cannot touch an old trip."""
+    if current_user.role == "admin":
+        return
+    if current_user.role == "pilot" and allow_pilot:
+        pilot = resolve_pilot(db, trip.school_id, current_user.linked_person_id)
+        if pilot is not None and trip.pilot_id == pilot.pilot_id and trip.route_id == pilot.route_id:
+            return
+        raise ForbiddenError("This trip is not assigned to you")
+    raise ForbiddenError(f"Role '{current_user.role}' cannot operate this trip")
+
+
+def create_trip(db: Session, school_id: int, current_user, data: dict) -> dict:
+    """Create the day's trip for a route and snapshot its current roster.
+
+    Snapshots are drawn from the route's own trusted records. The client does
+    not supply school_id, pilot identity, driver_name or vehicle. RouteStudent
+    membership at this moment becomes the historical TripStudent roster.
+    """
+    route_id = data["route_id"]
+    trip_date = data["trip_date"]
+    direction = data.get("direction", "pickup")
+
+    if current_user.role not in ("admin", "pilot"):
+        raise ForbiddenError(f"Role '{current_user.role}' cannot create trips")
+
+    route = (
+        db.query(Route)
+        .filter(
+            Route.route_id == route_id,
+            Route.school_id == school_id,
+            Route.is_active.is_(True),
+        )
+        .first()
+    )
+    if route is None:
+        raise NotFoundError("Route not found")
+
+    if current_user.role == "pilot":
+        pilot = resolve_pilot(db, school_id, current_user.linked_person_id)
+        if pilot is None or route.route_id != pilot.route_id:
+            raise ForbiddenError("This route is not assigned to you")
+        snapshot_pilot_id = pilot.pilot_id
+    else:
+        snapshot_pilot_id = route.pilot.pilot_id if route.pilot is not None else None
+
+    duplicate = (
+        db.query(Trip.trip_id)
+        .filter(
+            Trip.route_id == route_id,
+            Trip.trip_date == trip_date,
+            Trip.direction == direction,
+        )
+        .first()
+    )
+    if duplicate is not None:
+        raise ConflictError("A trip already exists for this route on this day and direction")
+
+    trip = Trip(
+        school_id=school_id,
+        route_id=route_id,
+        trip_date=trip_date,
+        direction=direction,
+        status="scheduled",
+        pilot_id=snapshot_pilot_id,
+        driver_name=route.driver_name,
+        vehicle=route.vehicle,
+    )
+    db.add(trip)
+    db.flush()
+
+    roster = (
+        db.query(RouteStudent.student_id)
+        .filter(RouteStudent.route_id == route_id)
+        .all()
+    )
+    for (student_id,) in roster:
+        db.add(TripStudent(trip_id=trip.trip_id, student_id=student_id))
+
+    db.commit()
+    db.refresh(trip)
+    return get_trip_detail(db, school_id, trip.trip_id)
+
+
+def apply_transition(db: Session, trip: Trip, target: str, actor: int, reason: str | None = None) -> Trip:
+    """The single place a trip changes status.
+
+    Enforces the lifecycle matrix and stamps the appropriate audit/time/reason
+    fields. `actor` is the authenticated user's user_id, never client-supplied.
+    """
+    previous = trip.status
+    allowed = _LIFECYCLE_TRANSITIONS.get(previous, set())
+    if target not in allowed:
+        raise AppError(f"Cannot move trip from '{previous}' to '{target}'")
+    trip.status = target
+    if target == "in_progress":
+        if previous == "scheduled":
+            trip.started_at = utcnow()
+        else:  # reopened from cancelled
+            trip.reopened_at = utcnow()
+            trip.reopened_by = actor
+            trip.reopen_reason = reason
+    elif target == "completed":
+        trip.ended_at = utcnow()
+    elif target == "cancelled":
+        trip.cancelled_at = utcnow()
+        trip.cancelled_by = actor
+        trip.cancellation_reason = reason
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+def transition_trip(
+    db: Session,
+    school_id: int,
+    trip_id: int,
+    current_user: CurrentUser,
+    target: str,
+    reason: str | None = None,
+    allow_pilot: bool = True,
+) -> Trip:
+    """Resolve, authorize and apply a status transition in one step."""
+    trip = _get_trip(db, school_id, trip_id)
+    if trip is None:
+        raise NotFoundError("Trip not found")
+    _authorize_trip(db, trip, current_user, allow_pilot=allow_pilot)
+    return apply_transition(db, trip, target, current_user.user_id, reason=reason)
+
+
+def _validate_stop_for_trip(db: Session, trip: Trip, stop_id: int, required_type: str) -> int:
+    """A stop is only valid if it belongs to this trip's route AND matches the
+    leg being recorded: pickup-type stops for boarding, drop-type for dropping.
+    Nothing is ever derived automatically from the route's schedule."""
+    stop = db.query(RouteStop).filter(RouteStop.stop_id == stop_id).first()
+    if stop is None or stop.route_id != trip.route_id or stop.stop_type != required_type:
+        raise AppError(f"Stop is not a valid {required_type} stop on this trip's route")
+    return stop.stop_id
+
+
+def _apply_boarding(ts: TripStudent, status: str) -> None:
+    allowed = _BOARDING_TRANSITIONS.get(ts.boarding_status, set())
+    if status not in allowed:
+        raise AppError(f"Cannot set boarding status to '{status}' from '{ts.boarding_status}'")
+    ts.boarding_status = status
+    if status != "pending":
+        ts.boarding_at = utcnow()
+
+
+def _apply_drop(ts: TripStudent, status: str) -> None:
+    allowed = _DROP_TRANSITIONS.get(ts.drop_status, set())
+    if status not in allowed:
+        raise AppError(f"Cannot set drop status to '{status}' from '{ts.drop_status}'")
+    ts.drop_status = status
+    if status != "pending":
+        ts.drop_at = utcnow()
+
+
+def update_trip_student(
+    db: Session,
+    school_id: int,
+    trip_id: int,
+    student_id: int,
+    current_user: CurrentUser,
+    data: dict,
+) -> dict:
+    """Record one student's boarding/drop outcome on an in-progress trip.
+
+    The row is located by (trip_id, student_id) so a TripStudent row that does
+    not belong to the requested trip or student cannot be reached (a student
+    must be on the trip's snapshot roster first). Timestamps are server time.
+    """
+    trip = _get_trip(db, school_id, trip_id)
+    if trip is None:
+        raise NotFoundError("Trip not found")
+    _authorize_trip(db, trip, current_user)
+    if trip.status != "in_progress":
+        raise AppError("Student outcomes can only be recorded while the trip is in progress")
+
+    row = (
+        db.query(TripStudent)
+        .filter(TripStudent.trip_id == trip_id, TripStudent.student_id == student_id)
+        .first()
+    )
+    if row is None:
+        raise NotFoundError("Student is not on this trip")
+
+    if data.get("boarding_status") is not None:
+        _apply_boarding(row, data["boarding_status"])
+    if data.get("drop_status") is not None:
+        _apply_drop(row, data["drop_status"])
+    if data.get("boarding_stop_id") is not None:
+        row.boarding_stop_id = _validate_stop_for_trip(db, trip, data["boarding_stop_id"], "pickup")
+    if data.get("drop_stop_id") is not None:
+        row.drop_stop_id = _validate_stop_for_trip(db, trip, data["drop_stop_id"], "drop")
+
+    student = db.query(Student).filter(Student.student_id == student_id).first()
+    db.commit()
+    db.refresh(row)
+    return {
+        "student_id": row.student_id,
+        "student_name": student.name if student else "",
+        "boarding_status": row.boarding_status,
+        "boarding_at": row.boarding_at,
+        "boarding_stop_id": row.boarding_stop_id,
+        "drop_status": row.drop_status,
+        "drop_at": row.drop_at,
+        "drop_stop_id": row.drop_stop_id,
+    }

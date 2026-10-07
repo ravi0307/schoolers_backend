@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from common.enums import BoardingStatus, DropStatus, TripDirection
 from common.security import validate_password_byte_length
 
 
@@ -286,3 +287,83 @@ class ParentTripRead(TripSummaryRead):
     drop_at: datetime | None = None
     drop_stop_id: int | None = None
     drop_stop_name: str | None = None
+
+
+class TripCreate(BaseModel):
+    """Create the day's trip for a route.
+
+    Only identity inputs come from the client. Everything else (school scope,
+    pilot, driver_name, vehicle) is snapshotted server-side from the route's
+    own records, never trusted from the payload.
+    """
+
+    route_id: int
+    trip_date: date
+    direction: str = "pickup"
+
+    @field_validator("direction")
+    @classmethod
+    def _direction_must_be_known(cls, value: str) -> str:
+        allowed = {member.value for member in TripDirection}
+        if value not in allowed:
+            raise ValueError("direction must be 'pickup' or 'drop'")
+        return value
+
+
+class TripStudentUpdate(BaseModel):
+    """Outcome snapshot for one student on an in-progress trip.
+
+    Timestamps are recorded server-side; the client only reports which status
+    applied and, when explicitly selected, the stop it happened at.
+    """
+
+    boarding_status: str | None = None
+    boarding_stop_id: int | None = None
+    drop_status: str | None = None
+    drop_stop_id: int | None = None
+
+    @field_validator("boarding_status")
+    @classmethod
+    def _boarding_must_be_known(cls, value: str | None) -> str | None:
+        if value is not None and value not in {member.value for member in BoardingStatus}:
+            raise ValueError("boarding_status must be pending, picked or did_not_board")
+        return value
+
+    @field_validator("drop_status")
+    @classmethod
+    def _drop_must_be_known(cls, value: str | None) -> str | None:
+        if value is not None and value not in {member.value for member in DropStatus}:
+            raise ValueError("drop_status must be pending, dropped or drop_not_recorded")
+        return value
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self):
+        if all(v is None for v in (self.boarding_status, self.boarding_stop_id,
+                                   self.drop_status, self.drop_stop_id)):
+            raise ValueError("at least one outcome field is required")
+        return self
+
+
+def _not_blank(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("must not be blank")
+    return stripped
+
+
+class TripCancel(BaseModel):
+    cancellation_reason: str
+
+    @field_validator("cancellation_reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _not_blank(value)
+
+
+class TripReopen(BaseModel):
+    reopen_reason: str
+
+    @field_validator("reopen_reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _not_blank(value)
