@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -226,3 +226,63 @@ class ParentPickDropRead(BaseModel):
     # which stop a given student boards at, so this is the full route stop
     # list and the client decides which one is next.
     stops: list[StopRead] = Field(default_factory=list)
+
+
+class TripSummaryRead(BaseModel):
+    """Base read model for a historical trip. Shared by admin, pilot and parent."""
+
+    trip_id: int
+    trip_date: date
+    route_id: int
+    route_name: str
+    direction: str  # 'pickup' | 'drop'
+    status: str  # 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+    pilot_id: int | None = None
+    driver_name: str | None = None
+    vehicle: str | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    cancelled_at: datetime | None = None
+
+
+class AdminTripRead(TripSummaryRead):
+    """Admin-facing summary; adds the server-computed outcome summary string."""
+
+    outcome_summary: str = ""
+
+
+class TripStudentRead(BaseModel):
+    """One student's boarding/drop snapshot within a trip."""
+
+    student_id: int
+    student_name: str
+    boarding_status: str  # 'pending' | 'picked' | 'did_not_board'
+    boarding_at: datetime | None = None
+    boarding_stop_id: int | None = None
+    drop_status: str  # 'pending' | 'dropped' | 'drop_not_recorded'
+    drop_at: datetime | None = None
+    drop_stop_id: int | None = None
+
+
+class AdminTripDetailRead(AdminTripRead):
+    """Full admin detail: summary + cancellation/reopen history + students."""
+
+    cancelled_by: int | None = None
+    cancellation_reason: str | None = None
+    reopened_at: datetime | None = None
+    reopened_by: int | None = None
+    reopen_reason: str | None = None
+    students: list[TripStudentRead] = Field(default_factory=list)
+
+
+class ParentTripRead(TripSummaryRead):
+    """A completed trip as seen by a parent: trip facts + this child's snapshot."""
+
+    boarding_status: str  # 'pending' | 'picked' | 'did_not_board'
+    boarding_at: datetime | None = None
+    boarding_stop_id: int | None = None
+    boarding_stop_name: str | None = None
+    drop_status: str  # 'pending' | 'dropped' | 'drop_not_recorded'
+    drop_at: datetime | None = None
+    drop_stop_id: int | None = None
+    drop_stop_name: str | None = None

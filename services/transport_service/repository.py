@@ -1,11 +1,14 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.models import (
     Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent,
-    Staff, Student, User, Vehicle,
+    Staff, Student, Trip, TripStudent, User, Vehicle,
 )
 from common.security import hash_password
-from common.exceptions import AppError, ConflictError, NotFoundError
+from common.exceptions import (
+    AppError, ConflictError, ForbiddenError, NotFoundError,
+)
 
 
 def list_vehicles(db: Session, school_id: int) -> list[Vehicle]:
@@ -567,4 +570,288 @@ def list_children_pickdrop(db: Session, school_id: int, parent_id: int) -> list[
                 "stops": stops_by_route.get(route["route_id"], []) if route else [],
             }
         )
+    return result
+
+
+def _trip_summary_row(trip: Trip, route: Route) -> dict:
+    """Common trip-row shape shared by admin, pilot and parent responses."""
+    return {
+        "trip_id": trip.trip_id,
+        "trip_date": trip.trip_date,
+        "route_id": trip.route_id,
+        "route_name": route.name,
+        "direction": trip.direction,
+        "status": trip.status,
+        "pilot_id": trip.pilot_id,
+        "driver_name": trip.driver_name,
+        "vehicle": trip.vehicle,
+        "started_at": trip.started_at,
+        "ended_at": trip.ended_at,
+        "cancelled_at": trip.cancelled_at,
+    }
+
+
+def _trip_query(db: Session, school_id: int):
+    """Trip joined with its route, scoped to one school. Driver name is read
+    from the immutable snapshot on Trip, so no staff/pilot join is needed."""
+    return (
+        db.query(Trip, Route)
+        .join(Route, Route.route_id == Trip.route_id)
+        .filter(Trip.school_id == school_id)
+    )
+
+
+def _apply_date_filters(query, from_date, to_date):
+    if from_date is not None:
+        query = query.filter(Trip.trip_date >= from_date)
+    if to_date is not None:
+        query = query.filter(Trip.trip_date <= to_date)
+    return query
+
+
+def _ensure_filter_exists(db: Session, school_id: int, route_id: int | None, pilot_id: int | None):
+    """Cross-school filter ids must not silently match other schools' rows."""
+    if route_id is not None:
+        route = (
+            db.query(Route.route_id)
+            .filter(Route.route_id == route_id, Route.school_id == school_id)
+            .first()
+        )
+        if route is None:
+            raise AppError("Route not found for this school")
+    if pilot_id is not None:
+        pilot = (
+            db.query(Pilot.pilot_id)
+            .join(Staff, Staff.staff_id == Pilot.staff_id)
+            .filter(Pilot.pilot_id == pilot_id, Staff.school_id == school_id)
+            .first()
+        )
+        if pilot is None:
+            raise AppError("Pilot not found for this school")
+
+
+def _outcome_summary_map(db: Session, trip_ids: list[int]) -> dict[int, str]:
+    """One batched query per status axis -> deterministic per-trip summary
+    strings. Keeps the admin list free of per-row N+1 badge queries."""
+    if not trip_ids:
+        return {}
+    boarding_counts: dict[int, dict[str, int]] = {}
+    for trip_id, status, count in (
+        db.query(TripStudent.trip_id, TripStudent.boarding_status, func.count())
+        .filter(
+            TripStudent.trip_id.in_(trip_ids),
+            TripStudent.boarding_status != "pending",
+        )
+        .group_by(TripStudent.trip_id, TripStudent.boarding_status)
+        .all()
+    ):
+        boarding_counts.setdefault(trip_id, {})[status] = count
+    drop_counts: dict[int, dict[str, int]] = {}
+    for trip_id, status, count in (
+        db.query(TripStudent.trip_id, TripStudent.drop_status, func.count())
+        .filter(
+            TripStudent.trip_id.in_(trip_ids),
+            TripStudent.drop_status != "pending",
+        )
+        .group_by(TripStudent.trip_id, TripStudent.drop_status)
+        .all()
+    ):
+        drop_counts.setdefault(trip_id, {})[status] = count
+    result: dict[int, str] = {}
+    for trip_id in trip_ids:
+        counts = boarding_counts.get(trip_id, {})
+        parts = []
+        for key in ("picked", "did_not_board"):
+            if counts.get(key):
+                parts.append(f"{counts[key]} {key.replace('_', ' ')}")
+        counts = drop_counts.get(trip_id, {})
+        for key in ("dropped", "drop_not_recorded"):
+            if counts.get(key):
+                parts.append(f"{counts[key]} {key.replace('_', ' ')}")
+        result[trip_id] = " · ".join(parts)
+    return result
+
+
+def list_trips(
+    db: Session,
+    school_id: int,
+    route_id: int | None = None,
+    pilot_id: int | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    from_date=None,
+    to_date=None,
+) -> list[dict]:
+    """Admin history list. Filters that reference another school's route/pilot
+    are rejected rather than silently returning an empty/spoofed set."""
+    _ensure_filter_exists(db, school_id, route_id, pilot_id)
+    query = _trip_query(db, school_id)
+    if route_id is not None:
+        query = query.filter(Trip.route_id == route_id)
+    if pilot_id is not None:
+        query = query.filter(Trip.pilot_id == pilot_id)
+    if direction is not None:
+        query = query.filter(Trip.direction == direction)
+    if status is not None:
+        query = query.filter(Trip.status == status)
+    query = _apply_date_filters(query, from_date, to_date)
+    rows = query.order_by(Trip.trip_date.desc(), Trip.trip_id.desc()).all()
+    summaries = []
+    for trip, route in rows:
+        summary = _trip_summary_row(trip, route)
+        summaries.append(summary)
+    summaries_by_id = {summary["trip_id"]: summary for summary in summaries}
+    outcome_summary = _outcome_summary_map(db, [s["trip_id"] for s in summaries])
+    for trip_id, text in outcome_summary.items():
+        summaries_by_id[trip_id]["outcome_summary"] = text
+    for summary in summaries:
+        summary.setdefault("outcome_summary", "")
+    return summaries
+
+
+def _trip_students(db: Session, trip_id: int) -> list[dict]:
+    """All of a trip's students in one joined query (no per-student N+1)."""
+    rows = (
+        db.query(TripStudent, Student)
+        .join(Student, Student.student_id == TripStudent.student_id)
+        .filter(TripStudent.trip_id == trip_id)
+        .order_by(Student.name)
+        .all()
+    )
+    return [
+        {
+            "student_id": trip_student.student_id,
+            "student_name": student.name,
+            "boarding_status": trip_student.boarding_status,
+            "boarding_at": trip_student.boarding_at,
+            "boarding_stop_id": trip_student.boarding_stop_id,
+            "drop_status": trip_student.drop_status,
+            "drop_at": trip_student.drop_at,
+            "drop_stop_id": trip_student.drop_stop_id,
+        }
+        for trip_student, student in rows
+    ]
+
+
+def get_trip_detail(db: Session, school_id: int, trip_id: int) -> dict | None:
+    """Admin detail. Returns None when the trip does not exist in this school
+    (the router turns that into a 404 without leaking another school's data)."""
+    row = _trip_query(db, school_id).filter(Trip.trip_id == trip_id).first()
+    if row is None:
+        return None
+    trip, route = row
+    outcome_summary = _outcome_summary_map(db, [trip_id])[trip_id]
+    detail = _trip_summary_row(trip, route)
+    detail["outcome_summary"] = outcome_summary
+    detail.update(
+        {
+            "cancelled_by": trip.cancelled_by,
+            "cancellation_reason": trip.cancellation_reason,
+            "reopened_at": trip.reopened_at,
+            "reopened_by": trip.reopened_by,
+            "reopen_reason": trip.reopen_reason,
+            "students": _trip_students(db, trip_id),
+        }
+    )
+    return detail
+
+
+def list_pilot_trips(
+    db: Session,
+    school_id: int,
+    staff_id: int | None,
+    from_date=None,
+    to_date=None,
+) -> list[dict]:
+    """Pilot history. Identity comes only from the caller's linked staff row;
+    the pilot_id broadcast never filters anything, so a pilot can never list
+    another pilot's trips by passing the id of a route they do not drive."""
+    if staff_id is None:
+        return []
+    pilot = (
+        db.query(Pilot)
+        .join(Staff, Staff.staff_id == Pilot.staff_id)
+        .filter(Pilot.staff_id == staff_id, Staff.school_id == school_id, Pilot.is_active.is_(True))
+        .first()
+    )
+    if pilot is None:
+        return []
+    query = _trip_query(db, school_id).filter(Trip.pilot_id == pilot.pilot_id)
+    query = _apply_date_filters(query, from_date, to_date)
+    rows = query.order_by(Trip.trip_date.desc(), Trip.trip_id.desc()).all()
+    return [_trip_summary_row(trip, route) for trip, route in rows]
+
+
+def _stop_names(db: Session, stop_ids) -> dict[int, str]:
+    stop_ids = {sid for sid in stop_ids if sid is not None}
+    if not stop_ids:
+        return {}
+    rows = db.query(RouteStop).filter(RouteStop.stop_id.in_(stop_ids)).all()
+    return {stop.stop_id: stop.name for stop in rows}
+
+
+def list_child_completed_trips(
+    db: Session,
+    school_id: int,
+    parent_id: int | None,
+    student_id: int,
+    from_date=None,
+    to_date=None,
+) -> list[dict]:
+    """Parent history. Two hard invariants: only completed trips, and only the
+    requested child's own TripStudent snapshot - parents never see siblings'
+    boarding/drop rows. A student the caller does not own (including one in
+    another school) is refused up front."""
+    if parent_id is None:
+        raise AppError("User is not linked to a parent account")
+    owned = (
+        db.query(ParentStudent.parent_id)
+        .filter(
+            ParentStudent.parent_id == parent_id,
+            ParentStudent.student_id == student_id,
+        )
+        .first()
+    )
+    if owned is None:
+        raise ForbiddenError("You do not have access to this student's trips")
+    student = (
+        db.query(Student.student_id)
+        .filter(Student.student_id == student_id, Student.school_id == school_id)
+        .first()
+    )
+    if student is None:
+        raise ForbiddenError("You do not have access to this student's trips")
+    query = (
+        db.query(Trip, Route, TripStudent)
+        .join(Route, Route.route_id == Trip.route_id)
+        .join(TripStudent, TripStudent.trip_id == Trip.trip_id)
+        .filter(
+            Trip.school_id == school_id,
+            TripStudent.student_id == student_id,
+            Trip.status == "completed",
+        )
+    )
+    query = _apply_date_filters(query, from_date, to_date)
+    rows = query.order_by(Trip.trip_date.desc(), Trip.trip_id.desc()).all()
+    stop_ids = set()
+    for trip, route, trip_student in rows:
+        stop_ids.add(trip_student.boarding_stop_id)
+        stop_ids.add(trip_student.drop_stop_id)
+    names = _stop_names(db, stop_ids)
+    result = []
+    for trip, route, trip_student in rows:
+        row = _trip_summary_row(trip, route)
+        row.update(
+            {
+                "boarding_status": trip_student.boarding_status,
+                "boarding_at": trip_student.boarding_at,
+                "boarding_stop_id": trip_student.boarding_stop_id,
+                "boarding_stop_name": names.get(trip_student.boarding_stop_id),
+                "drop_status": trip_student.drop_status,
+                "drop_at": trip_student.drop_at,
+                "drop_stop_id": trip_student.drop_stop_id,
+                "drop_stop_name": names.get(trip_student.drop_stop_id),
+            }
+        )
+        result.append(row)
     return result

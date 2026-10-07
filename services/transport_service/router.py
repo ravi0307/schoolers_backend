@@ -1,15 +1,19 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
-from common.exceptions import NotFoundError
+from common.enums import TripDirection, TripStatus
+from common.exceptions import AppError, NotFoundError
 import repository as repo
 from schemas import (
     VehicleCreate, VehicleUpdate, VehicleRead,
     PilotCreate, PilotUpdate, PilotRead,
     RouteCreate, RouteUpdate, RouteRead, StopCreate, StopUpdate, StopRead,
     RouteStudentRead, RouteStudentStatusUpdate, ParentPickDropRead,
+    AdminTripDetailRead, AdminTripRead, ParentTripRead, TripSummaryRead,
 )
 
 router = APIRouter(prefix="/routes", tags=["transport"])
@@ -253,3 +257,90 @@ def my_pickdrop_status(
     if parent_id is None:
         return []
     return repo.list_children_pickdrop(db, school_id, parent_id)
+
+
+trips_router = APIRouter(prefix="/trips", tags=["transport"])
+
+_DIRECTIONS = {member.value for member in TripDirection}
+_STATUSES = {member.value for member in TripStatus}
+
+
+def _validate_optional_filter(value, allowed, label):
+    if value is not None and value not in allowed:
+        raise AppError(f"Invalid {label}: '{value}'")
+
+
+def _validate_date_range(from_date, to_date):
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise AppError("from_date must not be later than to_date")
+
+
+@trips_router.get("", response_model=list[AdminTripRead])
+def list_trips(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    route_id: int | None = None,
+    pilot_id: int | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Admin trip history. School scope comes from the token, never the client."""
+    _validate_optional_filter(direction, _DIRECTIONS, "direction")
+    _validate_optional_filter(status, _STATUSES, "status")
+    _validate_date_range(from_date, to_date)
+    return repo.list_trips(
+        db, school_id, route_id, pilot_id, direction, status, from_date, to_date
+    )
+
+
+@trips_router.get("/mine", response_model=list[TripSummaryRead])
+def my_trips(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("pilot")),
+):
+    """Pilot history. The pilot identity is derived from the token's linked
+    staff record only; the endpoint accepts no pilot_id that could spoof
+    another pilot's trips."""
+    _validate_date_range(from_date, to_date)
+    staff_id = current_user.linked_person_id
+    if staff_id is None:
+        return []
+    return repo.list_pilot_trips(db, school_id, staff_id, from_date, to_date)
+
+
+@trips_router.get("/children/{student_id}", response_model=list[ParentTripRead])
+def parent_child_trips(
+    student_id: int,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent")),
+):
+    """Parent view of one of their own children's completed trips. Only the
+    requested child's rows are returned; siblings and non-completed trips are
+    filtered in SQL, and a student the parent does not own is refused."""
+    _validate_date_range(from_date, to_date)
+    return repo.list_child_completed_trips(
+        db, school_id, current_user.linked_person_id, student_id, from_date, to_date
+    )
+
+
+@trips_router.get("/{trip_id}", response_model=AdminTripDetailRead)
+def get_trip_detail(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Admin detail for one in-school trip; any other school's trip is 404."""
+    trip = repo.get_trip_detail(db, school_id, trip_id)
+    if trip is None:
+        raise NotFoundError("Trip not found")
+    return trip
