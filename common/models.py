@@ -426,10 +426,10 @@ class TripStudent(AuditColumnsMixin, Base):
     trip_student_id = Column(Integer, primary_key=True)
     trip_id = Column(Integer, ForeignKey("trips.trip_id", ondelete="CASCADE"), nullable=False)
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
-    boarding_status = Column(String(10), nullable=False, default="pending")  # pending | picked | did_not_board
+    boarding_status = Column(String(20), nullable=False, default="pending")  # pending | picked | did_not_board
     boarding_at = Column(DateTime)
     boarding_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"))
-    drop_status = Column(String(10), nullable=False, default="pending")  # pending | dropped | drop_not_recorded
+    drop_status = Column(String(20), nullable=False, default="pending")  # pending | dropped | drop_not_recorded
     drop_at = Column(DateTime)
     drop_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"))
     created_at = Column(DateTime, server_default=func.now())
