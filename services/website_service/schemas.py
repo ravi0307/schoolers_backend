@@ -69,6 +69,27 @@ class WebsiteBuilderState(BaseModel):
     published_at: datetime | None
 
 
+class WebsiteQueryCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(
+        min_length=3,
+        max_length=254,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+    )
+    message: str = Field(min_length=1, max_length=5000)
+
+
+class WebsiteQueryRead(BaseModel):
+    query_id: int
+    school_id: int
+    name: str
+    email: str
+    message: str
+    created_at: datetime
+
+
 class PublishedWebsite(BaseModel):
     school_id: int
     school_name: str

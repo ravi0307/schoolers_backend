@@ -8,7 +8,7 @@ from unittest.mock import patch
 from pydantic import ValidationError
 
 from common.exceptions import NotFoundError
-from services.website_service.schemas import WebsiteBuilderContent
+from services.website_service.schemas import WebsiteBuilderContent, WebsiteQueryCreate
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_DIR = ROOT / "services" / "website_service"
@@ -16,6 +16,25 @@ BARE_MODULES = ("repository", "router", "schemas")
 
 
 class WebsiteBuilderSchemaTests(unittest.TestCase):
+    def test_contact_query_trims_and_validates_public_submission_fields(self):
+        query = WebsiteQueryCreate.model_validate({
+            "name": "  Taylor Morgan ",
+            "email": " taylor@example.com ",
+            "message": "  Please send admissions details. ",
+        })
+        self.assertEqual(query.model_dump(), {
+            "name": "Taylor Morgan",
+            "email": "taylor@example.com",
+            "message": "Please send admissions details.",
+        })
+        for payload in (
+            {"name": "Taylor", "email": "invalid", "message": "Hello"},
+            {"name": " ", "email": "taylor@example.com", "message": "Hello"},
+            {"name": "Taylor", "email": "taylor@example.com", "message": " "},
+        ):
+            with self.subTest(payload=payload), self.assertRaises(ValidationError):
+                WebsiteQueryCreate.model_validate(payload)
+
     def test_canvas_document_round_trips_editor_node_fields(self):
         content = WebsiteBuilderContent.model_validate({
             "school_name": "Sunrise School",
@@ -124,6 +143,24 @@ class WebsiteBuilderPersistenceTests(unittest.TestCase):
         published.draft["nodes"].append({"id": "later-edit"})
         self.assertEqual(published.published["nodes"], [{"id": "hero"}])
 
+    def test_contact_queries_are_saved_for_their_school(self):
+        db = _FakeSession()
+        payload = {
+            "name": "Taylor Morgan",
+            "email": "taylor@example.com",
+            "message": "Please send admissions details.",
+        }
+
+        query = self.repository.create_website_query(db, 17, payload)
+
+        self.assertIs(db.site, query)
+        self.assertEqual(query.school_id, 17)
+        self.assertEqual(query.name, "Taylor Morgan")
+        self.assertEqual(query.email, "taylor@example.com")
+        self.assertEqual(query.message, "Please send admissions details.")
+        self.assertEqual(db.commit_count, 1)
+        self.assertEqual(db.refresh_count, 1)
+
     def test_public_handlers_render_only_the_published_snapshot(self):
         site = SimpleNamespace(
             school_id=17,
@@ -208,6 +245,52 @@ class WebsiteBuilderPersistenceTests(unittest.TestCase):
             with self.assertRaises(NotFoundError):
                 self.router.get_builder_for_school(18, db, 17, current_user)
         get_site.assert_not_called()
+
+    def test_public_contact_submission_requires_published_site_and_saves_school_query(self):
+        payload = WebsiteQueryCreate.model_validate({
+            "name": "Taylor Morgan",
+            "email": "taylor@example.com",
+            "message": "Please send admissions details.",
+        })
+        query = SimpleNamespace(
+            query_id=23,
+            school_id=17,
+            name=payload.name,
+            email=payload.email,
+            message=payload.message,
+            created_at=datetime.now(timezone.utc),
+        )
+        db = object()
+        with patch.object(self.router.repo, "get_published_site", return_value=object()) as published, \
+                patch.object(self.router.repo, "create_website_query", return_value=query) as create:
+            response = self.router.submit_website_query(17, payload, db)
+        published.assert_called_once_with(db, 17)
+        create.assert_called_once_with(db, 17, payload.model_dump())
+        self.assertEqual(response.query_id, 23)
+        self.assertEqual(response.school_id, 17)
+
+        with patch.object(self.router.repo, "get_published_site", return_value=None), \
+                patch.object(self.router.repo, "create_website_query") as create:
+            with self.assertRaises(NotFoundError):
+                self.router.submit_website_query(17, payload, db)
+        create.assert_not_called()
+
+    def test_admin_query_list_is_filtered_to_the_authenticated_school(self):
+        queries = [SimpleNamespace(
+            query_id=23,
+            school_id=17,
+            name="Taylor Morgan",
+            email="taylor@example.com",
+            message="Admissions details, please.",
+            created_at=datetime.now(timezone.utc),
+        )]
+        db = object()
+        current_user = SimpleNamespace(user_id=1, role="admin", school_id=17)
+        with patch.object(self.router.repo, "list_website_queries", return_value=queries) as list_queries:
+            response = self.router.get_website_queries(db, 17, current_user)
+        list_queries.assert_called_once_with(db, 17)
+        self.assertEqual(response[0].school_id, 17)
+        self.assertEqual(response[0].email, "taylor@example.com")
 
     def test_upload_rejects_mismatched_image_signatures_and_unknown_asset_names(self):
         matches = self.router._matches_image_signature

@@ -616,6 +616,16 @@ class WebsiteBuilderSite(AuditColumnsMixin, Base):
     published = Column(JSONB)
     published_at = Column(DateTime)
 
+class WebsiteQuery(AuditColumnsMixin, Base):
+    __tablename__ = "website_queries"
+
+    query_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(120), nullable=False)
+    email = Column(String(254), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
 
 # ============================================================================
 # 12. ACCOUNTS
