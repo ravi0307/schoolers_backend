@@ -38,7 +38,7 @@ _ENGINES = []
 ROOT = Path(__file__).resolve().parent.parent
 ROUTER_SOURCE = ROOT / "services" / "media_service" / "router.py"
 
-# The full metadata includes Postgres-only JSONB columns (website_pages) that
+# The full metadata includes Postgres-only JSONB columns (website_builder_sites) that
 # SQLite cannot render; mirror the other repo tests by creating just the
 # tables the gallery exercises (plus their FK dependencies).
 GALLERY_TABLES = [

@@ -24,7 +24,7 @@ import services.people_service.repository as people_repo
 
 def make_session():
     engine = create_engine("sqlite://")
-    tables = [t for t in Base.metadata.sorted_tables if t.name != "website_pages"]
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "website_builder_sites"]
     Base.metadata.create_all(engine, tables=tables)
     return engine, sessionmaker(bind=engine, autoflush=False, future=True)
 

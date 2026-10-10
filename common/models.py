@@ -605,53 +605,16 @@ class Activity(AuditColumnsMixin, Base):
 
 
 # ============================================================================
-# 9. SCHOOL WEBSITE
+# 9. SCHOOL WEBSITE BUILDER
 # ============================================================================
 
-class WebsiteSettings(AuditColumnsMixin, Base):
-    __tablename__ = "website_settings"
+class WebsiteBuilderSite(AuditColumnsMixin, Base):
+    __tablename__ = "website_builder_sites"
 
     school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), primary_key=True)
-    school_name = Column(String(150), nullable=False)
-    tagline = Column(String(200))
-    nav_links = Column(String(255), nullable=False, default="Home,About,Academics,Admissions,Contact")
-    font_family = Column(String(60), nullable=False, default="Inter, sans-serif")
-    font_size = Column(String(10), nullable=False, default="Medium")
-    accent_color = Column(String(10), nullable=False, default="#023859")
-    icon_url = Column(String(255))
-    footer_address = Column(String(200))
-    footer_phone = Column(String(30))
-    footer_email = Column(String(120))
-    footer_copyright = Column(String(150))
-    is_active = Column(Boolean, nullable=False, default=False, server_default="false")
-
-
-class WebsitePage(AuditColumnsMixin, Base):
-    __tablename__ = "website_pages"
-
-    page_id = Column(Integer, primary_key=True)
-    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    slug = Column(String(20), nullable=False)
-    banner_url = Column(String(255))
-    heading = Column(String(200), nullable=False)
-    subheading = Column(String(255))
-    body = Column(Text)
-    extra_json = Column(JSONB)
-    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
-
-    __table_args__ = (UniqueConstraint("school_id", "slug"),)
-
-
-class WebsiteTestimonial(AuditColumnsMixin, Base):
-    __tablename__ = "website_testimonials"
-
-    testimonial_id = Column(Integer, primary_key=True)
-    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(100), nullable=False)
-    role = Column(String(100), nullable=False)
-    quote = Column(Text, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    draft = Column(JSONB, nullable=False)
+    published = Column(JSONB)
+    published_at = Column(DateTime)
 
 
 # ============================================================================

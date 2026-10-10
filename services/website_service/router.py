@@ -1,173 +1,138 @@
+import re
+
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from common.config import settings
 from common.database import get_db
-from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.dependencies import CurrentUser, require_role, require_school_scope
 from common.exceptions import AppError, NotFoundError
 from common.storage import (
-    ALLOWED_IMAGE_TYPES,
     media_type_for_filename,
     resolve_upload_path,
     save_image,
 )
 import repository as repo
-from schemas import (
-    WebsiteSettingsUpdate, WebsiteSettingsRead,
-    WebsitePageUpsert, WebsitePageRead,
-    TestimonialCreate, TestimonialRead, PublicSiteRead,
-)
+from schemas import PublishedWebsite, WebsiteBuilderContent, WebsiteBuilderState
 
-router = APIRouter(prefix="/website", tags=["website"])
+router = APIRouter(prefix="/website", tags=["website-builder"])
+public_router = APIRouter(prefix="/public/sites", tags=["public-website"])
 
-VALID_SLUGS = {"home", "about", "academics", "admissions", "contact"}
+WEBSITE_IMAGE_TYPES = {
+    "image/jpeg": b"\xff\xd8\xff",
+    "image/png": b"\x89PNG\r\n\x1a\n",
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "image/webp": b"RIFF",
+}
+WEBSITE_ASSET_NAME = re.compile(r"website_\d+_\d{8}_\d{6}_\d+\.(?:jpg|png|gif|webp)")
 
 
-# ---- Admin-authenticated editing ----
-@router.get("/settings", response_model=WebsiteSettingsRead)
-def get_settings(
+def _site_state(site) -> WebsiteBuilderState:
+    return WebsiteBuilderState(
+        draft=site.draft if site else None,
+        updated_at=site.modified_at if site else None,
+        published_at=site.published_at if site else None,
+    )
+
+
+def _published_response(site) -> PublishedWebsite:
+    content = site.published
+    return PublishedWebsite(
+        school_id=site.school_id,
+        school_name=content["school_name"],
+        canvas_size=content["canvas_size"],
+        nodes=content["nodes"],
+        testimonials=content["testimonials"],
+        published_at=site.published_at,
+    )
+
+
+@router.get("/builder", response_model=WebsiteBuilderState)
+def get_builder(
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    settings = repo.get_settings_any(db, school_id)
-    if not settings:
-        raise NotFoundError("Website settings not yet created for this school")
-    return settings
+    return _site_state(repo.get_site(db, school_id))
 
 
-@router.put("/settings", response_model=WebsiteSettingsRead)
-def update_settings(
-    payload: WebsiteSettingsUpdate,
+@router.put("/builder/draft", response_model=WebsiteBuilderState)
+def save_builder_draft(
+    payload: WebsiteBuilderContent,
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.upsert_settings(db, school_id, payload.model_dump(exclude_unset=True), default_name="My School")
+    content = payload.as_json()
+    if len(str(content).encode("utf-8")) > 1_000_000:
+        raise AppError("Website content must be 1 MB or smaller")
+    return _site_state(repo.save_draft(db, school_id, content))
 
 
-@router.get("/pages/{slug}", response_model=WebsitePageRead)
-def get_page(
-    slug: str,
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
-):
-    page = repo.get_page(db, school_id, slug)
-    if not page:
-        raise NotFoundError(f"Page '{slug}' not yet created")
-    return page
-
-
-@router.put("/pages/{slug}", response_model=WebsitePageRead)
-def upsert_page(
-    slug: str,
-    payload: WebsitePageUpsert,
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
-):
-    if slug not in VALID_SLUGS:
-        raise NotFoundError(f"Unknown page slug '{slug}'")
-    return repo.upsert_page(db, school_id, slug, payload.model_dump(exclude_unset=True))
-
-
-@router.get("/testimonials", response_model=list[TestimonialRead])
-def list_testimonials(
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
-):
-    return repo.list_testimonials(db, school_id)
-
-
-@router.post("/testimonials", response_model=TestimonialRead, status_code=201)
-def add_testimonial(
-    payload: TestimonialCreate,
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
-):
-    return repo.add_testimonial(db, school_id, payload.model_dump())
-
-
-@router.delete("/testimonials/{testimonial_id}", status_code=204)
-def delete_testimonial(
-    testimonial_id: int,
-    db: Session = Depends(get_db),
-    school_id: int = Depends(require_school_scope),
-    current_user: CurrentUser = Depends(require_role("admin")),
-):
-    repo.delete_testimonial(db, school_id, testimonial_id)
-
-
-@router.post("/go-live", response_model=PublicSiteRead)
-def go_live(
+@router.post("/builder/publish", response_model=PublishedWebsite)
+def publish_builder(
     db: Session = Depends(get_db),
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     site = repo.publish_site(db, school_id)
-    if not site:
-        raise NotFoundError("Website settings not yet created for this school")
-    return site
+    if site is None:
+        raise NotFoundError("Save a website draft before publishing")
+    return _published_response(site)
 
 
-@router.post("/uploads")
-async def upload_image(
+@router.post("/builder/assets")
+async def upload_builder_asset(
     file: UploadFile = File(...),
-    current_user: CurrentUser = Depends(require_role("admin", "teacher", "master")),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
 ):
     content_type = file.content_type or ""
-    if content_type not in ALLOWED_IMAGE_TYPES:
-        raise AppError("Only JPEG, PNG, GIF, WebP, and SVG images are allowed")
-    data = await file.read()
+    signature = WEBSITE_IMAGE_TYPES.get(content_type)
+    if signature is None:
+        raise AppError("Only JPEG, PNG, GIF, and WebP images are allowed")
+    data = await file.read(settings.UPLOAD_MAX_BYTES + 1)
+    if len(data) > settings.UPLOAD_MAX_BYTES:
+        raise AppError("Image must be 5 MB or smaller")
+    if not _matches_image_signature(content_type, data, signature):
+        raise AppError("The uploaded file does not match its image type")
     try:
-        filename = save_image(data, content_type)
+        filename = save_image(data, content_type, filename_prefix=f"website_{school_id}")
     except ValueError as exc:
         raise AppError(str(exc)) from exc
-    return {"url": f"/api/v1/website/uploads/{filename}", "filename": filename}
+    return {"url": f"/api/v1/website/builder/assets/{filename}"}
 
 
-@router.get("/uploads/{filename}")
-def serve_upload(filename: str):
+@router.get("/builder/assets/{filename}")
+def serve_builder_asset(filename: str):
+    if not WEBSITE_ASSET_NAME.fullmatch(filename):
+        raise NotFoundError("Image not found")
     try:
         path = resolve_upload_path(filename)
     except FileNotFoundError:
-        raise NotFoundError("File not found") from None
+        raise NotFoundError("Image not found") from None
     return FileResponse(path, media_type=media_type_for_filename(filename))
 
 
-# ---- Public, unauthenticated read-only site ----
-public_router = APIRouter(prefix="/public/sites", tags=["public-website"])
+def _matches_image_signature(content_type: str, data: bytes, signature: bytes | tuple[bytes, ...]) -> bool:
+    if content_type == "image/webp":
+        return len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+    signatures = signature if isinstance(signature, tuple) else (signature,)
+    return any(data.startswith(item) for item in signatures)
 
 
-def _site_response(db: Session, settings) -> dict:
-    site = repo.site_payload(db, settings.school_id, settings)
-    return {
-        "settings": WebsiteSettingsRead.model_validate(site["settings"]),
-        "pages": {
-            slug: WebsitePageRead.model_validate(page)
-            for slug, page in site["pages"].items()
-        },
-        "testimonials": [
-            TestimonialRead.model_validate(testimonial)
-            for testimonial in site["testimonials"]
-        ],
-    }
-
-
-@public_router.get("/by-name/{school_name}")
+@public_router.get("/by-name/{school_name}", response_model=PublishedWebsite)
 def public_site_by_name(school_name: str, db: Session = Depends(get_db)):
-    settings = repo.find_settings_by_slug(db, school_name)
-    if not settings:
+    site = repo.find_published_site_by_slug(db, school_name)
+    if site is None:
         raise NotFoundError("This school has not published a website yet")
-    return _site_response(db, settings)
+    return _published_response(site)
 
 
-@public_router.get("/{school_id}")
+@public_router.get("/{school_id}", response_model=PublishedWebsite)
 def public_site(school_id: int, db: Session = Depends(get_db)):
-    settings = repo.get_settings(db, school_id)
-    if not settings:
+    site = repo.get_published_site(db, school_id)
+    if site is None:
         raise NotFoundError("This school has not published a website yet")
-    return _site_response(db, settings)
+    return _published_response(site)
