@@ -64,6 +64,7 @@ class WebsiteBuilderContent(BaseModel):
 
 class WebsiteBuilderState(BaseModel):
     draft: dict[str, Any] | None
+    published: dict[str, Any] | None = None
     updated_at: datetime | None
     published_at: datetime | None
 

@@ -206,8 +206,11 @@ class BackendContractTests(unittest.TestCase):
             ROOT / "services" / "website_service" / "repository.py"
         ).read_text(encoding="utf-8")
         self.assertIn("class WebsiteBuilderContent", schema)
-        self.assertIn('"/builder/draft"', router)
-        self.assertIn('"/builder/publish"', router)
+        self.assertIn('@router.put("/builder/draft", response_model=WebsiteBuilderState)', router)
+        self.assertIn('@router.post("/builder/publish", response_model=PublishedWebsite)', router)
+        self.assertIn('@router.get("/{school_id}"', router)
+        self.assertIn("scoped_school_id: int = Depends(require_school_scope)", router)
+        self.assertIn("published: dict[str, Any] | None = None", schema)
         self.assertIn("site.published = deepcopy(site.draft)", repository)
         migration = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")
         self.assertIn("DROP TABLE IF EXISTS schoolers.website_settings CASCADE", migration)

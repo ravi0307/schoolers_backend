@@ -31,6 +31,7 @@ WEBSITE_ASSET_NAME = re.compile(r"website_\d+_\d{8}_\d{6}_\d+\.(?:jpg|png|gif|we
 def _site_state(site) -> WebsiteBuilderState:
     return WebsiteBuilderState(
         draft=site.draft if site else None,
+        published=site.published if site else None,
         updated_at=site.modified_at if site else None,
         published_at=site.published_at if site else None,
     )
@@ -113,6 +114,18 @@ def serve_builder_asset(filename: str):
     except FileNotFoundError:
         raise NotFoundError("Image not found") from None
     return FileResponse(path, media_type=media_type_for_filename(filename))
+
+
+@router.get("/{school_id}", response_model=WebsiteBuilderState)
+def get_builder_for_school(
+    school_id: int,
+    db: Session = Depends(get_db),
+    scoped_school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if school_id != scoped_school_id:
+        raise NotFoundError("Website builder not found for this school")
+    return _site_state(repo.get_site(db, scoped_school_id))
 
 
 def _matches_image_signature(content_type: str, data: bytes, signature: bytes | tuple[bytes, ...]) -> bool:

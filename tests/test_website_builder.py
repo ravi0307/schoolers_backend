@@ -187,6 +187,28 @@ class WebsiteBuilderPersistenceTests(unittest.TestCase):
             with self.assertRaises(NotFoundError):
                 self.router.publish_builder(db, 17, current_user)
 
+    def test_multi_tenant_get_endpoint_returns_school_builder_state_and_blocks_other_schools(self):
+        current_user = SimpleNamespace(user_id=1, role="admin", school_id=17)
+        site = SimpleNamespace(
+            school_id=17,
+            draft={"school_name": "Sunrise School", "nodes": []},
+            published={"school_name": "Sunrise School", "nodes": [{"id": "live"}]},
+            modified_at=datetime.now(timezone.utc),
+            published_at=datetime.now(timezone.utc),
+        )
+        db = object()
+
+        with patch.object(self.router.repo, "get_site", return_value=site) as get_site:
+            state = self.router.get_builder_for_school(17, db, 17, current_user)
+        get_site.assert_called_once_with(db, 17)
+        self.assertEqual(state.draft["school_name"], "Sunrise School")
+        self.assertEqual(state.published["nodes"], [{"id": "live"}])
+
+        with patch.object(self.router.repo, "get_site") as get_site:
+            with self.assertRaises(NotFoundError):
+                self.router.get_builder_for_school(18, db, 17, current_user)
+        get_site.assert_not_called()
+
     def test_upload_rejects_mismatched_image_signatures_and_unknown_asset_names(self):
         matches = self.router._matches_image_signature
         self.assertTrue(matches("image/jpeg", b"\xff\xd8\xffdata", b"\xff\xd8\xff"))
