@@ -430,6 +430,20 @@ CREATE TABLE IF NOT EXISTS schoolers.website_builder_sites (
     modified_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS schoolers.website_queries (
+    query_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(254) NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS website_queries_school_created_idx
+    ON schoolers.website_queries (school_id, created_at DESC, query_id DESC);
+
 -- Master portal: school admin's name, used to generate the school login.
 ALTER TABLE IF EXISTS schoolers.schools
     ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),

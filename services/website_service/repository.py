@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from common.models import WebsiteBuilderSite
+from common.models import WebsiteBuilderSite, WebsiteQuery
 
 
 def get_site(db: Session, school_id: int) -> WebsiteBuilderSite | None:
@@ -57,6 +57,22 @@ def find_published_site_by_slug(db: Session, slug: str) -> WebsiteBuilderSite | 
         WebsiteBuilderSite.published.is_not(None),
         school_slug == expected_slug,
     ).first()
+
+def create_website_query(db: Session, school_id: int, payload: dict) -> WebsiteQuery:
+    query = WebsiteQuery(school_id=school_id, **payload)
+    db.add(query)
+    db.commit()
+    db.refresh(query)
+    return query
+
+
+def list_website_queries(db: Session, school_id: int) -> list[WebsiteQuery]:
+    return db.query(WebsiteQuery).filter(
+        WebsiteQuery.school_id == school_id
+    ).order_by(
+        WebsiteQuery.created_at.desc(),
+        WebsiteQuery.query_id.desc(),
+    ).all()
 
 
 def normalize_slug(value: str | None) -> str:

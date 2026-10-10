@@ -14,7 +14,13 @@ from common.storage import (
     save_image,
 )
 import repository as repo
-from schemas import PublishedWebsite, WebsiteBuilderContent, WebsiteBuilderState
+from schemas import (
+    PublishedWebsite,
+    WebsiteBuilderContent,
+    WebsiteBuilderState,
+    WebsiteQueryCreate,
+    WebsiteQueryRead,
+)
 
 router = APIRouter(prefix="/website", tags=["website-builder"])
 public_router = APIRouter(prefix="/public/sites", tags=["public-website"])
@@ -104,6 +110,14 @@ async def upload_builder_asset(
         raise AppError(str(exc)) from exc
     return {"url": f"/api/v1/website/builder/assets/{filename}"}
 
+@router.get("/queries", response_model=list[WebsiteQueryRead])
+def get_website_queries(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.list_website_queries(db, school_id)
+
 
 @router.get("/builder/assets/{filename}")
 def serve_builder_asset(filename: str):
@@ -149,3 +163,14 @@ def public_site(school_id: int, db: Session = Depends(get_db)):
     if site is None:
         raise NotFoundError("This school has not published a website yet")
     return _published_response(site)
+
+
+@public_router.post("/{school_id}/queries", response_model=WebsiteQueryRead, status_code=201)
+def submit_website_query(
+    school_id: int,
+    payload: WebsiteQueryCreate,
+    db: Session = Depends(get_db),
+):
+    if repo.get_published_site(db, school_id) is None:
+        raise NotFoundError("This school has not published a website yet")
+    return repo.create_website_query(db, school_id, payload.model_dump())
