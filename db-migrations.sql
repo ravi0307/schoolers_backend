@@ -1,7 +1,4 @@
 -- Keep the seeded database compatible with the current SQLAlchemy models.
-ALTER TABLE IF EXISTS schoolers.website_settings
-    ADD COLUMN IF NOT EXISTS icon_url VARCHAR(255);
-
 ALTER TABLE IF EXISTS schoolers.schools
     ADD COLUMN IF NOT EXISTS logo_url VARCHAR(255);
 
@@ -393,18 +390,6 @@ ALTER TABLE IF EXISTS schoolers.activities
     ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
 
-ALTER TABLE IF EXISTS schoolers.website_settings
-    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
-
-ALTER TABLE IF EXISTS schoolers.website_pages
-    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
-
-ALTER TABLE IF EXISTS schoolers.website_testimonials
-    ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
-
 ALTER TABLE IF EXISTS schoolers.users
     ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
@@ -429,6 +414,35 @@ ALTER TABLE IF EXISTS schoolers.media
 
 CREATE INDEX IF NOT EXISTS media_uploader_user_idx
     ON schoolers.media (uploader_user_id);
+
+-- The visual builder replaces the legacy multi-page website. Existing website
+-- settings, pages, and testimonials are intentionally retired with the old UI.
+DROP TABLE IF EXISTS schoolers.website_pages CASCADE;
+DROP TABLE IF EXISTS schoolers.website_testimonials CASCADE;
+DROP TABLE IF EXISTS schoolers.website_settings CASCADE;
+
+CREATE TABLE IF NOT EXISTS schoolers.website_builder_sites (
+    school_id INTEGER PRIMARY KEY REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    draft JSONB NOT NULL,
+    published JSONB,
+    published_at TIMESTAMP,
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS schoolers.website_queries (
+    query_id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schoolers.schools(school_id) ON DELETE CASCADE,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(254) NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
+    modified_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS website_queries_school_created_idx
+    ON schoolers.website_queries (school_id, created_at DESC, query_id DESC);
 
 -- Master portal: school admin's name, used to generate the school login.
 ALTER TABLE IF EXISTS schoolers.schools
