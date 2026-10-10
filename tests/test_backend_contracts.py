@@ -407,6 +407,12 @@ class BackendContractTests(unittest.TestCase):
             "updated_by_user",
             "support_tickets",
             "support_ticket_messages",
+            "schoolers.users",
+            "email VARCHAR(255)",
+            "trip_type TO direction",
+            "vehicle_number TO vehicle",
+            "cancelled_reason TO cancellation_reason",
+            "schoolers.trip_students",
         )
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):

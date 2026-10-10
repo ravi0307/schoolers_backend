@@ -259,6 +259,47 @@ class TripHistoryApiTests(unittest.TestCase):
     def _parent3_school2(self):
         return CurrentUser(user_id=720, role="parent", school_id=2, linked_person_id=20)
 
+    def test_route_roster_read_exposes_current_student_names_and_statuses(self):
+        self.db.add_all(
+            [
+                RouteStudent(route_id=1, student_id=101, status="picked"),
+                RouteStudent(route_id=1, student_id=102, status="pending"),
+            ]
+        )
+        self.db.commit()
+
+        rows = self.router.list_route_students(
+            route_id=1,
+            db=self.db,
+            current_user=self._pilot_staff(1),
+        )
+
+        self.assertEqual(
+            [
+                (row["student_id"], row["student_name"], row["status"])
+                for row in rows
+            ],
+            [
+                (101, "Aarav Rao", "picked"),
+                (102, "Anika Rao", "pending"),
+            ],
+        )
+
+    def test_route_roster_fallback_endpoint_allows_parent_admin_and_pilot(self):
+        source = ROUTER_SOURCE.read_text()
+        tree = ast.parse(source)
+        endpoint = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "list_route_students"
+        )
+        guard_defaults = [ast.unparse(default) for default in endpoint.args.defaults]
+
+        self.assertTrue(
+            any("require_role('parent', 'admin', 'pilot')" in default for default in guard_defaults),
+            "route-roster fallback must remain readable by parent, admin, and pilot",
+        )
+
     # --- Admin list -------------------------------------------------------
 
     def test_admin_lists_all_history_newest_first(self):

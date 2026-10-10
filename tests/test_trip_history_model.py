@@ -22,6 +22,7 @@ Design decisions under test (see the migration block in db-migrations.sql):
 """
 import unittest
 from datetime import date, datetime
+from pathlib import Path
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
@@ -495,6 +496,30 @@ class TripModelTests(unittest.TestCase):
                          {"pending", "picked", "did_not_board"})
         self.assertEqual({e.value for e in DropStatus},
                          {"pending", "dropped", "drop_not_recorded"})
+
+    def test_trip_student_status_columns_fit_all_supported_values_and_migration(self):
+        from common.enums import BoardingStatus, DropStatus
+
+        boarding_width = TripStudent.__table__.c.boarding_status.type.length
+        drop_width = TripStudent.__table__.c.drop_status.type.length
+        self.assertGreaterEqual(
+            boarding_width,
+            max(len(status.value) for status in BoardingStatus),
+        )
+        self.assertGreaterEqual(
+            drop_width,
+            max(len(status.value) for status in DropStatus),
+        )
+
+        migration = (
+            Path(__file__).resolve().parents[1] / "db-migrations.sql"
+        ).read_text(encoding="utf-8")
+        self.assertRegex(
+            migration,
+            r"(?is)ALTER TABLE schoolers\.trip_students\s+"
+            r"ALTER COLUMN boarding_status TYPE VARCHAR\(20\),\s+"
+            r"ALTER COLUMN drop_status TYPE VARCHAR\(20\)",
+        )
 
 
 if __name__ == "__main__":
