@@ -49,6 +49,7 @@ def _published_response(site) -> PublishedWebsite:
         school_id=site.school_id,
         school_name=content["school_name"],
         canvas_size=content["canvas_size"],
+        canvas_background=content.get("canvas_background", "#ffffff"),
         nodes=content["nodes"],
         testimonials=content["testimonials"],
         published_at=site.published_at,
