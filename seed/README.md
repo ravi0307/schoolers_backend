@@ -33,8 +33,7 @@ mutating commands.
 12 parents, 18 students, 3 pilots, 3 vehicles, 3 routes (2 stops / 4 students
 each), 270 timetable entries over a normalised set of 9 periods, attendance,
 72 marks, staff attendance, salaries (36) + fees (54) for 3 months, 5 holidays,
-6 leave requests, 4 broadcasts, 6 gallery media, website settings + 5 pages +
-4 testimonials + go-live, 4 activities, 2 support tickets, 3 barter listings,
+6 leave requests, 4 broadcasts, 6 gallery media, 4 activities, 2 support tickets, 3 barter listings,
 3 notifications. Totals are asserted by `verify`.
 
 ## Accounts

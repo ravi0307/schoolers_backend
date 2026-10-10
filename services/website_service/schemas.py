@@ -1,79 +1,77 @@
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class WebsiteSettingsUpdate(BaseModel):
-    school_name: str | None = None
-    tagline: str | None = None
-    nav_links: str | None = None
-    font_family: str | None = None
-    font_size: str | None = None
-    accent_color: str | None = None
-    icon_url: str | None = None
-    footer_address: str | None = None
-    footer_phone: str | None = None
-    footer_email: str | None = None
-    footer_copyright: str | None = None
+class CanvasSize(BaseModel):
+    width: int = Field(ge=650, le=5000)
+    height: int = Field(ge=560, le=5000)
 
 
-class WebsiteSettingsRead(BaseModel):
+class BuilderLabel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    text: str = Field(default="", max_length=80)
+    anchorId: str = Field(default="", max_length=80)
+
+
+class BannerSlide(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    imageUrl: str = Field(default="", max_length=2000)
+    title: str = Field(default="", max_length=200)
+    subtitle: str = Field(default="", max_length=500)
+
+
+class BuilderNode(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    anchorId: str = Field(default="", max_length=80)
+    type: Literal["header", "footer", "testimonial", "testimonials", "banner", "contact", "center"]
+    title: str = Field(default="Content", max_length=120)
+    x: float = Field(ge=0, le=100)
+    y: float = Field(ge=0, le=100)
+    width: float = Field(gt=0, le=100)
+    height: float = Field(gt=0, le=100)
+    html: str = Field(default="", max_length=50000)
+    slides: list[BannerSlide] = Field(default_factory=list, max_length=20)
+    labels: list[BuilderLabel] = Field(default_factory=list, max_length=100)
+
+
+class BuilderTestimonial(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(default="School community", max_length=120)
+    role: str = Field(default="", max_length=120)
+    quote: str = Field(default="", max_length=2000)
+
+
+class WebsiteBuilderContent(BaseModel):
+    school_name: str = Field(min_length=1, max_length=150)
+    canvas_size: CanvasSize
+    nodes: list[BuilderNode] = Field(max_length=100)
+    testimonials: list[BuilderTestimonial] = Field(max_length=500)
+    pending_testimonials: list[BuilderTestimonial] = Field(max_length=500)
+
+    def as_json(self) -> dict[str, Any]:
+        return self.model_dump(by_alias=True)
+
+
+class WebsiteBuilderState(BaseModel):
+    draft: dict[str, Any] | None
+    updated_at: datetime | None
+    published_at: datetime | None
+
+
+class PublishedWebsite(BaseModel):
     school_id: int
     school_name: str
-    tagline: str | None
-    nav_links: str
-    font_family: str
-    font_size: str
-    accent_color: str
-    icon_url: str | None
-    footer_address: str | None
-    footer_phone: str | None
-    footer_email: str | None
-    footer_copyright: str | None
-    is_active: bool
-
-    class Config:
-        from_attributes = True
-
-
-class WebsitePageUpsert(BaseModel):
-    banner_url: str | None = None
-    heading: str
-    subheading: str | None = None
-    body: str | None = None
-    extra_json: dict | None = None
-
-
-class WebsitePageRead(BaseModel):
-    page_id: int
-    school_id: int
-    slug: str
-    banner_url: str | None
-    heading: str
-    subheading: str | None
-    body: str | None
-    extra_json: dict | None
-
-    class Config:
-        from_attributes = True
-
-
-class TestimonialCreate(BaseModel):
-    name: str
-    role: str
-    quote: str
-
-
-class TestimonialRead(BaseModel):
-    testimonial_id: int
-    school_id: int
-    name: str
-    role: str
-    quote: str
-
-    class Config:
-        from_attributes = True
-
-
-class PublicSiteRead(BaseModel):
-    settings: WebsiteSettingsRead
-    pages: dict[str, WebsitePageRead]
-    testimonials: list[TestimonialRead]
+    canvas_size: dict[str, int]
+    nodes: list[dict[str, Any]]
+    testimonials: list[dict[str, Any]]
+    published_at: datetime

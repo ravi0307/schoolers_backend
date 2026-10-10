@@ -43,7 +43,7 @@ app/
 │   ├── media/                  # school photo/video gallery
 │   ├── barter/                 # barter_listings
 │   ├── activities/             # daily activity content feed
-│   ├── website/                # school website builder (settings/pages/testimonials)
+│   ├── website/                # school website builder (draft/publish/assets)
 │   ├── notifications/          # school_notifications + generic dispatch
 │   └── reports/                # aggregated stats, dashboards
 │
@@ -164,14 +164,12 @@ modules/attendance/
 - `GET /activities?school_id=`, `POST /activities` (admin/content role)
 - Tables: `activities`
 
-### `modules/website` — School Admin builds, public/anonymous reads
-- Settings: `GET/PUT /website/{school_id}/settings` (font/size/color/header/footer)
-- Pages: `GET/PUT /website/{school_id}/pages/{slug}` (home/about/academics/admissions/contact)
-- Testimonials: CRUD
-- Consider a **separate public router** with no auth (`/public/sites/{school_id}`)
-  since this content is meant to be a real public-facing page, distinct from
-  the authenticated app API
-- Tables: `website_settings`, `website_pages`, `website_testimonials`
+### `modules/website` — School Admin visual builder, public/anonymous reads
+- Draft: `GET /website/builder`, `PUT /website/builder/draft` (school-admin scoped)
+- Publish: `POST /website/builder/publish` snapshots the saved draft
+- Assets: `POST /website/builder/assets` (school-admin authenticated); public asset reads
+- Public: `GET /public/sites/{school_id}` or `/public/sites/by-name/{school_slug}`
+- Table: `website_builder_sites` stores one draft and the last published snapshot per school
 
 ### `modules/notifications`
 - `school_notifications`: Master Admin → School (Dues/Activation/General)

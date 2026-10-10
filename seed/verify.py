@@ -23,8 +23,7 @@ EXPECTED_COUNTS = {
     "student_fees": 108, "holidays": 10, "leave_requests": 12,
     "broadcasts": 8, "media": 12, "vehicles": 6, "pilots": 6, "routes": 6,
     "route_stops": 24, "route_students": 24, "activities": 8,
-    "barter_listings": 6, "website_settings": 2, "website_pages": 10,
-    "website_testimonials": 8, "support_tickets": 4,
+    "barter_listings": 6, "website_builder_sites": 0, "support_tickets": 4,
     "support_ticket_messages": 6, "school_notifications": 6,
 }
 

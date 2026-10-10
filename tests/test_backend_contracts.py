@@ -179,7 +179,7 @@ class BackendContractTests(unittest.TestCase):
         }
         self.assertTrue(expected_keys.issubset(route_map))
 
-    def test_public_website_lookup_supports_school_name_slug(self):
+    def test_public_builder_lookup_only_exposes_published_sites(self):
         router = (
             ROOT / "services" / "website_service" / "router.py"
         ).read_text(encoding="utf-8")
@@ -187,17 +187,15 @@ class BackendContractTests(unittest.TestCase):
             ROOT / "services" / "website_service" / "repository.py"
         ).read_text(encoding="utf-8")
         self.assertIn('"/by-name/{school_name}"', router)
-        self.assertIn("find_settings_by_slug", router)
-        self.assertIn("def find_settings_by_slug", repository)
-        self.assertIn("regexp_replace", repository)
-        self.assertIn("is_active.is_(True)", repository)
+        self.assertIn("find_published_site_by_slug", router)
+        self.assertIn("def find_published_site_by_slug", repository)
+        self.assertIn("WebsiteBuilderSite.published.is_not(None)", repository)
 
-    def test_website_settings_start_unpublished_until_go_live(self):
+    def test_builder_saves_a_draft_and_publishes_a_snapshot(self):
         model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
-        settings_block = model.split("class WebsiteSettings", 1)[1].split("\nclass ", 1)[0]
-        self.assertIn('default=False, server_default="false"', settings_block)
-
-    def test_website_read_schema_exposes_live_state_and_admin_can_edit_pre_live(self):
+        self.assertIn("class WebsiteBuilderSite", model)
+        self.assertIn("__tablename__ = \"website_builder_sites\"", model)
+        self.assertIn("published_at = Column(DateTime)", model)
         schema = (
             ROOT / "services" / "website_service" / "schemas.py"
         ).read_text(encoding="utf-8")
@@ -207,10 +205,13 @@ class BackendContractTests(unittest.TestCase):
         repository = (
             ROOT / "services" / "website_service" / "repository.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("is_active: bool", schema)
-        self.assertIn("repo.get_settings_any(db, school_id)", router)
-        upsert_block = repository.split("def upsert_settings(", 1)[1].split("def ", 1)[0]
-        self.assertIn("get_settings_any(db, school_id)", upsert_block)
+        self.assertIn("class WebsiteBuilderContent", schema)
+        self.assertIn('"/builder/draft"', router)
+        self.assertIn('"/builder/publish"', router)
+        self.assertIn("site.published = deepcopy(site.draft)", repository)
+        migration = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")
+        self.assertIn("DROP TABLE IF EXISTS schoolers.website_settings CASCADE", migration)
+        self.assertIn("CREATE TABLE IF NOT EXISTS schoolers.website_builder_sites", migration)
 
     def test_forgot_password_reset_requires_emailed_token_and_never_returns_it(self):
         schema = (

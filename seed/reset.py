@@ -46,9 +46,7 @@ TENANT_TABLES: list[str] = [
     "holidays",
     "activities",
     "barter_listings",
-    "website_pages",
-    "website_testimonials",
-    "website_settings",
+    "website_builder_sites",
     "school_notifications",
     "users",               # only non-master rows
     "schools",
