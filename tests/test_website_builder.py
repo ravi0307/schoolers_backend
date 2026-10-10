@@ -39,6 +39,7 @@ class WebsiteBuilderSchemaTests(unittest.TestCase):
         content = WebsiteBuilderContent.model_validate({
             "school_name": "Sunrise School",
             "canvas_size": {"width": 1200, "height": 1900},
+            "canvas_background": "rgba(15, 118, 110, 0.35)",
             "nodes": [{
                 "id": "site-header",
                 "anchorId": "top",
@@ -49,6 +50,18 @@ class WebsiteBuilderSchemaTests(unittest.TestCase):
                 "width": 100,
                 "height": 9,
                 "labels": [{"id": "about", "text": "About Us", "anchorId": "about"}],
+            }, {
+                "id": "school-profile",
+                "type": "school-profile",
+                "title": "School profile",
+                "x": 10,
+                "y": 20,
+                "width": 80,
+                "height": 15,
+                "variant": "centered",
+                "profileName": "Sunrise School",
+                "profileMotto": "Learn together",
+                "profileLogo": "/api/v1/website/uploads/logo.png",
             }],
             "testimonials": [{"id": "live-1", "name": "Parent", "role": "Parent", "quote": "Great school"}],
             "pending_testimonials": [],
@@ -56,8 +69,11 @@ class WebsiteBuilderSchemaTests(unittest.TestCase):
 
         serialized = content.as_json()
         self.assertEqual(serialized["canvas_size"], {"width": 1200, "height": 1900})
+        self.assertEqual(serialized["canvas_background"], "rgba(15, 118, 110, 0.35)")
         self.assertEqual(serialized["nodes"][0]["anchorId"], "top")
         self.assertEqual(serialized["nodes"][0]["labels"][0]["anchorId"], "about")
+        self.assertEqual(serialized["nodes"][1]["type"], "school-profile")
+        self.assertEqual(serialized["nodes"][1]["profileMotto"], "Learn together")
         self.assertEqual(serialized["testimonials"][0]["id"], "live-1")
 
     def test_canvas_document_rejects_invalid_dimensions_and_node_types(self):
@@ -65,6 +81,16 @@ class WebsiteBuilderSchemaTests(unittest.TestCase):
             WebsiteBuilderContent.model_validate({
                 "school_name": "Sunrise School",
                 "canvas_size": {"width": 500, "height": 1900},
+                "nodes": [],
+                "testimonials": [],
+                "pending_testimonials": [],
+            })
+
+        with self.assertRaises(ValidationError):
+            WebsiteBuilderContent.model_validate({
+                "school_name": "Sunrise School",
+                "canvas_size": {"width": 1200, "height": 1900},
+                "canvas_background": "url(javascript:alert(1))",
                 "nodes": [],
                 "testimonials": [],
                 "pending_testimonials": [],
@@ -168,6 +194,7 @@ class WebsiteBuilderPersistenceTests(unittest.TestCase):
             published={
                 "school_name": "Sunrise Public School",
                 "canvas_size": {"width": 1200, "height": 1900},
+                "canvas_background": "#f0f4f8",
                 "nodes": [{"id": "live"}],
                 "testimonials": [],
             },
@@ -179,6 +206,7 @@ class WebsiteBuilderPersistenceTests(unittest.TestCase):
             response = self.router.public_site(17, db)
         self.assertEqual(response.school_id, 17)
         self.assertEqual(response.nodes, [{"id": "live"}])
+        self.assertEqual(response.canvas_background, "#f0f4f8")
 
         with patch.object(self.router.repo, "find_published_site_by_slug", return_value=site) as find:
             response = self.router.public_site_by_name("sunrise-public-school", db)

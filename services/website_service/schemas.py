@@ -31,7 +31,7 @@ class BuilderNode(BaseModel):
 
     id: str = Field(min_length=1, max_length=100)
     anchorId: str = Field(default="", max_length=80)
-    type: Literal["header", "footer", "testimonial", "testimonials", "banner", "contact", "center"]
+    type: Literal["header", "footer", "testimonial", "testimonials", "banner", "contact", "center", "school-profile"]
     title: str = Field(default="Content", max_length=120)
     x: float = Field(ge=0, le=100)
     y: float = Field(ge=0, le=100)
@@ -54,6 +54,11 @@ class BuilderTestimonial(BaseModel):
 class WebsiteBuilderContent(BaseModel):
     school_name: str = Field(min_length=1, max_length=150)
     canvas_size: CanvasSize
+    canvas_background: str = Field(
+        default="#ffffff",
+        max_length=80,
+        pattern=r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$",
+    )
     nodes: list[BuilderNode] = Field(max_length=100)
     testimonials: list[BuilderTestimonial] = Field(max_length=500)
     pending_testimonials: list[BuilderTestimonial] = Field(max_length=500)
@@ -94,6 +99,7 @@ class PublishedWebsite(BaseModel):
     school_id: int
     school_name: str
     canvas_size: dict[str, int]
+    canvas_background: str = "#ffffff"
     nodes: list[dict[str, Any]]
     testimonials: list[dict[str, Any]]
     published_at: datetime
