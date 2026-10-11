@@ -112,6 +112,76 @@ class WebsiteBuilderSchemaTests(unittest.TestCase):
                 "pending_testimonials": [],
             })
 
+    def test_school_identity_and_block_style_fields_round_trip(self):
+        content = WebsiteBuilderContent.model_validate({
+            "school_name": "Sunrise School",
+            "canvas_size": {"width": 1200, "height": 1900},
+            "canvas_background": "rgba(15, 118, 110, 0.35)",
+            "nodes": [{
+                "id": "school-identity",
+                "type": "school-identity",
+                "x": 4,
+                "y": 6,
+                "width": 37.5,
+                "height": 9.5,
+                "data": {
+                    "schoolName": "Sunrise School",
+                    "tagline": "Learn together",
+                    "logoUrl": "/api/v1/website/uploads/logo.png",
+                },
+            }, {
+                "id": "div",
+                "type": "center",
+                "x": 0,
+                "y": 20,
+                "width": 50,
+                "height": 20,
+                "backgroundColor": "#0f766e",
+                "backgroundOpacity": 0.4,
+                "boxBgColor": "rgba(255, 255, 255, 0.8)",
+            }],
+            "testimonials": [],
+            "pending_testimonials": [],
+        })
+
+        serialized = content.as_json()
+        self.assertEqual(serialized["nodes"][0]["data"]["schoolName"], "Sunrise School")
+        self.assertEqual(serialized["nodes"][0]["data"]["tagline"], "Learn together")
+        self.assertEqual(serialized["nodes"][0]["data"]["logoUrl"], "/api/v1/website/uploads/logo.png")
+        self.assertEqual(serialized["nodes"][1]["backgroundColor"], "#0f766e")
+        self.assertEqual(serialized["nodes"][1]["backgroundOpacity"], 0.4)
+        self.assertEqual(serialized["nodes"][1]["boxBgColor"], "rgba(255, 255, 255, 0.8)")
+        self.assertNotIn("data", serialized["nodes"][1])
+
+    def test_school_identity_requires_nested_data_and_style_values_are_bounded(self):
+        base = {
+            "school_name": "Sunrise School",
+            "canvas_size": {"width": 1200, "height": 1900},
+            "nodes": [{
+                "id": "school-identity",
+                "type": "school-identity",
+                "x": 0,
+                "y": 0,
+                "width": 40,
+                "height": 20,
+            }],
+            "testimonials": [],
+            "pending_testimonials": [],
+        }
+        with self.assertRaises(ValidationError):
+            WebsiteBuilderContent.model_validate(base)
+
+        invalid_opacity = {
+            **base,
+            "nodes": [{
+                **base["nodes"][0],
+                "data": {},
+                "backgroundOpacity": 1.1,
+            }],
+        }
+        with self.assertRaises(ValidationError):
+            WebsiteBuilderContent.model_validate(invalid_opacity)
+
 
 class WebsiteBuilderPersistenceTests(unittest.TestCase):
     @classmethod
