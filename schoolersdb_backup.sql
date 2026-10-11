@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xZ1twj7I5MPM3YgTThVth3ZcSZlzQpjn88zaSkEznaNy8aDvihse4qHbUgForxn
+\restrict jaacC1PZwmbSwjg7dm9aWfUJIZ87EEZZxTlhnTnGur3OlfUFH3HbYsejz98Pl86
 
 -- Dumped from database version 17.10
 -- Dumped by pg_dump version 17.10
@@ -19,6 +19,339 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_route_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_reopened_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_pilot_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_created_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_cancelled_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_trip_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_drop_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_boarding_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_trip_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_drop_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_boarding_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_trip_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_route_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_trip_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_changed_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_trip_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_expected_pickup_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_expected_drop_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_subject_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_period_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_created_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_subject_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_created_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_ticket_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_author_user_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_marked_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.schools DROP CONSTRAINT IF EXISTS schools_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_route_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_pickup_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_drop_stop_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_route_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_route_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_parent_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_uploader_user_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_updated_by_user_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_updated_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_subject_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_class_teacher_staff_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_sender_user_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_route_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.barter_listings DROP CONSTRAINT IF EXISTS barter_listings_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.barter_listings DROP CONSTRAINT IF EXISTS barter_listings_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_user_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_student_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_marked_by_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_class_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_school_id_fkey;
+ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_modified_by_fkey;
+DROP TRIGGER IF EXISTS broadcasts_set_created_at_ist ON schoolers.broadcasts;
+DROP INDEX IF EXISTS schoolers.website_queries_school_created_idx;
+DROP INDEX IF EXISTS schoolers.uq_trip_students_trip_student;
+DROP INDEX IF EXISTS schoolers.uq_pilots_route_id;
+DROP INDEX IF EXISTS schoolers.trips_school_date_idx;
+DROP INDEX IF EXISTS schoolers.trips_route_date_idx;
+DROP INDEX IF EXISTS schoolers.trips_pilot_date_idx;
+DROP INDEX IF EXISTS schoolers.trip_student_events_student_idx;
+DROP INDEX IF EXISTS schoolers.trip_stop_events_trip_idx;
+DROP INDEX IF EXISTS schoolers.trip_status_audit_trip_idx;
+DROP INDEX IF EXISTS schoolers.trip_roster_trip_idx;
+DROP INDEX IF EXISTS schoolers.trip_roster_student_idx;
+DROP INDEX IF EXISTS schoolers.support_tickets_status_idx;
+DROP INDEX IF EXISTS schoolers.support_tickets_school_status_idx;
+DROP INDEX IF EXISTS schoolers.support_ticket_messages_ticket_idx;
+DROP INDEX IF EXISTS schoolers.student_fees_school_month_idx;
+DROP INDEX IF EXISTS schoolers.staff_salaries_school_month_idx;
+DROP INDEX IF EXISTS schoolers.route_students_student_id_key;
+DROP INDEX IF EXISTS schoolers.media_uploader_user_idx;
+DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_user_id;
+DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_family_id;
+DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_expires_at;
+DROP INDEX IF EXISTS schoolers.idx_users_school;
+DROP INDEX IF EXISTS schoolers.idx_trips_status_date;
+DROP INDEX IF EXISTS schoolers.idx_trips_school_date;
+DROP INDEX IF EXISTS schoolers.idx_trips_route_date;
+DROP INDEX IF EXISTS schoolers.idx_trips_pilot_date;
+DROP INDEX IF EXISTS schoolers.idx_trip_students_trip_student;
+DROP INDEX IF EXISTS schoolers.idx_timetable_class;
+DROP INDEX IF EXISTS schoolers.idx_students_school;
+DROP INDEX IF EXISTS schoolers.idx_students_class;
+DROP INDEX IF EXISTS schoolers.idx_staff_school;
+DROP INDEX IF EXISTS schoolers.idx_staff_person_type;
+DROP INDEX IF EXISTS schoolers.idx_staff_attendance_school_date;
+DROP INDEX IF EXISTS schoolers.idx_routes_school;
+DROP INDEX IF EXISTS schoolers.idx_route_stops_route;
+DROP INDEX IF EXISTS schoolers.idx_parents_school;
+DROP INDEX IF EXISTS schoolers.idx_marks_student;
+DROP INDEX IF EXISTS schoolers.idx_leave_requests_school;
+DROP INDEX IF EXISTS schoolers.idx_classes_school;
+DROP INDEX IF EXISTS schoolers.idx_broadcasts_school;
+DROP INDEX IF EXISTS schoolers.idx_attendance_student_date;
+DROP INDEX IF EXISTS schoolers.broadcasts_sender_user_idx;
+ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_school_vehicle_number_key;
+ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_username_key;
+ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS uq_trips_route_date_direction;
+ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_trip_student_key;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_trip_stop_key;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_trip_student_key;
+ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_class_id_day_of_week_period_id_key;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_staff_id_class_id_subject_id_key;
+ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_school_id_name_key;
+ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_admission_no_key;
+ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_student_id_month_key;
+ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_staff_id_month_key;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_staff_id_date_key;
+ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.schools DROP CONSTRAINT IF EXISTS schools_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_route_id_student_id_key;
+ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_staff_id_key;
+ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_period_no_key;
+ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_parent_id_student_id_key;
+ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_student_id_subject_id_term_key;
+ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_school_id_holiday_date_key;
+ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_school_id_name_key;
+ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_jti_hash_key;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_student_date_key;
+ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_pkey;
+ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_pkey;
+ALTER TABLE IF EXISTS schoolers.website_queries ALTER COLUMN query_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.users ALTER COLUMN user_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.trips ALTER COLUMN trip_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.trip_student_events ALTER COLUMN event_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.trip_stop_events ALTER COLUMN event_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.trip_status_audit ALTER COLUMN entry_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.trip_roster ALTER COLUMN entry_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.timetable_entries ALTER COLUMN entry_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.teacher_class_subjects ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.support_tickets ALTER COLUMN ticket_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.support_ticket_messages ALTER COLUMN message_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.subjects ALTER COLUMN subject_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.students ALTER COLUMN student_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.student_fees ALTER COLUMN fee_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.staff_salaries ALTER COLUMN salary_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.staff_attendance ALTER COLUMN attendance_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.staff ALTER COLUMN staff_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.schools ALTER COLUMN school_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.school_notifications ALTER COLUMN notification_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.routes ALTER COLUMN route_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.route_students ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.route_stops ALTER COLUMN stop_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.periods ALTER COLUMN period_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.parents ALTER COLUMN parent_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.parent_student ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.media ALTER COLUMN media_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.marks ALTER COLUMN mark_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.leave_requests ALTER COLUMN leave_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.holidays ALTER COLUMN holiday_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.classes ALTER COLUMN class_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.broadcasts ALTER COLUMN broadcast_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.barter_listings ALTER COLUMN listing_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.attendance ALTER COLUMN attendance_id DROP DEFAULT;
+ALTER TABLE IF EXISTS schoolers.activities ALTER COLUMN activity_id DROP DEFAULT;
+DROP SEQUENCE IF EXISTS schoolers.website_queries_query_id_seq;
+DROP TABLE IF EXISTS schoolers.website_queries;
+DROP TABLE IF EXISTS schoolers.website_builder_sites;
+DROP TABLE IF EXISTS schoolers.vehicles;
+DROP SEQUENCE IF EXISTS schoolers.users_user_id_seq;
+DROP TABLE IF EXISTS schoolers.users;
+DROP SEQUENCE IF EXISTS schoolers.trips_trip_id_seq;
+DROP TABLE IF EXISTS schoolers.trips;
+DROP TABLE IF EXISTS schoolers.trip_students;
+DROP SEQUENCE IF EXISTS schoolers.trip_student_events_event_id_seq;
+DROP TABLE IF EXISTS schoolers.trip_student_events;
+DROP SEQUENCE IF EXISTS schoolers.trip_stop_events_event_id_seq;
+DROP TABLE IF EXISTS schoolers.trip_stop_events;
+DROP SEQUENCE IF EXISTS schoolers.trip_status_audit_entry_id_seq;
+DROP TABLE IF EXISTS schoolers.trip_status_audit;
+DROP SEQUENCE IF EXISTS schoolers.trip_roster_entry_id_seq;
+DROP TABLE IF EXISTS schoolers.trip_roster;
+DROP SEQUENCE IF EXISTS schoolers.timetable_entries_entry_id_seq;
+DROP TABLE IF EXISTS schoolers.timetable_entries;
+DROP SEQUENCE IF EXISTS schoolers.teacher_class_subjects_id_seq;
+DROP TABLE IF EXISTS schoolers.teacher_class_subjects;
+DROP SEQUENCE IF EXISTS schoolers.support_tickets_ticket_id_seq;
+DROP TABLE IF EXISTS schoolers.support_tickets;
+DROP SEQUENCE IF EXISTS schoolers.support_ticket_messages_message_id_seq;
+DROP TABLE IF EXISTS schoolers.support_ticket_messages;
+DROP SEQUENCE IF EXISTS schoolers.subjects_subject_id_seq;
+DROP TABLE IF EXISTS schoolers.subjects;
+DROP SEQUENCE IF EXISTS schoolers.students_student_id_seq;
+DROP TABLE IF EXISTS schoolers.students;
+DROP SEQUENCE IF EXISTS schoolers.student_fees_fee_id_seq;
+DROP TABLE IF EXISTS schoolers.student_fees;
+DROP SEQUENCE IF EXISTS schoolers.staff_staff_id_seq;
+DROP SEQUENCE IF EXISTS schoolers.staff_salaries_salary_id_seq;
+DROP TABLE IF EXISTS schoolers.staff_salaries;
+DROP SEQUENCE IF EXISTS schoolers.staff_attendance_attendance_id_seq;
+DROP TABLE IF EXISTS schoolers.staff_attendance;
+DROP TABLE IF EXISTS schoolers.staff;
+DROP SEQUENCE IF EXISTS schoolers.schools_school_id_seq;
+DROP TABLE IF EXISTS schoolers.schools;
+DROP SEQUENCE IF EXISTS schoolers.school_notifications_notification_id_seq;
+DROP TABLE IF EXISTS schoolers.school_notifications;
+DROP SEQUENCE IF EXISTS schoolers.routes_route_id_seq;
+DROP TABLE IF EXISTS schoolers.routes;
+DROP SEQUENCE IF EXISTS schoolers.route_students_id_seq;
+DROP TABLE IF EXISTS schoolers.route_students;
+DROP SEQUENCE IF EXISTS schoolers.route_stops_stop_id_seq;
+DROP TABLE IF EXISTS schoolers.route_stops;
+DROP TABLE IF EXISTS schoolers.pilots;
+DROP SEQUENCE IF EXISTS schoolers.periods_period_id_seq;
+DROP TABLE IF EXISTS schoolers.periods;
+DROP SEQUENCE IF EXISTS schoolers.parents_parent_id_seq;
+DROP TABLE IF EXISTS schoolers.parents;
+DROP SEQUENCE IF EXISTS schoolers.parent_student_id_seq;
+DROP TABLE IF EXISTS schoolers.parent_student;
+DROP SEQUENCE IF EXISTS schoolers.media_media_id_seq;
+DROP TABLE IF EXISTS schoolers.media;
+DROP SEQUENCE IF EXISTS schoolers.marks_mark_id_seq;
+DROP TABLE IF EXISTS schoolers.marks;
+DROP SEQUENCE IF EXISTS schoolers.leave_requests_leave_id_seq;
+DROP TABLE IF EXISTS schoolers.leave_requests;
+DROP SEQUENCE IF EXISTS schoolers.holidays_holiday_id_seq;
+DROP TABLE IF EXISTS schoolers.holidays;
+DROP SEQUENCE IF EXISTS schoolers.classes_class_id_seq;
+DROP TABLE IF EXISTS schoolers.classes;
+DROP SEQUENCE IF EXISTS schoolers.broadcasts_broadcast_id_seq;
+DROP TABLE IF EXISTS schoolers.broadcasts;
+DROP SEQUENCE IF EXISTS schoolers.barter_listings_listing_id_seq;
+DROP TABLE IF EXISTS schoolers.barter_listings;
+DROP TABLE IF EXISTS schoolers.auth_refresh_sessions;
+DROP SEQUENCE IF EXISTS schoolers.attendance_attendance_id_seq;
+DROP TABLE IF EXISTS schoolers.attendance;
+DROP SEQUENCE IF EXISTS schoolers.activities_activity_id_seq;
+DROP TABLE IF EXISTS schoolers.activities;
+DROP FUNCTION IF EXISTS schoolers.set_broadcast_created_at_ist();
+DROP SCHEMA IF EXISTS schoolers;
 --
 -- Name: schoolers; Type: SCHEMA; Schema: -; Owner: ravi
 --
@@ -1615,99 +1948,44 @@ ALTER TABLE schoolers.vehicles ALTER COLUMN vehicle_id ADD GENERATED BY DEFAULT 
 
 
 --
--- Name: website_pages; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites; Type: TABLE; Schema: schoolers; Owner: ravi
 --
 
-CREATE TABLE schoolers.website_pages (
-    page_id integer NOT NULL,
+CREATE TABLE schoolers.website_builder_sites (
     school_id integer NOT NULL,
-    slug character varying(20) NOT NULL,
-    banner_url character varying(255),
-    heading character varying(200) NOT NULL,
-    subheading character varying(255),
-    body text,
-    extra_json jsonb,
-    is_active boolean DEFAULT true NOT NULL,
-    modified_by integer,
-    modified_at timestamp without time zone DEFAULT now(),
-    CONSTRAINT website_pages_slug_check CHECK (((slug)::text = ANY (ARRAY[('home'::character varying)::text, ('about'::character varying)::text, ('academics'::character varying)::text, ('admissions'::character varying)::text, ('contact'::character varying)::text])))
-);
-
-
-ALTER TABLE schoolers.website_pages OWNER TO ravi;
-
---
--- Name: website_pages_page_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
---
-
-CREATE SEQUENCE schoolers.website_pages_page_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE schoolers.website_pages_page_id_seq OWNER TO ravi;
-
---
--- Name: website_pages_page_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
---
-
-ALTER SEQUENCE schoolers.website_pages_page_id_seq OWNED BY schoolers.website_pages.page_id;
-
-
---
--- Name: website_settings; Type: TABLE; Schema: schoolers; Owner: ravi
---
-
-CREATE TABLE schoolers.website_settings (
-    school_id integer NOT NULL,
-    school_name character varying(150) NOT NULL,
-    tagline character varying(200),
-    nav_links character varying(255) DEFAULT 'Home,About,Academics,Admissions,Contact'::character varying NOT NULL,
-    font_family character varying(60) DEFAULT 'Inter, sans-serif'::character varying NOT NULL,
-    font_size character varying(10) DEFAULT 'Medium'::character varying NOT NULL,
-    accent_color character varying(10) DEFAULT '#023859'::character varying NOT NULL,
-    footer_address character varying(200),
-    footer_phone character varying(30),
-    footer_email character varying(120),
-    footer_copyright character varying(150),
-    is_active boolean DEFAULT true NOT NULL,
-    icon_url character varying(255),
-    modified_by integer,
-    modified_at timestamp without time zone DEFAULT now(),
-    CONSTRAINT website_settings_font_size_check CHECK (((font_size)::text = ANY (ARRAY[('Small'::character varying)::text, ('Medium'::character varying)::text, ('Large'::character varying)::text])))
-);
-
-
-ALTER TABLE schoolers.website_settings OWNER TO ravi;
-
---
--- Name: website_testimonials; Type: TABLE; Schema: schoolers; Owner: ravi
---
-
-CREATE TABLE schoolers.website_testimonials (
-    testimonial_id integer NOT NULL,
-    school_id integer NOT NULL,
-    name character varying(100) NOT NULL,
-    role character varying(100) NOT NULL,
-    quote text NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    is_active boolean DEFAULT true NOT NULL,
+    draft jsonb NOT NULL,
+    published jsonb,
+    published_at timestamp without time zone,
     modified_by integer,
     modified_at timestamp without time zone DEFAULT now()
 );
 
 
-ALTER TABLE schoolers.website_testimonials OWNER TO ravi;
+ALTER TABLE schoolers.website_builder_sites OWNER TO ravi;
 
 --
--- Name: website_testimonials_testimonial_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: website_queries; Type: TABLE; Schema: schoolers; Owner: ravi
 --
 
-CREATE SEQUENCE schoolers.website_testimonials_testimonial_id_seq
+CREATE TABLE schoolers.website_queries (
+    query_id integer NOT NULL,
+    school_id integer NOT NULL,
+    name character varying(120) NOT NULL,
+    email character varying(254) NOT NULL,
+    message text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    modified_by integer,
+    modified_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE schoolers.website_queries OWNER TO ravi;
+
+--
+-- Name: website_queries_query_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+--
+
+CREATE SEQUENCE schoolers.website_queries_query_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1716,13 +1994,13 @@ CREATE SEQUENCE schoolers.website_testimonials_testimonial_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.website_testimonials_testimonial_id_seq OWNER TO ravi;
+ALTER SEQUENCE schoolers.website_queries_query_id_seq OWNER TO ravi;
 
 --
--- Name: website_testimonials_testimonial_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: website_queries_query_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
 --
 
-ALTER SEQUENCE schoolers.website_testimonials_testimonial_id_seq OWNED BY schoolers.website_testimonials.testimonial_id;
+ALTER SEQUENCE schoolers.website_queries_query_id_seq OWNED BY schoolers.website_queries.query_id;
 
 
 --
@@ -1957,17 +2235,10 @@ ALTER TABLE ONLY schoolers.users ALTER COLUMN user_id SET DEFAULT nextval('schoo
 
 
 --
--- Name: website_pages page_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: website_queries query_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_pages ALTER COLUMN page_id SET DEFAULT nextval('schoolers.website_pages_page_id_seq'::regclass);
-
-
---
--- Name: website_testimonials testimonial_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
---
-
-ALTER TABLE ONLY schoolers.website_testimonials ALTER COLUMN testimonial_id SET DEFAULT nextval('schoolers.website_testimonials_testimonial_id_seq'::regclass);
+ALTER TABLE ONLY schoolers.website_queries ALTER COLUMN query_id SET DEFAULT nextval('schoolers.website_queries_query_id_seq'::regclass);
 
 
 --
@@ -14007,70 +14278,20 @@ COPY schoolers.vehicles (vehicle_id, school_id, vehicle_number, vehicle_type, re
 
 
 --
--- Data for Name: website_pages; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: website_builder_sites; Type: TABLE DATA; Schema: schoolers; Owner: ravi
 --
 
-COPY schoolers.website_pages (page_id, school_id, slug, banner_url, heading, subheading, body, extra_json, is_active, modified_by, modified_at) FROM stdin;
-1	1	home	\N	Welcome — Blue Horizon Academy	A place to learn and grow	Discover Blue Horizon Academy in Bengaluru.	\N	t	273	2026-10-03 15:11:59.311819
-2	1	about	\N	About Us — Blue Horizon Academy	A place to learn and grow	Discover Blue Horizon Academy in Bengaluru.	\N	t	273	2026-10-03 15:11:59.323221
-3	1	academics	\N	Academics — Blue Horizon Academy	A place to learn and grow	Discover Blue Horizon Academy in Bengaluru.	\N	t	273	2026-10-03 15:11:59.335437
-4	1	admissions	\N	Admissions — Blue Horizon Academy	A place to learn and grow	Discover Blue Horizon Academy in Bengaluru.	\N	t	273	2026-10-03 15:11:59.347625
-5	1	contact	\N	Contact Us — Blue Horizon Academy	A place to learn and grow	Discover Blue Horizon Academy in Bengaluru.	\N	t	273	2026-10-03 15:11:59.360619
-7	2	about	\N	About Us — Green Valley Public School	A place to learn and grow	Discover Green Valley Public School in Pune.	\N	t	301	2026-10-03 15:12:17.55153
-8	2	academics	\N	Academics — Green Valley Public School	A place to learn and grow	Discover Green Valley Public School in Pune.	\N	t	301	2026-10-03 15:12:17.564839
-9	2	admissions	\N	Admissions — Green Valley Public School	A place to learn and grow	Discover Green Valley Public School in Pune.	\N	t	301	2026-10-03 15:12:17.576612
-10	2	contact	\N	Contact Us — Green Valley Public School	A place to learn and grow	Discover Green Valley Public School in Pune.	\N	t	301	2026-10-03 15:12:17.589304
-6	2	home		Welcome — Green Valley Public School	A place to learn and grow	Discover Green Valley Public School in Pune.	\N	t	323	2026-10-03 15:16:07.345077
+COPY schoolers.website_builder_sites (school_id, draft, published, published_at, modified_by, modified_at) FROM stdin;
+1	{"nodes": [{"x": 0.0, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 100.0, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 10.01010101010101, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 25.98989898989899, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 36.46352417300446, "id": "home-content", "html": "<h2><font color=\\"#a03131\\">Growing bright minds, togethers</font></h2><p><font color=\\"#a03131\\">At Sunrise School, every child is known, encouraged and inspired. Our joyful classrooms combine strong foundations with hands-on discovery, helping students build the skills and confidence to shape their future.</font></p><p><font color=\\"#a03131\\">Explore a school community where learning has purpose and every day</font><img src=\\"http://localhost:8000/api/v1/website/builder/assets/website_1_20261010_201201_204654.jpg\\" alt=\\"Uploaded image\\"><font color=\\"#a03131\\">&nbsp;brings something new.</font></p>", "type": "center", "title": "Welcome to Sunrise", "width": 54.0, "height": 17.648742281179473, "labels": [], "slides": [], "variant": "minimal", "anchorId": "about", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 61.485595703125, "y": 36.39618359190045, "id": "programs-content", "html": "<h3><font color=\\"#157938\\">Learning with purpose</font></h3><ul><li><font color=\\"#157938\\">Thoughtful, student-centred teaching</font></li><li><font color=\\"#157938\\">Arts, sport and hands-on exploration</font></li><li><font color=\\"#157938\\">A safe and welcoming campus</font></li></ul>", "type": "center", "title": "Learning at Sunrise", "width": 31.0, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "programs", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 3.1028826678240744, "y": 55.39481781637566, "id": "campus-life-content", "html": "<h3><font color=\\"#4b27a0\\">More than a classroom</font></h3><p><font color=\\"#4b27a0\\">From the first note in the music room to a winning goal on the field, students have space to try, practice and find what they love.</font></p><p><strong><font color=\\"#4b27a0\\">Clubs · Arts · Sport · Community</font></strong></p>", "type": "center", "title": "A place to discover your strengths", "width": 43.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "campus-life", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 57.39918800636574, "y": 47.784511142306854, "id": "admissions-content", "html": "<h3><i><font color=\\"#832f2f\\">Come see Sunrise for yourself</font></i></h3><p><i><font color=\\"#832f2f\\">Meet our teachers, explore the campus and discover a school day designed around belonging and possibility.</font></i></p><p><strong><i><font color=\\"#832f2f\\">Now welcoming applications for the new school year.</font></i></strong></p>", "type": "center", "title": "Admissions are open", "width": 42.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "admissions", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 1.4444444444444446, "y": 65.19640835848722, "id": "testimonials", "html": "", "type": "testimonials", "title": "Families say it best", "width": 98.16459599247685, "height": 13.61616238680753, "labels": [], "slides": [], "variant": "minimal", "anchorId": "testimonials", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.19342041015625, "y": 79.57729305934551, "id": "contact", "html": "", "type": "contact", "title": "Come say hello", "width": 99.59671472620082, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "contact", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 90.38383838383838, "id": "site-footer", "html": "<p>Sunrise School · Learning together, shining brighter.</p>", "type": "footer", "title": "School footer", "width": 100.0, "height": 8.0, "labels": [{"id": "footer-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "footer-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "footer-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "footer-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "footer-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "minimal", "anchorId": "footer", "profileLogo": "", "profileName": "", "profileMotto": ""}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [{"id": "live-1", "name": "Divya Shah", "role": "Parent", "quote": "A warm, thoughtful school where our child feels seen and supported."}, {"id": "live-2", "name": "Rohan Das", "role": "Alumnus", "quote": "The teachers helped me discover what I love and gave me the confidence to pursue it."}], "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	{"nodes": [{"x": 0.0, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 100.0, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 10.01010101010101, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 25.98989898989899, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 36.46352417300446, "id": "home-content", "html": "<h2><font color=\\"#a03131\\">Growing bright minds, together</font></h2><p><font color=\\"#a03131\\">At Sunrise School, every child is known, encouraged and inspired. Our joyful classrooms combine strong foundations with hands-on discovery, helping students build the skills and confidence to shape their future.</font></p><p><font color=\\"#a03131\\">Explore a school community where learning has purpose and every day</font><img src=\\"http://localhost:8000/api/v1/website/builder/assets/website_1_20261010_201201_204654.jpg\\" alt=\\"Uploaded image\\"><font color=\\"#a03131\\">&nbsp;brings something new.</font></p>", "type": "center", "title": "Welcome to Sunrise", "width": 54.0, "height": 17.648742281179473, "labels": [], "slides": [], "variant": "minimal", "anchorId": "about", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 61.485595703125, "y": 36.39618359190045, "id": "programs-content", "html": "<h3><font color=\\"#157938\\">Learning with purpose</font></h3><ul><li><font color=\\"#157938\\">Thoughtful, student-centred teaching</font></li><li><font color=\\"#157938\\">Arts, sport and hands-on exploration</font></li><li><font color=\\"#157938\\">A safe and welcoming campus</font></li></ul>", "type": "center", "title": "Learning at Sunrise", "width": 31.0, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "programs", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 3.1028826678240744, "y": 55.39481781637566, "id": "campus-life-content", "html": "<h3><font color=\\"#4b27a0\\">More than a classroom</font></h3><p><font color=\\"#4b27a0\\">From the first note in the music room to a winning goal on the field, students have space to try, practice and find what they love.</font></p><p><strong><font color=\\"#4b27a0\\">Clubs · Arts · Sport · Community</font></strong></p>", "type": "center", "title": "A place to discover your strengths", "width": 43.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "campus-life", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 57.39918800636574, "y": 47.784511142306854, "id": "admissions-content", "html": "<h3><i><font color=\\"#832f2f\\">Come see Sunrise for yourself</font></i></h3><p><i><font color=\\"#832f2f\\">Meet our teachers, explore the campus and discover a school day designed around belonging and possibility.</font></i></p><p><strong><i><font color=\\"#832f2f\\">Now welcoming applications for the new school year.</font></i></strong></p>", "type": "center", "title": "Admissions are open", "width": 42.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "admissions", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 1.4444444444444446, "y": 65.19640835848722, "id": "testimonials", "html": "", "type": "testimonials", "title": "Families say it best", "width": 98.16459599247685, "height": 13.61616238680753, "labels": [], "slides": [], "variant": "minimal", "anchorId": "testimonials", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.19342041015625, "y": 79.57729305934551, "id": "contact", "html": "", "type": "contact", "title": "Come say hello", "width": 99.59671472620082, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "contact", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 90.38383838383838, "id": "site-footer", "html": "<p>Sunrise School · Learning together, shining brighter.</p>", "type": "footer", "title": "School footer", "width": 100.0, "height": 8.0, "labels": [{"id": "footer-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "footer-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "footer-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "footer-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "footer-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "minimal", "anchorId": "footer", "profileLogo": "", "profileName": "", "profileMotto": ""}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [{"id": "live-1", "name": "Divya Shah", "role": "Parent", "quote": "A warm, thoughtful school where our child feels seen and supported."}, {"id": "live-2", "name": "Rohan Das", "role": "Alumnus", "quote": "The teachers helped me discover what I love and gave me the confidence to pursue it."}], "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	2026-10-11 01:42:49.859846	273	2026-10-11 02:01:30.290615
 \.
 
 
 --
--- Data for Name: website_settings; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: website_queries; Type: TABLE DATA; Schema: schoolers; Owner: ravi
 --
 
-COPY schoolers.website_settings (school_id, school_name, tagline, nav_links, font_family, font_size, accent_color, footer_address, footer_phone, footer_email, footer_copyright, is_active, icon_url, modified_by, modified_at) FROM stdin;
-1	Blue Horizon Academy	Learn. Grow. Lead.	Home,About,Academics,Admissions,Contact	Inter	Medium	#1d4ed8	12 MG Road, Bengaluru	8105096987	ravigupta0307@gmail.com	© 2026 Blue Horizon Academy	t	\N	273	2026-10-03 15:11:59.418233
-2	Green Valley Public School	Learn. Grow. Lead.	Home,About,Academics,Admissions,Contact	Inter	Medium	#1d4ed8	45 FC Road, Shivajinagar, Pune	8105096987	ravigupta0307@gmail.com	© 2026 Green Valley Public School	t		323	2026-10-03 15:16:07.347483
-\.
-
-
---
--- Data for Name: website_testimonials; Type: TABLE DATA; Schema: schoolers; Owner: ravi
---
-
-COPY schoolers.website_testimonials (testimonial_id, school_id, name, role, quote, created_at, is_active, modified_by, modified_at) FROM stdin;
-1	1	Naveen Gupta	Parent	Great teachers and caring staff.	2026-10-03 15:11:59.372683	t	273	2026-10-03 15:11:59.372683
-2	1	Pooja Mehta	Parent	My child loves going to school.	2026-10-03 15:11:59.384761	t	273	2026-10-03 15:11:59.384761
-3	1	Aadhya Rao	Student	The labs are amazing!	2026-10-03 15:11:59.395894	t	273	2026-10-03 15:11:59.395894
-4	1	Aarav Sharma	Teacher	A wonderful place to work.	2026-10-03 15:11:59.40757	t	273	2026-10-03 15:11:59.40757
-5	2	Anil Pawar	Parent	Great teachers and caring staff.	2026-10-03 15:12:17.601017	t	301	2026-10-03 15:12:17.601017
-6	2	Snehal Patil	Parent	My child loves going to school.	2026-10-03 15:12:17.613491	t	301	2026-10-03 15:12:17.613491
-7	2	Ira Kulkarni	Student	The labs are amazing!	2026-10-03 15:12:17.625657	t	301	2026-10-03 15:12:17.625657
-8	2	Aditya Kulkarni	Teacher	A wonderful place to work.	2026-10-03 15:12:17.636408	t	301	2026-10-03 15:12:17.636408
-33	1	Parent 1	Guardian	Backfilled testimonial 1	2026-10-02 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-34	2	Parent 1	Guardian	Backfilled testimonial 1	2026-10-02 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-35	1	Parent 2	Guardian	Backfilled testimonial 2	2026-10-01 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-36	2	Parent 2	Guardian	Backfilled testimonial 2	2026-10-01 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-37	1	Parent 3	Guardian	Backfilled testimonial 3	2026-09-30 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-38	2	Parent 3	Guardian	Backfilled testimonial 3	2026-09-30 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-39	1	Parent 4	Guardian	Backfilled testimonial 4	2026-09-29 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-40	2	Parent 4	Guardian	Backfilled testimonial 4	2026-09-29 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-41	1	Parent 5	Guardian	Backfilled testimonial 5	2026-09-28 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-42	2	Parent 5	Guardian	Backfilled testimonial 5	2026-09-28 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-43	1	Parent 6	Guardian	Backfilled testimonial 6	2026-09-27 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-44	2	Parent 6	Guardian	Backfilled testimonial 6	2026-09-27 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-45	1	Parent 7	Guardian	Backfilled testimonial 7	2026-09-26 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-46	2	Parent 7	Guardian	Backfilled testimonial 7	2026-09-26 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-47	1	Parent 8	Guardian	Backfilled testimonial 8	2026-09-25 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-48	2	Parent 8	Guardian	Backfilled testimonial 8	2026-09-25 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-49	1	Parent 9	Guardian	Backfilled testimonial 9	2026-09-24 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-50	2	Parent 9	Guardian	Backfilled testimonial 9	2026-09-24 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-51	1	Parent 10	Guardian	Backfilled testimonial 10	2026-09-23 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-52	2	Parent 10	Guardian	Backfilled testimonial 10	2026-09-23 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-53	1	Parent 11	Guardian	Backfilled testimonial 11	2026-09-22 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-54	2	Parent 11	Guardian	Backfilled testimonial 11	2026-09-22 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
-55	1	Parent 12	Guardian	Backfilled testimonial 12	2026-09-21 15:11:41.753422	t	\N	2026-10-04 21:01:48.487203
-56	2	Parent 12	Guardian	Backfilled testimonial 12	2026-09-21 15:12:00.230009	t	\N	2026-10-04 21:01:48.487203
+COPY schoolers.website_queries (query_id, school_id, name, email, message, created_at, modified_by, modified_at) FROM stdin;
+1	1	ravi	ravigupta0307@gmail.com	test	2026-10-10 23:25:35.48501	\N	2026-10-10 23:25:41.590089
 \.
 
 
@@ -14334,17 +14555,10 @@ SELECT pg_catalog.setval('schoolers.vehicles_vehicle_id_seq', 6, true);
 
 
 --
--- Name: website_pages_page_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: website_queries_query_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
 --
 
-SELECT pg_catalog.setval('schoolers.website_pages_page_id_seq', 10, true);
-
-
---
--- Name: website_testimonials_testimonial_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
---
-
-SELECT pg_catalog.setval('schoolers.website_testimonials_testimonial_id_seq', 56, true);
+SELECT pg_catalog.setval('schoolers.website_queries_query_id_seq', 1, true);
 
 
 --
@@ -14812,35 +15026,19 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: website_pages website_pages_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_pages
-    ADD CONSTRAINT website_pages_pkey PRIMARY KEY (page_id);
-
-
---
--- Name: website_pages website_pages_school_id_slug_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
---
-
-ALTER TABLE ONLY schoolers.website_pages
-    ADD CONSTRAINT website_pages_school_id_slug_key UNIQUE (school_id, slug);
+ALTER TABLE ONLY schoolers.website_builder_sites
+    ADD CONSTRAINT website_builder_sites_pkey PRIMARY KEY (school_id);
 
 
 --
--- Name: website_settings website_settings_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_settings
-    ADD CONSTRAINT website_settings_pkey PRIMARY KEY (school_id);
-
-
---
--- Name: website_testimonials website_testimonials_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
---
-
-ALTER TABLE ONLY schoolers.website_testimonials
-    ADD CONSTRAINT website_testimonials_pkey PRIMARY KEY (testimonial_id);
+ALTER TABLE ONLY schoolers.website_queries
+    ADD CONSTRAINT website_queries_pkey PRIMARY KEY (query_id);
 
 
 --
@@ -15128,6 +15326,13 @@ CREATE UNIQUE INDEX uq_pilots_route_id ON schoolers.pilots USING btree (route_id
 --
 
 CREATE UNIQUE INDEX uq_trip_students_trip_student ON schoolers.trip_students USING btree (trip_id, student_id);
+
+
+--
+-- Name: website_queries_school_created_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+--
+
+CREATE INDEX website_queries_school_created_idx ON schoolers.website_queries USING btree (school_id, created_at DESC, query_id DESC);
 
 
 --
@@ -16074,56 +16279,40 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: website_pages website_pages_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_pages
-    ADD CONSTRAINT website_pages_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
-
-
---
--- Name: website_pages website_pages_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
---
-
-ALTER TABLE ONLY schoolers.website_pages
-    ADD CONSTRAINT website_pages_school_id_fkey FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
+ALTER TABLE ONLY schoolers.website_builder_sites
+    ADD CONSTRAINT website_builder_sites_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
 
 
 --
--- Name: website_settings website_settings_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_settings
-    ADD CONSTRAINT website_settings_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
-
-
---
--- Name: website_settings website_settings_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
---
-
-ALTER TABLE ONLY schoolers.website_settings
-    ADD CONSTRAINT website_settings_school_id_fkey FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
+ALTER TABLE ONLY schoolers.website_builder_sites
+    ADD CONSTRAINT website_builder_sites_school_id_fkey FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
 
 
 --
--- Name: website_testimonials website_testimonials_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_testimonials
-    ADD CONSTRAINT website_testimonials_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
+ALTER TABLE ONLY schoolers.website_queries
+    ADD CONSTRAINT website_queries_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES schoolers.users(user_id) ON DELETE SET NULL;
 
 
 --
--- Name: website_testimonials website_testimonials_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
 --
 
-ALTER TABLE ONLY schoolers.website_testimonials
-    ADD CONSTRAINT website_testimonials_school_id_fkey FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
+ALTER TABLE ONLY schoolers.website_queries
+    ADD CONSTRAINT website_queries_school_id_fkey FOREIGN KEY (school_id) REFERENCES schoolers.schools(school_id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xZ1twj7I5MPM3YgTThVth3ZcSZlzQpjn88zaSkEznaNy8aDvihse4qHbUgForxn
+\unrestrict jaacC1PZwmbSwjg7dm9aWfUJIZ87EEZZxTlhnTnGur3OlfUFH3HbYsejz98Pl86
 
