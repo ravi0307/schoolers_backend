@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CanvasSize(BaseModel):
@@ -26,20 +26,46 @@ class BannerSlide(BaseModel):
     subtitle: str = Field(default="", max_length=500)
 
 
+class SchoolIdentityData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schoolName: str = Field(default="Blue Horizon Academy", max_length=120)
+    tagline: str = Field(default="A place to learn and grow", max_length=240)
+    logoUrl: str = Field(default="", max_length=2000)
+
+
 class BuilderNode(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     id: str = Field(min_length=1, max_length=100)
     anchorId: str = Field(default="", max_length=80)
-    type: Literal["header", "footer", "testimonial", "testimonials", "banner", "contact", "center", "school-profile"]
+    type: Literal["header", "footer", "testimonial", "testimonials", "banner", "contact", "center", "school-profile", "school-identity"]
     title: str = Field(default="Content", max_length=120)
     x: float = Field(ge=0, le=100)
     y: float = Field(ge=0, le=100)
     width: float = Field(gt=0, le=100)
     height: float = Field(gt=0, le=100)
     html: str = Field(default="", max_length=50000)
+    boxBgColor: str | None = Field(
+        default=None,
+        max_length=80,
+        pattern=r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$",
+    )
+    backgroundColor: str = Field(
+        default="#ffffff",
+        max_length=80,
+        pattern=r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$",
+    )
+    backgroundOpacity: float = Field(default=1, ge=0, le=1)
+    data: SchoolIdentityData | None = None
     slides: list[BannerSlide] = Field(default_factory=list, max_length=20)
     labels: list[BuilderLabel] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def require_school_identity_data(self):
+        if self.type == "school-identity" and self.data is None:
+            raise ValueError("School identity nodes require school name, tagline, and logo data")
+        return self
 
 
 class BuilderTestimonial(BaseModel):
@@ -64,7 +90,7 @@ class WebsiteBuilderContent(BaseModel):
     pending_testimonials: list[BuilderTestimonial] = Field(max_length=500)
 
     def as_json(self) -> dict[str, Any]:
-        return self.model_dump(by_alias=True)
+        return self.model_dump(by_alias=True, exclude_none=True)
 
 
 class WebsiteBuilderState(BaseModel):
