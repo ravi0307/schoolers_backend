@@ -315,6 +315,61 @@ class RouteStudentStopAssignmentTests(unittest.TestCase):
         self.assertEqual((rows[102]["pickup_stop_id"], rows[102]["drop_stop_id"]), (1, 2))
 
 
+class RouteStudentDisplayFieldsTests(unittest.TestCase):
+    """Route-student rows carry photo, class, parent, and stop names.
+
+    Anika (102) is in Grade 5 with parent Mrs. Rao; route 1 stops 1/2 are
+    both named Koramangala.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine("sqlite://")
+        _ENGINES.append(cls.engine)
+        cls.Session = sessionmaker(bind=cls.engine)
+
+    def setUp(self):
+        Base.metadata.drop_all(self.engine, tables=TRANSPORT_TABLES)
+        Base.metadata.create_all(self.engine, tables=TRANSPORT_TABLES)
+        self.session = self.Session()
+        seed(self.session)
+
+    def tearDown(self):
+        self.session.close()
+
+    def _repo(self):
+        from services.transport_service import repository as repo
+
+        return repo
+
+    def test_list_enriches_photo_class_parent_and_stop_names(self):
+        repo = self._repo()
+        student = self.session.query(Student).filter(Student.student_id == 102).first()
+        student.photo_url = "/uploads/photo102.jpg"
+        self.session.commit()
+        repo.add_student(self.session, 1, 102, pickup_stop_id=1, drop_stop_id=2)
+        rows = {r["student_id"]: r for r in repo.list_route_students(self.session, 1)}
+        row = rows[102]
+        self.assertEqual(row["photo_url"], "/uploads/photo102.jpg")
+        self.assertEqual(row["class_name"], "Grade 5")
+        self.assertEqual(row["parent_name"], "Mrs. Rao")
+        self.assertEqual(row["pickup_stop_name"], "Koramangala")
+        self.assertEqual(row["drop_stop_name"], "Koramangala")
+
+    def test_missing_relations_stay_none(self):
+        repo = self._repo()
+        self.session.add(
+            Student(student_id=200, school_id=1, class_id=5, admission_no="ADM200", name="No Parent")
+        )
+        self.session.commit()
+        row = repo.add_student(self.session, 1, 200)
+        self.assertIsNone(row["photo_url"])
+        self.assertIsNone(row["parent_name"])
+        self.assertIsNone(row["pickup_stop_name"])
+        self.assertIsNone(row["drop_stop_name"])
+        self.assertEqual(row["class_name"], "Grade 5")
+
+
 class ParentPickdropRouterTests(unittest.TestCase):
     """Execute the /routes/mine handler directly (media-test convention)."""
 
@@ -433,3 +488,59 @@ class ParentPickdropGuardTests(unittest.TestCase):
     def test_gateway_forwards_routes_segment_to_transport_service(self):
         gateway = (ROOT / "gateway" / "main.py").read_text(encoding="utf-8")
         self.assertIn('"routes": "transport"', gateway)
+
+
+class RouteStudentAssignGuardTests(unittest.TestCase):
+    """POST student assignment stays admin-only with an optional stop body."""
+
+    def _route_by(self, method, path):
+        tree = ast.parse(ROUTER_SOURCE.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for dec in node.decorator_list:
+                    if (
+                        isinstance(dec, ast.Call)
+                        and isinstance(dec.func, ast.Attribute)
+                        and getattr(dec.func.value, "id", None) == "router"
+                    ):
+                        p = dec.args[0].value if dec.args and isinstance(dec.args[0], ast.Constant) else None
+                        if dec.func.attr == method and p == path:
+                            return node
+        self.fail(f"route {method} {path} not found")
+
+    def _roles_of(self, func):
+        roles = set()
+        for node in ast.walk(func):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Depends":
+                arg = node.args[0] if node.args else None
+                if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "require_role":
+                    roles.add(tuple(a.value for a in arg.args if isinstance(a, ast.Constant)))
+        return roles
+
+    def test_assign_endpoint_remains_admin_only(self):
+        func = self._route_by("post", "/{route_id}/students/{student_id}")
+        self.assertEqual(self._roles_of(func), {("admin",)})
+
+    def test_assign_endpoint_accepts_optional_stop_body(self):
+        func = self._route_by("post", "/{route_id}/students/{student_id}")
+        by_name = {a.arg: a for a in func.args.args}
+        self.assertIn("payload", by_name)
+        payload_index = [a.arg for a in func.args.args].index("payload")
+        first_defaulted = len(func.args.args) - len(func.args.defaults)
+        payload_default = func.args.defaults[payload_index - first_defaulted]
+        self.assertIsInstance(payload_default, ast.Constant)
+        self.assertIsNone(payload_default.value)
+        src = ROUTER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("RouteStudentAssign", src)
+        self.assertIn("repo.add_student(db, route_id, student_id, **data)", src)
+
+    def test_assign_schema_carries_optional_stop_ids(self):
+        schemas = (ROOT / "services" / "transport_service" / "schemas.py").read_text(encoding="utf-8")
+        self.assertIn("class RouteStudentAssign(BaseModel):", schemas)
+        self.assertIn("pickup_stop_id: int | None = None", schemas)
+        self.assertIn("drop_stop_id: int | None = None", schemas)
+
+    def test_assign_response_exposes_display_fields(self):
+        schemas = (ROOT / "services" / "transport_service" / "schemas.py").read_text(encoding="utf-8")
+        for field in ("photo_url", "parent_name", "class_name", "pickup_stop_name", "drop_stop_name"):
+            self.assertIn(field, schemas)
