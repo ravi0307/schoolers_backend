@@ -12,7 +12,7 @@ from schemas import (
     VehicleCreate, VehicleUpdate, VehicleRead,
     PilotCreate, PilotUpdate, PilotRead,
     RouteCreate, RouteUpdate, RouteRead, StopCreate, StopUpdate, StopRead,
-    RouteStudentRead, RouteStudentStatusUpdate, ParentPickDropRead,
+    RouteStudentRead, RouteStudentAssign, RouteStudentStatusUpdate, ParentPickDropRead,
     AdminTripDetailRead, AdminTripRead, ParentTripRead, TripSummaryRead,
     PilotTripDetailRead,
     TripCancel, TripCreate, TripReopen, TripStudentRead, TripStudentUpdate,
@@ -209,10 +209,12 @@ def remove_stop(
 def add_student_to_route(
     route_id: int,
     student_id: int,
+    payload: RouteStudentAssign | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    return repo.add_student(db, route_id, student_id)
+    data = payload.model_dump(exclude_unset=True) if payload else {}
+    return repo.add_student(db, route_id, student_id, **data)
 
 
 @router.delete("/{route_id}/students/{student_id}", status_code=204)

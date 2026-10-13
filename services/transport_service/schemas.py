@@ -204,6 +204,13 @@ class RouteStudentRead(BaseModel):
     student_name: str
     admission_no: str
     status: str
+    pickup_stop_id: int | None = None
+    drop_stop_id: int | None = None
+
+
+class RouteStudentAssign(BaseModel):
+    pickup_stop_id: int | None = None
+    drop_stop_id: int | None = None
 
 
 class RouteStudentStatusUpdate(BaseModel):

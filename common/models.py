@@ -305,6 +305,8 @@ class RouteStudent(AuditColumnsMixin, Base):
     route_id = Column(Integer, ForeignKey("routes.route_id", ondelete="CASCADE"), nullable=False)
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
     status = Column(String(10), nullable=False, default="pending")  # pending/picked/dropped (app-level, not in original DDL)
+    pickup_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"), nullable=True)
+    drop_stop_id = Column(Integer, ForeignKey("route_stops.stop_id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("route_id", "student_id"),
