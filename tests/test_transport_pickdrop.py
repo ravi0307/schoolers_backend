@@ -488,3 +488,59 @@ class ParentPickdropGuardTests(unittest.TestCase):
     def test_gateway_forwards_routes_segment_to_transport_service(self):
         gateway = (ROOT / "gateway" / "main.py").read_text(encoding="utf-8")
         self.assertIn('"routes": "transport"', gateway)
+
+
+class RouteStudentAssignGuardTests(unittest.TestCase):
+    """POST student assignment stays admin-only with an optional stop body."""
+
+    def _route_by(self, method, path):
+        tree = ast.parse(ROUTER_SOURCE.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for dec in node.decorator_list:
+                    if (
+                        isinstance(dec, ast.Call)
+                        and isinstance(dec.func, ast.Attribute)
+                        and getattr(dec.func.value, "id", None) == "router"
+                    ):
+                        p = dec.args[0].value if dec.args and isinstance(dec.args[0], ast.Constant) else None
+                        if dec.func.attr == method and p == path:
+                            return node
+        self.fail(f"route {method} {path} not found")
+
+    def _roles_of(self, func):
+        roles = set()
+        for node in ast.walk(func):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Depends":
+                arg = node.args[0] if node.args else None
+                if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "require_role":
+                    roles.add(tuple(a.value for a in arg.args if isinstance(a, ast.Constant)))
+        return roles
+
+    def test_assign_endpoint_remains_admin_only(self):
+        func = self._route_by("post", "/{route_id}/students/{student_id}")
+        self.assertEqual(self._roles_of(func), {("admin",)})
+
+    def test_assign_endpoint_accepts_optional_stop_body(self):
+        func = self._route_by("post", "/{route_id}/students/{student_id}")
+        by_name = {a.arg: a for a in func.args.args}
+        self.assertIn("payload", by_name)
+        payload_index = [a.arg for a in func.args.args].index("payload")
+        first_defaulted = len(func.args.args) - len(func.args.defaults)
+        payload_default = func.args.defaults[payload_index - first_defaulted]
+        self.assertIsInstance(payload_default, ast.Constant)
+        self.assertIsNone(payload_default.value)
+        src = ROUTER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("RouteStudentAssign", src)
+        self.assertIn("repo.add_student(db, route_id, student_id, **data)", src)
+
+    def test_assign_schema_carries_optional_stop_ids(self):
+        schemas = (ROOT / "services" / "transport_service" / "schemas.py").read_text(encoding="utf-8")
+        self.assertIn("class RouteStudentAssign(BaseModel):", schemas)
+        self.assertIn("pickup_stop_id: int | None = None", schemas)
+        self.assertIn("drop_stop_id: int | None = None", schemas)
+
+    def test_assign_response_exposes_display_fields(self):
+        schemas = (ROOT / "services" / "transport_service" / "schemas.py").read_text(encoding="utf-8")
+        for field in ("photo_url", "parent_name", "class_name", "pickup_stop_name", "drop_stop_name"):
+            self.assertIn(field, schemas)
