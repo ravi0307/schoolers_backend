@@ -437,20 +437,46 @@ def route_student_response(route_student: RouteStudent, student: Student) -> dic
         "student_name": student.name,
         "admission_no": student.admission_no,
         "status": route_student.status,
+        "pickup_stop_id": route_student.pickup_stop_id,
+        "drop_stop_id": route_student.drop_stop_id,
     }
 
 
-def add_student(db: Session, route_id: int, student_id: int) -> dict:
+def _validate_route_stop(db: Session, route_id: int, stop_id: int) -> int:
+    """A stop point assigned to a student must be a stop on that route."""
+    stop = db.query(RouteStop).filter(RouteStop.stop_id == stop_id).first()
+    if stop is None or stop.route_id != route_id:
+        raise AppError("Stop point is not on this route")
+    return stop.stop_id
+
+
+def add_student(
+    db: Session,
+    route_id: int,
+    student_id: int,
+    pickup_stop_id: int | None = None,
+    drop_stop_id: int | None = None,
+) -> dict:
     student = db.query(Student).filter(
         Student.student_id == student_id,
         Student.is_active.is_(True),
     ).first()
     if not student:
         raise ConflictError("Student not found")
+    if pickup_stop_id is not None:
+        pickup_stop_id = _validate_route_stop(db, route_id, pickup_stop_id)
+    if drop_stop_id is not None:
+        drop_stop_id = _validate_route_stop(db, route_id, drop_stop_id)
     existing = db.query(RouteStudent).filter(
         RouteStudent.route_id == route_id, RouteStudent.student_id == student_id
     ).first()
     if existing:
+        if pickup_stop_id is not None:
+            existing.pickup_stop_id = pickup_stop_id
+        if drop_stop_id is not None:
+            existing.drop_stop_id = drop_stop_id
+        db.commit()
+        db.refresh(existing)
         return route_student_response(existing, student)
     assigned_route = (
         db.query(RouteStudent)
@@ -462,7 +488,12 @@ def add_student(db: Session, route_id: int, student_id: int) -> dict:
             "Student is already assigned to another route. Remove the student "
             "from the current route before moving them."
         )
-    rs = RouteStudent(route_id=route_id, student_id=student_id)
+    rs = RouteStudent(
+        route_id=route_id,
+        student_id=student_id,
+        pickup_stop_id=pickup_stop_id,
+        drop_stop_id=drop_stop_id,
+    )
     db.add(rs)
     db.commit()
     db.refresh(rs)

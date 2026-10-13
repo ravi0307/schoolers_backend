@@ -14,6 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from common.dependencies import CurrentUser
+from common.exceptions import AppError
 from common.models import (
     Base,
     Parent,
@@ -251,6 +252,67 @@ class ParentPickdropRepositoryTests(unittest.TestCase):
             if row["student_id"] == 102:
                 self.assertIsNone(model.route_id)
                 self.assertEqual(model.status, "not_assigned")
+
+
+class RouteStudentStopAssignmentTests(unittest.TestCase):
+    """Assigning a student to a route can record their stop point.
+
+    Student 102 (Anika Rao) starts unassigned, route 1 stops 1/2 belong to
+    route 1, and stop 5 belongs to route 3.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine("sqlite://")
+        _ENGINES.append(cls.engine)
+        cls.Session = sessionmaker(bind=cls.engine)
+
+    def setUp(self):
+        Base.metadata.drop_all(self.engine, tables=TRANSPORT_TABLES)
+        Base.metadata.create_all(self.engine, tables=TRANSPORT_TABLES)
+        self.session = self.Session()
+        seed(self.session)
+
+    def tearDown(self):
+        self.session.close()
+
+    def _repo(self):
+        from services.transport_service import repository as repo
+
+        return repo
+
+    def test_assign_with_stop_pair_persists_and_returns_ids(self):
+        repo = self._repo()
+        row = repo.add_student(self.session, 1, 102, pickup_stop_id=1, drop_stop_id=2)
+        self.assertEqual((row["pickup_stop_id"], row["drop_stop_id"]), (1, 2))
+
+    def test_assign_without_stops_stays_backward_compatible(self):
+        repo = self._repo()
+        row = repo.add_student(self.session, 1, 102)
+        self.assertIsNone(row["pickup_stop_id"])
+        self.assertIsNone(row["drop_stop_id"])
+
+    def test_assign_with_stop_from_another_route_is_rejected(self):
+        repo = self._repo()
+        with self.assertRaises(AppError):
+            repo.add_student(self.session, 1, 102, pickup_stop_id=5)
+
+    def test_assign_with_unknown_stop_is_rejected(self):
+        repo = self._repo()
+        with self.assertRaises(AppError):
+            repo.add_student(self.session, 1, 102, drop_stop_id=9999)
+
+    def test_reassigning_same_route_updates_stop_point(self):
+        repo = self._repo()
+        repo.add_student(self.session, 1, 102, pickup_stop_id=1, drop_stop_id=2)
+        row = repo.add_student(self.session, 1, 102, pickup_stop_id=3, drop_stop_id=4)
+        self.assertEqual((row["pickup_stop_id"], row["drop_stop_id"]), (3, 4))
+
+    def test_list_exposes_assigned_stop_ids(self):
+        repo = self._repo()
+        repo.add_student(self.session, 1, 102, pickup_stop_id=1, drop_stop_id=2)
+        rows = {r["student_id"]: r for r in repo.list_route_students(self.session, 1)}
+        self.assertEqual((rows[102]["pickup_stop_id"], rows[102]["drop_stop_id"]), (1, 2))
 
 
 class ParentPickdropRouterTests(unittest.TestCase):
