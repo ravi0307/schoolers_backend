@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from common.dependencies import CurrentUser
 from common.models import (
     Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent,
-    Staff, Student, Trip, TripStudent, User, Vehicle,
+    SchoolClass, Staff, Student, Trip, TripStudent, User, Vehicle,
 )
 from common.security import hash_password
 from common.exceptions import (
@@ -429,17 +429,75 @@ def remove_stop(db: Session, stop_id: int) -> None:
         db.commit()
 
 
-def route_student_response(route_student: RouteStudent, student: Student) -> dict:
+def route_student_response(
+    route_student: RouteStudent,
+    student: Student,
+    parent_name: str | None = None,
+    class_name: str | None = None,
+    pickup_stop_name: str | None = None,
+    drop_stop_name: str | None = None,
+) -> dict:
     return {
         "id": route_student.id,
         "route_id": route_student.route_id,
         "student_id": route_student.student_id,
         "student_name": student.name,
         "admission_no": student.admission_no,
+        "photo_url": student.photo_url,
+        "parent_name": parent_name,
+        "class_name": class_name,
         "status": route_student.status,
         "pickup_stop_id": route_student.pickup_stop_id,
         "drop_stop_id": route_student.drop_stop_id,
+        "pickup_stop_name": pickup_stop_name,
+        "drop_stop_name": drop_stop_name,
     }
+
+
+def _enrich_route_students(db: Session, pairs: list) -> list[dict]:
+    """Attach display fields (parent, class, stop names) to route-student rows.
+
+    Batched in three queries so row count never drives query count. Missing
+    relations stay None and the frontend renders fallbacks.
+    """
+    student_ids = [student.student_id for _, student in pairs]
+    parent_rows = (
+        db.query(ParentStudent.student_id, Parent.name)
+        .join(Parent, Parent.parent_id == ParentStudent.parent_id)
+        .filter(ParentStudent.student_id.in_(student_ids), Parent.is_active.is_(True))
+        .order_by(ParentStudent.student_id, Parent.parent_id)
+        .all()
+        if student_ids
+        else []
+    )
+    parents: dict[int, str] = {}
+    for sid, name in parent_rows:
+        parents.setdefault(sid, name)
+    class_ids = {student.class_id for _, student in pairs if student.class_id is not None}
+    classes = (
+        dict(
+            db.query(SchoolClass.class_id, SchoolClass.name)
+            .filter(SchoolClass.class_id.in_(class_ids))
+            .all()
+        )
+        if class_ids
+        else {}
+    )
+    stop_names = _stop_names(
+        db,
+        [rs.pickup_stop_id for rs, _ in pairs] + [rs.drop_stop_id for rs, _ in pairs],
+    )
+    return [
+        route_student_response(
+            rs,
+            student,
+            parent_name=parents.get(student.student_id),
+            class_name=classes.get(student.class_id),
+            pickup_stop_name=stop_names.get(rs.pickup_stop_id),
+            drop_stop_name=stop_names.get(rs.drop_stop_id),
+        )
+        for rs, student in pairs
+    ]
 
 
 def _validate_route_stop(db: Session, route_id: int, stop_id: int) -> int:
@@ -477,7 +535,7 @@ def add_student(
             existing.drop_stop_id = drop_stop_id
         db.commit()
         db.refresh(existing)
-        return route_student_response(existing, student)
+        return _enrich_route_students(db, [(existing, student)])[0]
     assigned_route = (
         db.query(RouteStudent)
         .filter(RouteStudent.student_id == student_id)
@@ -497,7 +555,7 @@ def add_student(
     db.add(rs)
     db.commit()
     db.refresh(rs)
-    return route_student_response(rs, student)
+    return _enrich_route_students(db, [(rs, student)])[0]
 
 
 def remove_student(db: Session, route_id: int, student_id: int) -> None:
@@ -515,7 +573,7 @@ def list_route_students(db: Session, route_id: int) -> list[dict]:
         .order_by(Student.name)
         .all()
     )
-    return [route_student_response(route_student, student) for route_student, student in rows]
+    return _enrich_route_students(db, [(route_student, student) for route_student, student in rows])
 
 
 def update_student_status(db: Session, route_id: int, student_id: int, status: str) -> dict | None:

@@ -315,6 +315,61 @@ class RouteStudentStopAssignmentTests(unittest.TestCase):
         self.assertEqual((rows[102]["pickup_stop_id"], rows[102]["drop_stop_id"]), (1, 2))
 
 
+class RouteStudentDisplayFieldsTests(unittest.TestCase):
+    """Route-student rows carry photo, class, parent, and stop names.
+
+    Anika (102) is in Grade 5 with parent Mrs. Rao; route 1 stops 1/2 are
+    both named Koramangala.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine("sqlite://")
+        _ENGINES.append(cls.engine)
+        cls.Session = sessionmaker(bind=cls.engine)
+
+    def setUp(self):
+        Base.metadata.drop_all(self.engine, tables=TRANSPORT_TABLES)
+        Base.metadata.create_all(self.engine, tables=TRANSPORT_TABLES)
+        self.session = self.Session()
+        seed(self.session)
+
+    def tearDown(self):
+        self.session.close()
+
+    def _repo(self):
+        from services.transport_service import repository as repo
+
+        return repo
+
+    def test_list_enriches_photo_class_parent_and_stop_names(self):
+        repo = self._repo()
+        student = self.session.query(Student).filter(Student.student_id == 102).first()
+        student.photo_url = "/uploads/photo102.jpg"
+        self.session.commit()
+        repo.add_student(self.session, 1, 102, pickup_stop_id=1, drop_stop_id=2)
+        rows = {r["student_id"]: r for r in repo.list_route_students(self.session, 1)}
+        row = rows[102]
+        self.assertEqual(row["photo_url"], "/uploads/photo102.jpg")
+        self.assertEqual(row["class_name"], "Grade 5")
+        self.assertEqual(row["parent_name"], "Mrs. Rao")
+        self.assertEqual(row["pickup_stop_name"], "Koramangala")
+        self.assertEqual(row["drop_stop_name"], "Koramangala")
+
+    def test_missing_relations_stay_none(self):
+        repo = self._repo()
+        self.session.add(
+            Student(student_id=200, school_id=1, class_id=5, admission_no="ADM200", name="No Parent")
+        )
+        self.session.commit()
+        row = repo.add_student(self.session, 1, 200)
+        self.assertIsNone(row["photo_url"])
+        self.assertIsNone(row["parent_name"])
+        self.assertIsNone(row["pickup_stop_name"])
+        self.assertIsNone(row["drop_stop_name"])
+        self.assertEqual(row["class_name"], "Grade 5")
+
+
 class ParentPickdropRouterTests(unittest.TestCase):
     """Execute the /routes/mine handler directly (media-test convention)."""
 
