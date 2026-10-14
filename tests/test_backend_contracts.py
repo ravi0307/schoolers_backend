@@ -290,6 +290,36 @@ class BackendContractTests(unittest.TestCase):
         self.assertIn("route_id INTEGER", migrations)
         self.assertIn("'route'", migrations)
 
+    def test_route_student_contract_supports_stop_point(self):
+        """Assigning a student to a route can record their stop point."""
+        model = (ROOT / "common" / "models.py").read_text(encoding="utf-8")
+        schema = (
+            ROOT / "services" / "transport_service" / "schemas.py"
+        ).read_text(encoding="utf-8")
+        router = (
+            ROOT / "services" / "transport_service" / "router.py"
+        ).read_text(encoding="utf-8")
+        repository = (
+            ROOT / "services" / "transport_service" / "repository.py"
+        ).read_text(encoding="utf-8")
+        migrations = (ROOT / "db-migrations.sql").read_text(encoding="utf-8")
+        for field in ("pickup_stop_id", "drop_stop_id"):
+            self.assertIn(field, model)
+            self.assertIn(field, schema)
+            self.assertIn(field, repository)
+        self.assertIn('ForeignKey("route_stops.stop_id", ondelete="SET NULL")', model)
+        self.assertIn("class RouteStudentAssign", schema)
+        self.assertIn("pickup_stop_name", schema)
+        self.assertIn("drop_stop_name", schema)
+        self.assertIn("photo_url", schema)
+        self.assertIn("parent_name", schema)
+        self.assertIn("class_name", schema)
+        self.assertIn("RouteStudentAssign | None = None", router)
+        self.assertIn("_validate_route_stop", repository)
+        self.assertIn("Stop point is not on this route", repository)
+        self.assertIn("ADD COLUMN IF NOT EXISTS pickup_stop_id", migrations)
+        self.assertIn("ADD COLUMN IF NOT EXISTS drop_stop_id", migrations)
+
     def test_marks_service_contract_supports_class_grade_and_teacher_scope(self):
         router_path = ROOT / "services" / "marks_service" / "router.py"
         repository_path = ROOT / "services" / "marks_service" / "repository.py"
