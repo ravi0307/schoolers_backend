@@ -528,6 +528,7 @@ class LeaveRequest(AuditColumnsMixin, Base):
     to_date = Column(Date, nullable=False)
     reason = Column(String(255))
     status = Column(String(10), nullable=False, default="Pending")
+    review_remark = Column(String(500))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
