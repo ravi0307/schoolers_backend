@@ -3,6 +3,7 @@
 Runs against an in-memory SQLite database following the same convention as
 the transport pick/drop tests.
 """
+import ast
 import unittest
 from datetime import date
 from pathlib import Path
@@ -113,6 +114,44 @@ class LeaveReviewContractTests(unittest.TestCase):
         self.assertIn("payload: LeaveRequestReview | None = None", router)
         self.assertIn("review_remark = Column(String(500))", model)
         self.assertIn("ADD COLUMN IF NOT EXISTS review_remark VARCHAR(500)", migrations)
+
+
+class LeaveReviewGuardTests(unittest.TestCase):
+    """Decision endpoints stay admin-only with an optional remark body."""
+
+    def _route_by(self, method, path):
+        tree = ast.parse((ROOT / "services" / "leave_service" / "router.py").read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for dec in node.decorator_list:
+                    if (
+                        isinstance(dec, ast.Call)
+                        and isinstance(dec.func, ast.Attribute)
+                        and getattr(dec.func.value, "id", None) == "router"
+                    ):
+                        p = dec.args[0].value if dec.args and isinstance(dec.args[0], ast.Constant) else None
+                        if dec.func.attr == method and p == path:
+                            return node
+        self.fail(f"route {method} {path} not found")
+
+    def _roles_of(self, func):
+        roles = set()
+        for node in ast.walk(func):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Depends":
+                arg = node.args[0] if node.args else None
+                if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "require_role":
+                    roles.add(tuple(a.value for a in arg.args if isinstance(a, ast.Constant)))
+        return roles
+
+    def test_approve_and_reject_remain_admin_only(self):
+        for path in ("/{leave_id}/approve", "/{leave_id}/reject"):
+            with self.subTest(path=path):
+                self.assertEqual(self._roles_of(self._route_by("patch", path)), {("admin",)})
+
+    def test_decisions_accept_an_optional_remark_body(self):
+        src = (ROOT / "services" / "leave_service" / "router.py").read_text(encoding="utf-8")
+        self.assertIn("payload: LeaveRequestReview | None = None", src)
+        self.assertIn("remark=payload.remark if payload else None", src)
 
 
 def tearDownModule():
