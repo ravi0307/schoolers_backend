@@ -380,6 +380,9 @@ ALTER TABLE IF EXISTS schoolers.leave_requests
     ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();
 
+ALTER TABLE IF EXISTS schoolers.leave_requests
+    ADD COLUMN IF NOT EXISTS review_remark VARCHAR(500);
+
 ALTER TABLE IF EXISTS schoolers.broadcasts
     ADD COLUMN IF NOT EXISTS modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP DEFAULT now();

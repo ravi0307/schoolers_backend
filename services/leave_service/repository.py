@@ -22,8 +22,15 @@ def get(db: Session, leave_id: int) -> LeaveRequest | None:
     return db.query(LeaveRequest).filter(LeaveRequest.leave_id == leave_id, LeaveRequest.is_active.is_(True)).first()
 
 
-def set_status(db: Session, leave: LeaveRequest, status: str) -> LeaveRequest:
+def set_status(
+    db: Session,
+    leave: LeaveRequest,
+    status: str,
+    remark: str | None = None,
+) -> LeaveRequest:
     leave.status = status
+    if remark is not None:
+        leave.review_remark = remark
     db.commit()
     db.refresh(leave)
     return leave

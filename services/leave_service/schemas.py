@@ -10,6 +10,10 @@ class LeaveRequestCreate(BaseModel):
     reason: str | None = None
 
 
+class LeaveRequestReview(BaseModel):
+    remark: str | None = None
+
+
 class LeaveRequestRead(BaseModel):
     leave_id: int
     school_id: int
@@ -19,6 +23,7 @@ class LeaveRequestRead(BaseModel):
     to_date: date
     reason: str | None
     status: str
+    review_remark: str | None = None
 
     class Config:
         from_attributes = True

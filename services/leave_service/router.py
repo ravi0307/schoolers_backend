@@ -5,7 +5,7 @@ from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import NotFoundError
 import repository as repo
-from schemas import LeaveRequestCreate, LeaveRequestRead
+from schemas import LeaveRequestCreate, LeaveRequestRead, LeaveRequestReview
 
 router = APIRouter(prefix="/leave", tags=["leave"])
 
@@ -33,22 +33,24 @@ def list_leave_requests(
 @router.patch("/{leave_id}/approve", response_model=LeaveRequestRead)
 def approve(
     leave_id: int,
+    payload: LeaveRequestReview | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     leave = repo.get(db, leave_id)
     if not leave:
         raise NotFoundError("Leave request not found")
-    return repo.set_status(db, leave, "Approved")
+    return repo.set_status(db, leave, "Approved", remark=payload.remark if payload else None)
 
 
 @router.patch("/{leave_id}/reject", response_model=LeaveRequestRead)
 def reject(
     leave_id: int,
+    payload: LeaveRequestReview | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     leave = repo.get(db, leave_id)
     if not leave:
         raise NotFoundError("Leave request not found")
-    return repo.set_status(db, leave, "Rejected")
+    return repo.set_status(db, leave, "Rejected", remark=payload.remark if payload else None)
