@@ -262,6 +262,73 @@ class GradeLevel(AuditColumnsMixin, Base):
 
 
 # ============================================================================
+# 2d. EXAMINATIONS AND SESSIONS (Phase 3, marks_feature)
+# ============================================================================
+# An examination is academic context (year, period, type, format); its
+# sessions are the schedulable units (class × subject × date/time/venue).
+# Sessions are the source of truth for timetables and conflict checks.
+# Amendments to published sessions append version rows; the live row is
+# always current. Marks link to sessions in Phase 4 (nothing references
+# sessions yet, so all Phase-3 sessions are freely editable within the
+# conflict rules).
+
+
+class Examination(AuditColumnsMixin, Base):
+    __tablename__ = "examinations"
+
+    exam_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    type_id = Column(Integer, ForeignKey("examination_types.type_id", ondelete="RESTRICT"), nullable=False)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="RESTRICT"), nullable=False)
+    period_id = Column(Integer, ForeignKey("academic_periods.period_id", ondelete="SET NULL"), nullable=True)
+    name = Column(String(120), nullable=False)
+    description = Column(String(255))
+    result_format_expectation = Column(String(10), nullable=False, default="marks", server_default="marks")
+    grade_scale_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="RESTRICT"), nullable=True)
+    status = Column(String(20), nullable=False, default="draft", server_default="draft")
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "year_id", "name"),
+        CheckConstraint("result_format_expectation IN ('marks', 'grade')"),
+        CheckConstraint("status IN ('draft', 'published', 'cancelled')"),
+    )
+
+
+class ExaminationSession(AuditColumnsMixin, Base):
+    __tablename__ = "examination_sessions"
+
+    session_id = Column(Integer, primary_key=True)
+    exam_id = Column(Integer, ForeignKey("examinations.exam_id", ondelete="CASCADE"), nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="RESTRICT"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="RESTRICT"), nullable=False)
+    date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    venue = Column(String(120))
+    max_marks = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, default="scheduled", server_default="scheduled")
+
+    __table_args__ = (
+        CheckConstraint("end_time > start_time"),
+        CheckConstraint("max_marks > 0"),
+        CheckConstraint("status IN ('scheduled', 'rescheduled', 'cancelled', 'completed')"),
+    )
+
+
+class ExaminationSessionVersion(AuditColumnsMixin, Base):
+    __tablename__ = "examination_session_versions"
+
+    version_id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("examination_sessions.session_id", ondelete="CASCADE"), nullable=False)
+    changed_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    changed_at = Column(DateTime, server_default=func.now())
+    reason = Column(String(255))
+    old_row = Column(JSON)
+    new_row = Column(JSON)
+
+
+# ============================================================================
 # 3. PEOPLE
 # ============================================================================
 

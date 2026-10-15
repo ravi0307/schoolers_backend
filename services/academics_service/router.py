@@ -1,9 +1,11 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_school_scope, CurrentUser
-from common.exceptions import NotFoundError
+from common.exceptions import ConflictError, NotFoundError
 import repository as repo
 from schemas import (
     ClassCreate, ClassUpdate, ClassRead, SubjectRead, SubjectCreate, SubjectUpdate,
@@ -14,6 +16,9 @@ from schemas import (
     ExaminationTypeCreate, ExaminationTypeUpdate, ExaminationTypeRead,
     GradeScaleCreate, GradeScaleUpdate, GradeScaleRead,
     GradeLevelCreate, GradeLevelUpdate, GradeLevelRead,
+    ExaminationCreate, ExaminationUpdate, ExaminationRead, ExaminationCancel,
+    SessionCreate, SessionUpdate, SessionRead, SessionWriteResult,
+    SessionTimetableRow, SessionVersionRead,
 )
 
 router = APIRouter(tags=["academics"])
@@ -478,3 +483,219 @@ def delete_grade_level(
         raise NotFoundError("Grade level not found")
     repo.delete_grade_level(db, level)
     return Response(status_code=204)
+
+
+# ---- Examinations and sessions (Phase 3) ----
+
+
+@router.post("/examinations", response_model=ExaminationRead, status_code=201)
+def create_examination(
+    payload: ExaminationCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_examination(
+        db, school_id, current_user.user_id, payload.model_dump(exclude_unset=True)
+    )
+
+
+@router.get("/examinations", response_model=list[ExaminationRead])
+def list_examinations(
+    year_id: int | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    if year_id is not None and repo.get_year(db, school_id, year_id) is None:
+        raise NotFoundError("Academic year not found")
+    return repo.list_examinations(db, school_id, year_id)
+
+
+@router.get("/examinations/timetable", response_model=list[SessionTimetableRow])
+def examination_timetable(
+    year_id: int | None = None,
+    class_id: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    # NOTE: defined before /examinations/{exam_id} so "timetable" is not
+    # captured as an exam id.
+    return repo.timetable(db, school_id, year_id, class_id, date_from, date_to)
+
+
+@router.get("/examinations/{exam_id}", response_model=ExaminationRead)
+def get_examination(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    return exam
+
+
+@router.patch("/examinations/{exam_id}", response_model=ExaminationRead)
+def update_examination(
+    exam_id: int,
+    payload: ExaminationUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    return repo.update_examination_draft(db, exam, payload.model_dump(exclude_unset=True))
+
+
+@router.post("/examinations/{exam_id}/publish", response_model=ExaminationRead)
+def publish_examination(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    return repo.publish_examination(db, exam)
+
+
+@router.post("/examinations/{exam_id}/unpublish", response_model=ExaminationRead)
+def unpublish_examination(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    return repo.unpublish_examination(db, exam)
+
+
+@router.post("/examinations/{exam_id}/cancel", response_model=ExaminationRead)
+def cancel_examination(
+    exam_id: int,
+    payload: ExaminationCancel,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    return repo.cancel_examination(db, exam, current_user.user_id, payload.reason)
+
+
+@router.delete("/examinations/{exam_id}", status_code=204)
+def delete_examination(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    if exam.status != "draft":
+        raise ConflictError("Only draft examinations can be deleted; cancel instead")
+    db.delete(exam)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/examinations/{exam_id}/sessions", response_model=list[SessionRead])
+def list_examination_sessions(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    if repo.get_examination(db, school_id, exam_id) is None:
+        raise NotFoundError("Examination not found")
+    return repo.list_sessions(db, exam_id)
+
+
+@router.post("/examinations/{exam_id}/sessions", response_model=SessionWriteResult, status_code=201)
+def create_examination_session(
+    exam_id: int,
+    payload: SessionCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam = repo.get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    session, warnings = repo.create_session(
+        db, exam, current_user.user_id, payload.model_dump(exclude_unset=True)
+    )
+    return {"session": session, "warnings": warnings}
+
+
+def _session_in_scope(db: Session, school_id: int, session_id: int):
+    session = repo.get_session_in_school(db, school_id, session_id)
+    if session is None:
+        raise NotFoundError("Examination session not found")
+    exam = repo.get_examination(db, school_id, session.exam_id)
+    if exam is None:  # Cannot happen while the FK holds; guarded regardless.
+        raise NotFoundError("Examination not found")
+    return session, exam
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionWriteResult)
+def update_examination_session(
+    session_id: int,
+    payload: SessionUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    session, exam = _session_in_scope(db, school_id, session_id)
+    data = payload.model_dump(exclude_unset=True)
+    session, warnings = repo.update_session(
+        db, exam, session, current_user.user_id, data, data.get("reason")
+    )
+    return {"session": session, "warnings": warnings}
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_examination_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    session, exam = _session_in_scope(db, school_id, session_id)
+    repo.delete_session(db, exam, session)
+    return Response(status_code=204)
+
+
+@router.post("/sessions/{session_id}/complete", response_model=SessionWriteResult)
+def complete_examination_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    session, exam = _session_in_scope(db, school_id, session_id)
+    session, warnings = repo.complete_session(db, exam, session, current_user.user_id)
+    return {"session": session, "warnings": warnings}
+
+
+@router.get("/sessions/{session_id}/versions", response_model=list[SessionVersionRead])
+def list_session_versions(
+    session_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    session, _ = _session_in_scope(db, school_id, session_id)
+    return repo.list_session_versions(db, session.session_id)

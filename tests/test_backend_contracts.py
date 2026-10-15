@@ -172,6 +172,8 @@ class BackendContractTests(unittest.TestCase):
             "examination-types",
             "grade-scales",
             "grade-levels",
+            "examinations",
+            "sessions",
             "teachers",
             "staff",
             "students",
@@ -537,6 +539,39 @@ class BackendContractTests(unittest.TestCase):
             "examination_types",
             "grade_scales",
             "grade_levels",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_examination_scheduling_endpoints_and_migration_contract(self):
+        """Phase 3: sessions are the scheduling source of truth with versions."""
+        router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/examinations"',
+            '"/examinations/timetable"',
+            '"/examinations/{exam_id}/publish"',
+            '"/examinations/{exam_id}/cancel"',
+            '"/examinations/{exam_id}/sessions"',
+            '"/sessions/{session_id}"',
+            '"/sessions/{session_id}/complete"',
+            '"/sessions/{session_id}/versions"',
+        ):
+            self.assertIn(route, router)
+        # Timetable is defined before the {exam_id} capture route.
+        self.assertLess(
+            router.index('"/examinations/timetable"'),
+            router.index('"/examinations/{exam_id}"'),
+        )
+        # Published-schedule writes are admin-only; reads include all roles.
+        self.assertIn('require_role("parent", "teacher", "admin")', router)
+        migration = (ROOT / "db-migration-examinations.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "examinations",
+            "examination_sessions",
+            "examination_session_versions",
             "IF NOT EXISTS",
         ):
             with self.subTest(fragment=fragment):

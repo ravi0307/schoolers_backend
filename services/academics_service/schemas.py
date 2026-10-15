@@ -1,4 +1,8 @@
 from datetime import date, time
+# `dt` alias: annotations evaluate lazily, so a field literally named `date`
+# would shadow the `date` type in its own annotation. New session schemas
+# use `dt.date` / `dt.time` for that reason.
+import datetime as dt
 from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -462,3 +466,150 @@ class GradeLevelRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---- Examinations and sessions (Phase 3) ----
+
+ResultFormat = Literal["marks", "grade"]
+ExamStatus = Literal["draft", "published", "cancelled"]
+SessionStatus = Literal["scheduled", "rescheduled", "cancelled", "completed"]
+
+
+class ExaminationCreate(BaseModel):
+    type_id: int
+    year_id: int
+    period_id: int | None = None
+    name: str
+    description: str | None = None
+    result_format_expectation: ResultFormat = "marks"
+    grade_scale_id: int | None = None
+
+    _validate_name = field_validator("name")(classmethod(
+        lambda cls, v: _clean_calendar_name(v, "Examination name", 120)
+    ))
+
+    @model_validator(mode="after")
+    def _scale_matches_format(self):
+        if self.result_format_expectation == "grade" and self.grade_scale_id is None:
+            raise ValueError("Grade-wise examinations require a grade scale")
+        if self.result_format_expectation == "marks" and self.grade_scale_id is not None:
+            raise ValueError("Marks-wise examinations must not set a grade scale")
+        return self
+
+
+class ExaminationUpdate(BaseModel):
+    """Draft-only edits. Format, year, period, and type are immutable once
+    set (sessions already reference them); published examinations change
+    only through publish/unpublish/cancel endpoints."""
+
+    name: str | None = None
+    description: str | None = None
+    grade_scale_id: int | None = None
+
+    _validate_name = field_validator("name")(classmethod(
+        lambda cls, v: None if v is None else _clean_calendar_name(v, "Examination name", 120)
+    ))
+
+
+class ExaminationRead(BaseModel):
+    exam_id: int
+    school_id: int
+    type_id: int
+    year_id: int
+    period_id: int | None
+    name: str
+    description: str | None
+    result_format_expectation: str
+    grade_scale_id: int | None
+    status: str
+    created_by: int | None
+
+    class Config:
+        from_attributes = True
+
+
+class SessionCreate(BaseModel):
+    class_id: int
+    subject_id: int
+    date: dt.date
+    start_time: dt.time
+    end_time: dt.time
+    venue: str | None = None
+    max_marks: int
+
+    @model_validator(mode="after")
+    def _time_and_max(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("Session end time must be after start time")
+        if self.max_marks <= 0:
+            raise ValueError("Session maximum marks must be positive")
+        return self
+
+
+class SessionUpdate(BaseModel):
+    """Rescheduling fields. `reason` is required when the parent examination
+    is published (it lands on the version row); draft edits omit it."""
+
+    class_id: int | None = None
+    subject_id: int | None = None
+    date: dt.date | None = None
+    start_time: dt.time | None = None
+    end_time: dt.time | None = None
+    venue: str | None = None
+    max_marks: int | None = None
+    reason: str | None = None
+
+
+class SessionRead(BaseModel):
+    session_id: int
+    exam_id: int
+    class_id: int
+    subject_id: int
+    date: dt.date
+    start_time: dt.time
+    end_time: dt.time
+    venue: str | None
+    max_marks: int
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+class SessionWriteResult(BaseModel):
+    """A session write plus the non-blocking warnings computed for it.
+
+    Warnings are computed, returned, and never stored: re-reading the
+    timetable recomputes them from live data.
+    """
+
+    session: SessionRead
+    warnings: list[str] = []
+
+
+class SessionTimetableRow(SessionRead):
+    exam_name: str
+    exam_type_name: str
+    class_name: str
+    subject_name: str
+
+
+class SessionVersionRead(BaseModel):
+    version_id: int
+    session_id: int
+    changed_by: int | None
+    changed_at: object | None = None
+    reason: str | None
+    old_row: object | None = None
+    new_row: object | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ExaminationCancel(BaseModel):
+    reason: str
+
+    _validate_reason = field_validator("reason")(classmethod(
+        lambda cls, v: _clean_calendar_name(v, "Cancellation reason", 255)
+    ))

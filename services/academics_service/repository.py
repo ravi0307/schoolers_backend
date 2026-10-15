@@ -7,6 +7,7 @@ from common.models import (
     SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
     AcademicYear, AcademicPeriod, AcademicEvent,
     ExaminationType, GradeScale, GradeLevel,
+    Examination, ExaminationSession, ExaminationSessionVersion,
 )
 from common.holidays import (
     expand_holiday_range,
@@ -794,3 +795,378 @@ def update_grade_level(db: Session, level, data: dict):
 def delete_grade_level(db: Session, level) -> None:
     db.delete(level)
     db.commit()
+
+
+# ---- Examinations and sessions (Phase 3) ----
+
+
+def exam_name_taken(
+    db: Session, school_id: int, year_id: int, name: str, exclude_id: int | None = None
+) -> bool:
+    query = db.query(Examination).filter(
+        Examination.school_id == school_id,
+        Examination.year_id == year_id,
+        Examination.name == name,
+    )
+    if exclude_id is not None:
+        query = query.filter(Examination.exam_id != exclude_id)
+    return query.first() is not None
+
+
+def get_examination(db: Session, school_id: int, exam_id: int):
+    return (
+        db.query(Examination)
+        .filter(Examination.school_id == school_id, Examination.exam_id == exam_id)
+        .first()
+    )
+
+
+def list_examinations(db: Session, school_id: int, year_id: int | None = None):
+    query = db.query(Examination).filter(Examination.school_id == school_id)
+    if year_id is not None:
+        query = query.filter(Examination.year_id == year_id)
+    return query.order_by(Examination.name).all()
+
+
+def create_examination(db: Session, school_id: int, user_id: int, data: dict):
+    if get_examination_type(db, school_id, data["type_id"]) is None:
+        raise NotFoundError("Examination type not found")
+    if get_year(db, school_id, data["year_id"]) is None:
+        raise NotFoundError("Academic year not found")
+    if data.get("period_id") is not None and (
+        get_period_in_school(db, school_id, data["period_id"]) is None
+        or get_period_in_school(db, school_id, data["period_id"]).year_id != data["year_id"]
+    ):
+        raise NotFoundError("Academic period not found in this year")
+    if data.get("grade_scale_id") is not None and (
+        get_grade_scale(db, school_id, data["grade_scale_id"]) is None
+    ):
+        raise NotFoundError("Grade scale not found")
+    if exam_name_taken(db, school_id, data["year_id"], data["name"]):
+        raise ConflictError("An examination with this name already exists for this year")
+    exam = Examination(
+        school_id=school_id,
+        created_by=user_id,
+        status="draft",
+        **{k: v for k, v in data.items() if k != "status"},
+    )
+    db.add(exam)
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
+def update_examination_draft(db: Session, exam, data: dict):
+    if exam.status != "draft":
+        raise ConflictError("Only draft examinations can be edited")
+    if "grade_scale_id" in data and data["grade_scale_id"] is not None:
+        if get_grade_scale(db, exam.school_id, data["grade_scale_id"]) is None:
+            raise NotFoundError("Grade scale not found")
+    name = data.get("name")
+    if name and exam_name_taken(db, exam.school_id, exam.year_id, name, exclude_id=exam.exam_id):
+        raise ConflictError("An examination with this name already exists for this year")
+    for k, v in data.items():
+        if v is not None:
+            setattr(exam, k, v)
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
+def publish_examination(db: Session, exam):
+    if exam.status == "published":
+        return exam
+    if exam.status != "draft":
+        raise ConflictError("Only draft examinations can be published")
+    live = (
+        db.query(ExaminationSession)
+        .filter(
+            ExaminationSession.exam_id == exam.exam_id,
+            ExaminationSession.status == "scheduled",
+        )
+        .count()
+    )
+    if live == 0:
+        raise ConflictError("An examination needs at least one scheduled session to publish")
+    exam.status = "published"
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
+def unpublish_examination(db: Session, exam):
+    if exam.status != "published":
+        raise ConflictError("Only published examinations can be unpublished")
+    exam.status = "draft"
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
+def cancel_examination(db: Session, exam, user_id: int | None, reason: str):
+    """Cancel the examination and every live session, preserving all rows.
+
+    Cancellation never deletes: sessions flip to cancelled with version rows
+    so report cards keep rendering the history with its status.
+    """
+    for session in list_sessions(db, exam.exam_id):
+        if session.status != "cancelled":
+            _apply_session_change(
+                db, session, {"status": "cancelled"}, user_id, reason or "Examination cancelled"
+            )
+    exam.status = "cancelled"
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
+def get_session_in_school(db: Session, school_id: int, session_id: int):
+    return (
+        db.query(ExaminationSession)
+        .join(Examination, Examination.exam_id == ExaminationSession.exam_id)
+        .filter(
+            ExaminationSession.session_id == session_id,
+            Examination.school_id == school_id,
+        )
+        .first()
+    )
+
+
+def list_sessions(db: Session, exam_id: int):
+    return (
+        db.query(ExaminationSession)
+        .filter(ExaminationSession.exam_id == exam_id)
+        .order_by(ExaminationSession.date, ExaminationSession.start_time)
+        .all()
+    )
+
+
+def list_session_versions(db: Session, session_id: int):
+    return (
+        db.query(ExaminationSessionVersion)
+        .filter(ExaminationSessionVersion.session_id == session_id)
+        .order_by(ExaminationSessionVersion.version_id)
+        .all()
+    )
+
+
+def _times_overlap(start_a, end_a, start_b, end_b) -> bool:
+    return start_a < end_b and start_b < end_a
+
+
+def _session_scope_rows(db: Session, school_id: int, on_date, exclude_session_id=None):
+    """Non-cancelled same-school sessions on one date, with their exam status."""
+    query = (
+        db.query(ExaminationSession, Examination.status)
+        .join(Examination, Examination.exam_id == ExaminationSession.exam_id)
+        .filter(
+            Examination.school_id == school_id,
+            ExaminationSession.date == on_date,
+            ExaminationSession.status != "cancelled",
+        )
+    )
+    if exclude_session_id is not None:
+        query = query.filter(ExaminationSession.session_id != exclude_session_id)
+    return query.all()
+
+
+def check_session_conflicts(
+    db: Session,
+    school_id: int,
+    *,
+    class_id: int,
+    subject_id: int,
+    on_date,
+    start_time,
+    end_time,
+    venue: str | None,
+    exam_id: int,
+    exclude_session_id: int | None = None,
+) -> tuple[list[str], list[str]]:
+    """Transactional conflict check. Returns (blocking, warnings).
+
+    Blocking errors refuse the write (409); warnings ride along on the
+    response and are recomputed on every read, never stored.
+    """
+    blocking, warnings = [], []
+    exam = get_examination(db, school_id, exam_id)
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    # Period/year bounds come from the examination's own academic context.
+    if exam.period_id is not None:
+        period = get_period_in_school(db, school_id, exam.period_id)
+        if period is not None and not (period.start_date <= on_date <= period.end_date):
+            blocking.append("Session date falls outside the examination period")
+    year = get_year(db, school_id, exam.year_id)
+    if year is not None and not (year.start_date <= on_date <= year.end_date):
+        blocking.append("Session date falls outside the academic year")
+    for other, other_exam_status in _session_scope_rows(
+        db, school_id, on_date, exclude_session_id
+    ):
+        if not _times_overlap(start_time, end_time, other.start_time, other.end_time):
+            continue
+        if other.class_id == class_id:
+            message = f"Class is already scheduled at {other.start_time}-{other.end_time}"
+            (blocking if other_exam_status == "published" else warnings).append(message)
+        if venue and other.venue and venue.strip().casefold() == other.venue.strip().casefold():
+            message = f"Venue '{other.venue}' is already booked at {other.start_time}-{other.end_time}"
+            (blocking if other_exam_status == "published" else warnings).append(message)
+    taken = (
+        db.query(Holiday.holiday_date, Holiday.occasion)
+        .filter(Holiday.school_id == school_id, Holiday.holiday_date == on_date)
+        .all()
+    )
+    for _, occasion in taken:
+        warnings.append(f"School holiday on this date: {occasion}")
+    for event in list_events(db, school_id):
+        if event.start_date <= on_date <= event.end_date:
+            warnings.append(f"{event.title} ({event.event_type}) spans this date")
+    return blocking, warnings
+
+
+def _snapshot_session(session) -> dict:
+    return {
+        "class_id": session.class_id,
+        "subject_id": session.subject_id,
+        "date": session.date.isoformat(),
+        "start_time": session.start_time.isoformat(),
+        "end_time": session.end_time.isoformat(),
+        "venue": session.venue,
+        "max_marks": session.max_marks,
+        "status": session.status,
+    }
+
+
+def _apply_session_change(db: Session, session, changes: dict, user_id, reason: str | None):
+    old = _snapshot_session(session)
+    for k, v in changes.items():
+        setattr(session, k, v)
+    db.flush()
+    db.add(ExaminationSessionVersion(
+        session_id=session.session_id,
+        changed_by=user_id,
+        reason=reason,
+        old_row=old,
+        new_row=_snapshot_session(session),
+    ))
+
+
+def create_session(db: Session, exam, user_id: int | None, data: dict):
+    if get_class(db, exam.school_id, data["class_id"]) is None:
+        raise NotFoundError("Class not found")
+    if get_subject(db, exam.school_id, data["subject_id"]) is None:
+        raise NotFoundError("Subject not found")
+    blocking, warnings = check_session_conflicts(
+        db,
+        exam.school_id,
+        exam_id=exam.exam_id,
+        class_id=data["class_id"],
+        subject_id=data["subject_id"],
+        on_date=data["date"],
+        start_time=data["start_time"],
+        end_time=data["end_time"],
+        venue=data.get("venue"),
+    )
+    if blocking:
+        raise ConflictError("; ".join(blocking))
+    session = ExaminationSession(exam_id=exam.exam_id, status="scheduled", **data)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session, warnings
+
+
+def update_session(db: Session, exam, session, user_id: int | None, data: dict, reason: str | None):
+    if exam.status != "draft" and not reason:
+        raise AppError("Amending a published schedule requires a reason", status_code=400)
+    changes = {k: v for k, v in data.items() if k != "reason" and v is not None}
+    if "class_id" in changes and get_class(db, exam.school_id, changes["class_id"]) is None:
+        raise NotFoundError("Class not found")
+    if "subject_id" in changes and get_subject(db, exam.school_id, changes["subject_id"]) is None:
+        raise NotFoundError("Subject not found")
+    merged = {
+        "class_id": changes.get("class_id", session.class_id),
+        "subject_id": changes.get("subject_id", session.subject_id),
+        "on_date": changes.get("date", session.date),
+        "start_time": changes.get("start_time", session.start_time),
+        "end_time": changes.get("end_time", session.end_time),
+        "venue": changes.get("venue", session.venue),
+        "exam_id": exam.exam_id,
+        "exclude_session_id": session.session_id,
+    }
+    blocking, warnings = check_session_conflicts(db, exam.school_id, **merged)
+    if blocking:
+        raise ConflictError("; ".join(blocking))
+    # Touching date/time/venue of a published session marks it rescheduled.
+    if exam.status != "draft" and any(k in changes for k in ("date", "start_time", "end_time", "venue")):
+        changes["status"] = "rescheduled"
+    if exam.status != "draft":
+        _apply_session_change(db, session, changes, user_id, reason)
+    else:
+        for k, v in changes.items():
+            setattr(session, k, v)
+    db.commit()
+    db.refresh(session)
+    return session, warnings
+
+
+def delete_session(db: Session, exam, session) -> None:
+    if exam.status != "draft":
+        raise ConflictError("Only draft examination sessions can be deleted; cancel instead")
+    db.delete(session)
+    db.commit()
+
+
+def complete_session(db: Session, exam, session, user_id: int | None):
+    if session.status == "cancelled":
+        raise ConflictError("A cancelled session cannot be completed")
+    if session.status == "completed":
+        return session, []
+    if exam.status != "draft":
+        _apply_session_change(db, session, {"status": "completed"}, user_id, "Session completed")
+    else:
+        session.status = "completed"
+    db.commit()
+    db.refresh(session)
+    return session, []
+
+
+def timetable(
+    db: Session,
+    school_id: int,
+    year_id: int | None = None,
+    class_id: int | None = None,
+    date_from=None,
+    date_to=None,
+):
+    """Session rows with their exam/class/subject names, ordered by slot."""
+    query = (
+        db.query(
+            ExaminationSession,
+            Examination.name.label("exam_name"),
+            ExaminationType.name.label("exam_type_name"),
+            SchoolClass.name.label("class_name"),
+            Subject.name.label("subject_name"),
+        )
+        .join(Examination, Examination.exam_id == ExaminationSession.exam_id)
+        .join(ExaminationType, ExaminationType.type_id == Examination.type_id)
+        .join(SchoolClass, SchoolClass.class_id == ExaminationSession.class_id)
+        .join(Subject, Subject.subject_id == ExaminationSession.subject_id)
+        .filter(Examination.school_id == school_id)
+    )
+    if year_id is not None:
+        query = query.filter(Examination.year_id == year_id)
+    if class_id is not None:
+        query = query.filter(ExaminationSession.class_id == class_id)
+    if date_from is not None:
+        query = query.filter(ExaminationSession.date >= date_from)
+    if date_to is not None:
+        query = query.filter(ExaminationSession.date <= date_to)
+    return [
+        {**_snapshot_session(s), "session_id": s.session_id, "exam_id": s.exam_id,
+         "exam_name": exam_name, "exam_type_name": exam_type_name,
+         "class_name": class_name, "subject_name": subject_name}
+        for s, exam_name, exam_type_name, class_name, subject_name in query.order_by(
+            ExaminationSession.date, ExaminationSession.start_time
+        ).all()
+    ]

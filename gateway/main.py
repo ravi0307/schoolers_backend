@@ -41,6 +41,8 @@ ROUTE_MAP = {
     "examination-types": "academics",
     "grade-scales": "academics",
     "grade-levels": "academics",
+    "examinations": "academics",
+    "sessions": "academics",
     "teachers": "people",
     "staff": "people",
     "parents": "people",
