@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict jaacC1PZwmbSwjg7dm9aWfUJIZ87EEZZxTlhnTnGur3OlfUFH3HbYsejz98Pl86
+\restrict Ho4MgR2WRcTcbnQnl6Oe2XL6dgZW9XHZnUCJKaLW4GhZsLnxsnloOkDhFQkXQaX
 
--- Dumped from database version 17.10
--- Dumped by pg_dump version 17.10
+-- Dumped from database version 17.10 (Postgres.app)
+-- Dumped by pg_dump version 17.10 (Postgres.app)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -19,350 +19,15 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_route_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_reopened_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_pilot_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_cancelled_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_trip_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_drop_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_boarding_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_trip_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_drop_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_boarding_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_trip_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_route_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_trip_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_changed_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_trip_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_expected_pickup_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_expected_drop_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_subject_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_period_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_subject_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_ticket_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_author_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_marked_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.schools DROP CONSTRAINT IF EXISTS schools_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_route_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_pickup_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_drop_stop_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_route_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_route_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_parent_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_uploader_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_updated_by_user_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_updated_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_subject_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_class_teacher_staff_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_sender_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_route_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.barter_listings DROP CONSTRAINT IF EXISTS barter_listings_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.barter_listings DROP CONSTRAINT IF EXISTS barter_listings_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_modified_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_marked_by_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_class_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_school_id_fkey;
-ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_modified_by_fkey;
-DROP TRIGGER IF EXISTS broadcasts_set_created_at_ist ON schoolers.broadcasts;
-DROP INDEX IF EXISTS schoolers.website_queries_school_created_idx;
-DROP INDEX IF EXISTS schoolers.uq_trip_students_trip_student;
-DROP INDEX IF EXISTS schoolers.uq_pilots_route_id;
-DROP INDEX IF EXISTS schoolers.trips_school_date_idx;
-DROP INDEX IF EXISTS schoolers.trips_route_date_idx;
-DROP INDEX IF EXISTS schoolers.trips_pilot_date_idx;
-DROP INDEX IF EXISTS schoolers.trip_student_events_student_idx;
-DROP INDEX IF EXISTS schoolers.trip_stop_events_trip_idx;
-DROP INDEX IF EXISTS schoolers.trip_status_audit_trip_idx;
-DROP INDEX IF EXISTS schoolers.trip_roster_trip_idx;
-DROP INDEX IF EXISTS schoolers.trip_roster_student_idx;
-DROP INDEX IF EXISTS schoolers.support_tickets_status_idx;
-DROP INDEX IF EXISTS schoolers.support_tickets_school_status_idx;
-DROP INDEX IF EXISTS schoolers.support_ticket_messages_ticket_idx;
-DROP INDEX IF EXISTS schoolers.student_fees_school_month_idx;
-DROP INDEX IF EXISTS schoolers.staff_salaries_school_month_idx;
-DROP INDEX IF EXISTS schoolers.route_students_student_id_key;
-DROP INDEX IF EXISTS schoolers.media_uploader_user_idx;
-DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_user_id;
-DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_family_id;
-DROP INDEX IF EXISTS schoolers.ix_auth_refresh_sessions_expires_at;
-DROP INDEX IF EXISTS schoolers.idx_users_school;
-DROP INDEX IF EXISTS schoolers.idx_trips_status_date;
-DROP INDEX IF EXISTS schoolers.idx_trips_school_date;
-DROP INDEX IF EXISTS schoolers.idx_trips_route_date;
-DROP INDEX IF EXISTS schoolers.idx_trips_pilot_date;
-DROP INDEX IF EXISTS schoolers.idx_trip_students_trip_student;
-DROP INDEX IF EXISTS schoolers.idx_timetable_class;
-DROP INDEX IF EXISTS schoolers.idx_students_school;
-DROP INDEX IF EXISTS schoolers.idx_students_class;
-DROP INDEX IF EXISTS schoolers.idx_staff_school;
-DROP INDEX IF EXISTS schoolers.idx_staff_person_type;
-DROP INDEX IF EXISTS schoolers.idx_staff_attendance_school_date;
-DROP INDEX IF EXISTS schoolers.idx_routes_school;
-DROP INDEX IF EXISTS schoolers.idx_route_stops_route;
-DROP INDEX IF EXISTS schoolers.idx_parents_school;
-DROP INDEX IF EXISTS schoolers.idx_marks_student;
-DROP INDEX IF EXISTS schoolers.idx_leave_requests_school;
-DROP INDEX IF EXISTS schoolers.idx_classes_school;
-DROP INDEX IF EXISTS schoolers.idx_broadcasts_school;
-DROP INDEX IF EXISTS schoolers.idx_attendance_student_date;
-DROP INDEX IF EXISTS schoolers.broadcasts_sender_user_idx;
-ALTER TABLE IF EXISTS ONLY schoolers.website_queries DROP CONSTRAINT IF EXISTS website_queries_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.website_builder_sites DROP CONSTRAINT IF EXISTS website_builder_sites_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_school_vehicle_number_key;
-ALTER TABLE IF EXISTS ONLY schoolers.vehicles DROP CONSTRAINT IF EXISTS vehicles_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_username_key;
-ALTER TABLE IF EXISTS ONLY schoolers.users DROP CONSTRAINT IF EXISTS users_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS uq_trips_route_date_direction;
-ALTER TABLE IF EXISTS ONLY schoolers.trips DROP CONSTRAINT IF EXISTS trips_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_students DROP CONSTRAINT IF EXISTS trip_students_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_trip_student_key;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_student_events DROP CONSTRAINT IF EXISTS trip_student_events_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_trip_stop_key;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_stop_events DROP CONSTRAINT IF EXISTS trip_stop_events_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_status_audit DROP CONSTRAINT IF EXISTS trip_status_audit_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_trip_student_key;
-ALTER TABLE IF EXISTS ONLY schoolers.trip_roster DROP CONSTRAINT IF EXISTS trip_roster_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.timetable_entries DROP CONSTRAINT IF EXISTS timetable_entries_class_id_day_of_week_period_id_key;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_staff_id_class_id_subject_id_key;
-ALTER TABLE IF EXISTS ONLY schoolers.teacher_class_subjects DROP CONSTRAINT IF EXISTS teacher_class_subjects_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_tickets DROP CONSTRAINT IF EXISTS support_tickets_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.support_ticket_messages DROP CONSTRAINT IF EXISTS support_ticket_messages_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_school_id_name_key;
-ALTER TABLE IF EXISTS ONLY schoolers.subjects DROP CONSTRAINT IF EXISTS subjects_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.students DROP CONSTRAINT IF EXISTS students_admission_no_key;
-ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_student_id_month_key;
-ALTER TABLE IF EXISTS ONLY schoolers.student_fees DROP CONSTRAINT IF EXISTS student_fees_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_staff_id_month_key;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_salaries DROP CONSTRAINT IF EXISTS staff_salaries_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff DROP CONSTRAINT IF EXISTS staff_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_staff_id_date_key;
-ALTER TABLE IF EXISTS ONLY schoolers.staff_attendance DROP CONSTRAINT IF EXISTS staff_attendance_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.schools DROP CONSTRAINT IF EXISTS schools_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.school_notifications DROP CONSTRAINT IF EXISTS school_notifications_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.routes DROP CONSTRAINT IF EXISTS routes_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_route_id_student_id_key;
-ALTER TABLE IF EXISTS ONLY schoolers.route_students DROP CONSTRAINT IF EXISTS route_students_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.route_stops DROP CONSTRAINT IF EXISTS route_stops_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_staff_id_key;
-ALTER TABLE IF EXISTS ONLY schoolers.pilots DROP CONSTRAINT IF EXISTS pilots_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.periods DROP CONSTRAINT IF EXISTS periods_period_no_key;
-ALTER TABLE IF EXISTS ONLY schoolers.parents DROP CONSTRAINT IF EXISTS parents_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.parent_student DROP CONSTRAINT IF EXISTS parent_student_parent_id_student_id_key;
-ALTER TABLE IF EXISTS ONLY schoolers.media DROP CONSTRAINT IF EXISTS media_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_student_id_subject_id_term_key;
-ALTER TABLE IF EXISTS ONLY schoolers.marks DROP CONSTRAINT IF EXISTS marks_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_school_id_holiday_date_key;
-ALTER TABLE IF EXISTS ONLY schoolers.holidays DROP CONSTRAINT IF EXISTS holidays_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_school_id_name_key;
-ALTER TABLE IF EXISTS ONLY schoolers.classes DROP CONSTRAINT IF EXISTS classes_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.broadcasts DROP CONSTRAINT IF EXISTS broadcasts_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.auth_refresh_sessions DROP CONSTRAINT IF EXISTS auth_refresh_sessions_jti_hash_key;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_student_date_key;
-ALTER TABLE IF EXISTS ONLY schoolers.attendance DROP CONSTRAINT IF EXISTS attendance_pkey;
-ALTER TABLE IF EXISTS ONLY schoolers.activities DROP CONSTRAINT IF EXISTS activities_pkey;
-ALTER TABLE IF EXISTS schoolers.website_queries ALTER COLUMN query_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.users ALTER COLUMN user_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.trips ALTER COLUMN trip_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.trip_student_events ALTER COLUMN event_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.trip_stop_events ALTER COLUMN event_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.trip_status_audit ALTER COLUMN entry_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.trip_roster ALTER COLUMN entry_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.timetable_entries ALTER COLUMN entry_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.teacher_class_subjects ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.support_tickets ALTER COLUMN ticket_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.support_ticket_messages ALTER COLUMN message_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.subjects ALTER COLUMN subject_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.students ALTER COLUMN student_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.student_fees ALTER COLUMN fee_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.staff_salaries ALTER COLUMN salary_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.staff_attendance ALTER COLUMN attendance_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.staff ALTER COLUMN staff_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.schools ALTER COLUMN school_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.school_notifications ALTER COLUMN notification_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.routes ALTER COLUMN route_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.route_students ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.route_stops ALTER COLUMN stop_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.periods ALTER COLUMN period_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.parents ALTER COLUMN parent_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.parent_student ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.media ALTER COLUMN media_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.marks ALTER COLUMN mark_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.leave_requests ALTER COLUMN leave_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.holidays ALTER COLUMN holiday_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.classes ALTER COLUMN class_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.broadcasts ALTER COLUMN broadcast_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.barter_listings ALTER COLUMN listing_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.attendance ALTER COLUMN attendance_id DROP DEFAULT;
-ALTER TABLE IF EXISTS schoolers.activities ALTER COLUMN activity_id DROP DEFAULT;
-DROP SEQUENCE IF EXISTS schoolers.website_queries_query_id_seq;
-DROP TABLE IF EXISTS schoolers.website_queries;
-DROP TABLE IF EXISTS schoolers.website_builder_sites;
-DROP TABLE IF EXISTS schoolers.vehicles;
-DROP SEQUENCE IF EXISTS schoolers.users_user_id_seq;
-DROP TABLE IF EXISTS schoolers.users;
-DROP SEQUENCE IF EXISTS schoolers.trips_trip_id_seq;
-DROP TABLE IF EXISTS schoolers.trips;
-DROP TABLE IF EXISTS schoolers.trip_students;
-DROP SEQUENCE IF EXISTS schoolers.trip_student_events_event_id_seq;
-DROP TABLE IF EXISTS schoolers.trip_student_events;
-DROP SEQUENCE IF EXISTS schoolers.trip_stop_events_event_id_seq;
-DROP TABLE IF EXISTS schoolers.trip_stop_events;
-DROP SEQUENCE IF EXISTS schoolers.trip_status_audit_entry_id_seq;
-DROP TABLE IF EXISTS schoolers.trip_status_audit;
-DROP SEQUENCE IF EXISTS schoolers.trip_roster_entry_id_seq;
-DROP TABLE IF EXISTS schoolers.trip_roster;
-DROP SEQUENCE IF EXISTS schoolers.timetable_entries_entry_id_seq;
-DROP TABLE IF EXISTS schoolers.timetable_entries;
-DROP SEQUENCE IF EXISTS schoolers.teacher_class_subjects_id_seq;
-DROP TABLE IF EXISTS schoolers.teacher_class_subjects;
-DROP SEQUENCE IF EXISTS schoolers.support_tickets_ticket_id_seq;
-DROP TABLE IF EXISTS schoolers.support_tickets;
-DROP SEQUENCE IF EXISTS schoolers.support_ticket_messages_message_id_seq;
-DROP TABLE IF EXISTS schoolers.support_ticket_messages;
-DROP SEQUENCE IF EXISTS schoolers.subjects_subject_id_seq;
-DROP TABLE IF EXISTS schoolers.subjects;
-DROP SEQUENCE IF EXISTS schoolers.students_student_id_seq;
-DROP TABLE IF EXISTS schoolers.students;
-DROP SEQUENCE IF EXISTS schoolers.student_fees_fee_id_seq;
-DROP TABLE IF EXISTS schoolers.student_fees;
-DROP SEQUENCE IF EXISTS schoolers.staff_staff_id_seq;
-DROP SEQUENCE IF EXISTS schoolers.staff_salaries_salary_id_seq;
-DROP TABLE IF EXISTS schoolers.staff_salaries;
-DROP SEQUENCE IF EXISTS schoolers.staff_attendance_attendance_id_seq;
-DROP TABLE IF EXISTS schoolers.staff_attendance;
-DROP TABLE IF EXISTS schoolers.staff;
-DROP SEQUENCE IF EXISTS schoolers.schools_school_id_seq;
-DROP TABLE IF EXISTS schoolers.schools;
-DROP SEQUENCE IF EXISTS schoolers.school_notifications_notification_id_seq;
-DROP TABLE IF EXISTS schoolers.school_notifications;
-DROP SEQUENCE IF EXISTS schoolers.routes_route_id_seq;
-DROP TABLE IF EXISTS schoolers.routes;
-DROP SEQUENCE IF EXISTS schoolers.route_students_id_seq;
-DROP TABLE IF EXISTS schoolers.route_students;
-DROP SEQUENCE IF EXISTS schoolers.route_stops_stop_id_seq;
-DROP TABLE IF EXISTS schoolers.route_stops;
-DROP TABLE IF EXISTS schoolers.pilots;
-DROP SEQUENCE IF EXISTS schoolers.periods_period_id_seq;
-DROP TABLE IF EXISTS schoolers.periods;
-DROP SEQUENCE IF EXISTS schoolers.parents_parent_id_seq;
-DROP TABLE IF EXISTS schoolers.parents;
-DROP SEQUENCE IF EXISTS schoolers.parent_student_id_seq;
-DROP TABLE IF EXISTS schoolers.parent_student;
-DROP SEQUENCE IF EXISTS schoolers.media_media_id_seq;
-DROP TABLE IF EXISTS schoolers.media;
-DROP SEQUENCE IF EXISTS schoolers.marks_mark_id_seq;
-DROP TABLE IF EXISTS schoolers.marks;
-DROP SEQUENCE IF EXISTS schoolers.leave_requests_leave_id_seq;
-DROP TABLE IF EXISTS schoolers.leave_requests;
-DROP SEQUENCE IF EXISTS schoolers.holidays_holiday_id_seq;
-DROP TABLE IF EXISTS schoolers.holidays;
-DROP SEQUENCE IF EXISTS schoolers.classes_class_id_seq;
-DROP TABLE IF EXISTS schoolers.classes;
-DROP SEQUENCE IF EXISTS schoolers.broadcasts_broadcast_id_seq;
-DROP TABLE IF EXISTS schoolers.broadcasts;
-DROP SEQUENCE IF EXISTS schoolers.barter_listings_listing_id_seq;
-DROP TABLE IF EXISTS schoolers.barter_listings;
-DROP TABLE IF EXISTS schoolers.auth_refresh_sessions;
-DROP SEQUENCE IF EXISTS schoolers.attendance_attendance_id_seq;
-DROP TABLE IF EXISTS schoolers.attendance;
-DROP SEQUENCE IF EXISTS schoolers.activities_activity_id_seq;
-DROP TABLE IF EXISTS schoolers.activities;
-DROP FUNCTION IF EXISTS schoolers.set_broadcast_created_at_ist();
-DROP SCHEMA IF EXISTS schoolers;
 --
--- Name: schoolers; Type: SCHEMA; Schema: -; Owner: ravi
+-- Name: schoolers; Type: SCHEMA; Schema: -; Owner: -
 --
 
 CREATE SCHEMA schoolers;
 
 
-ALTER SCHEMA schoolers OWNER TO ravi;
-
 --
--- Name: set_broadcast_created_at_ist(); Type: FUNCTION; Schema: schoolers; Owner: ravi
+-- Name: set_broadcast_created_at_ist(); Type: FUNCTION; Schema: schoolers; Owner: -
 --
 
 CREATE FUNCTION schoolers.set_broadcast_created_at_ist() RETURNS trigger
@@ -375,14 +40,12 @@ END;
 $$;
 
 
-ALTER FUNCTION schoolers.set_broadcast_created_at_ist() OWNER TO ravi;
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: activities; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: activities; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.activities (
@@ -398,10 +61,8 @@ CREATE TABLE schoolers.activities (
 );
 
 
-ALTER TABLE schoolers.activities OWNER TO ravi;
-
 --
--- Name: activities_activity_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: activities_activity_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.activities_activity_id_seq
@@ -413,17 +74,15 @@ CREATE SEQUENCE schoolers.activities_activity_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.activities_activity_id_seq OWNER TO ravi;
-
 --
--- Name: activities_activity_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: activities_activity_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.activities_activity_id_seq OWNED BY schoolers.activities.activity_id;
 
 
 --
--- Name: attendance; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: attendance; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.attendance (
@@ -439,10 +98,8 @@ CREATE TABLE schoolers.attendance (
 );
 
 
-ALTER TABLE schoolers.attendance OWNER TO ravi;
-
 --
--- Name: attendance_attendance_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: attendance_attendance_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.attendance_attendance_id_seq
@@ -454,17 +111,15 @@ CREATE SEQUENCE schoolers.attendance_attendance_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.attendance_attendance_id_seq OWNER TO ravi;
-
 --
--- Name: attendance_attendance_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: attendance_attendance_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.attendance_attendance_id_seq OWNED BY schoolers.attendance.attendance_id;
 
 
 --
--- Name: auth_refresh_sessions; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.auth_refresh_sessions (
@@ -481,10 +136,8 @@ CREATE TABLE schoolers.auth_refresh_sessions (
 );
 
 
-ALTER TABLE schoolers.auth_refresh_sessions OWNER TO ravi;
-
 --
--- Name: auth_refresh_sessions_session_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions_session_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE schoolers.auth_refresh_sessions ALTER COLUMN session_id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -498,7 +151,7 @@ ALTER TABLE schoolers.auth_refresh_sessions ALTER COLUMN session_id ADD GENERATE
 
 
 --
--- Name: barter_listings; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: barter_listings; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.barter_listings (
@@ -515,10 +168,8 @@ CREATE TABLE schoolers.barter_listings (
 );
 
 
-ALTER TABLE schoolers.barter_listings OWNER TO ravi;
-
 --
--- Name: barter_listings_listing_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: barter_listings_listing_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.barter_listings_listing_id_seq
@@ -530,17 +181,15 @@ CREATE SEQUENCE schoolers.barter_listings_listing_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.barter_listings_listing_id_seq OWNER TO ravi;
-
 --
--- Name: barter_listings_listing_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: barter_listings_listing_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.barter_listings_listing_id_seq OWNED BY schoolers.barter_listings.listing_id;
 
 
 --
--- Name: broadcasts; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: broadcasts; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.broadcasts (
@@ -561,10 +210,8 @@ CREATE TABLE schoolers.broadcasts (
 );
 
 
-ALTER TABLE schoolers.broadcasts OWNER TO ravi;
-
 --
--- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.broadcasts_broadcast_id_seq
@@ -576,17 +223,15 @@ CREATE SEQUENCE schoolers.broadcasts_broadcast_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.broadcasts_broadcast_id_seq OWNER TO ravi;
-
 --
--- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.broadcasts_broadcast_id_seq OWNED BY schoolers.broadcasts.broadcast_id;
 
 
 --
--- Name: classes; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: classes; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.classes (
@@ -601,10 +246,8 @@ CREATE TABLE schoolers.classes (
 );
 
 
-ALTER TABLE schoolers.classes OWNER TO ravi;
-
 --
--- Name: classes_class_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: classes_class_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.classes_class_id_seq
@@ -616,17 +259,15 @@ CREATE SEQUENCE schoolers.classes_class_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.classes_class_id_seq OWNER TO ravi;
-
 --
--- Name: classes_class_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: classes_class_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.classes_class_id_seq OWNED BY schoolers.classes.class_id;
 
 
 --
--- Name: holidays; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: holidays; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.holidays (
@@ -639,10 +280,8 @@ CREATE TABLE schoolers.holidays (
 );
 
 
-ALTER TABLE schoolers.holidays OWNER TO ravi;
-
 --
--- Name: holidays_holiday_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: holidays_holiday_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.holidays_holiday_id_seq
@@ -654,17 +293,15 @@ CREATE SEQUENCE schoolers.holidays_holiday_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.holidays_holiday_id_seq OWNER TO ravi;
-
 --
--- Name: holidays_holiday_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: holidays_holiday_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.holidays_holiday_id_seq OWNED BY schoolers.holidays.holiday_id;
 
 
 --
--- Name: leave_requests; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: leave_requests; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.leave_requests (
@@ -680,15 +317,14 @@ CREATE TABLE schoolers.leave_requests (
     is_active boolean DEFAULT true NOT NULL,
     modified_by integer,
     modified_at timestamp without time zone DEFAULT now(),
+    review_remark character varying(500),
     CONSTRAINT leave_requests_requester_type_check CHECK (((requester_type)::text = ANY (ARRAY[('Teacher'::character varying)::text, ('Student'::character varying)::text, ('Staff'::character varying)::text, ('Pilot'::character varying)::text]))),
     CONSTRAINT leave_requests_status_check CHECK (((status)::text = ANY (ARRAY[('Pending'::character varying)::text, ('Approved'::character varying)::text, ('Rejected'::character varying)::text])))
 );
 
 
-ALTER TABLE schoolers.leave_requests OWNER TO ravi;
-
 --
--- Name: leave_requests_leave_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: leave_requests_leave_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.leave_requests_leave_id_seq
@@ -700,17 +336,15 @@ CREATE SEQUENCE schoolers.leave_requests_leave_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.leave_requests_leave_id_seq OWNER TO ravi;
-
 --
--- Name: leave_requests_leave_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: leave_requests_leave_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.leave_requests_leave_id_seq OWNED BY schoolers.leave_requests.leave_id;
 
 
 --
--- Name: marks; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: marks; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.marks (
@@ -728,10 +362,8 @@ CREATE TABLE schoolers.marks (
 );
 
 
-ALTER TABLE schoolers.marks OWNER TO ravi;
-
 --
--- Name: marks_mark_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: marks_mark_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.marks_mark_id_seq
@@ -743,17 +375,15 @@ CREATE SEQUENCE schoolers.marks_mark_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.marks_mark_id_seq OWNER TO ravi;
-
 --
--- Name: marks_mark_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: marks_mark_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.marks_mark_id_seq OWNED BY schoolers.marks.mark_id;
 
 
 --
--- Name: media; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: media; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.media (
@@ -773,10 +403,8 @@ CREATE TABLE schoolers.media (
 );
 
 
-ALTER TABLE schoolers.media OWNER TO ravi;
-
 --
--- Name: media_media_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: media_media_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.media_media_id_seq
@@ -788,17 +416,15 @@ CREATE SEQUENCE schoolers.media_media_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.media_media_id_seq OWNER TO ravi;
-
 --
--- Name: media_media_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: media_media_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.media_media_id_seq OWNED BY schoolers.media.media_id;
 
 
 --
--- Name: parent_student; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: parent_student; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.parent_student (
@@ -811,10 +437,8 @@ CREATE TABLE schoolers.parent_student (
 );
 
 
-ALTER TABLE schoolers.parent_student OWNER TO ravi;
-
 --
--- Name: parent_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: parent_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.parent_student_id_seq
@@ -826,17 +450,15 @@ CREATE SEQUENCE schoolers.parent_student_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.parent_student_id_seq OWNER TO ravi;
-
 --
--- Name: parent_student_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: parent_student_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.parent_student_id_seq OWNED BY schoolers.parent_student.id;
 
 
 --
--- Name: parents; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: parents; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.parents (
@@ -854,10 +476,8 @@ CREATE TABLE schoolers.parents (
 );
 
 
-ALTER TABLE schoolers.parents OWNER TO ravi;
-
 --
--- Name: parents_parent_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: parents_parent_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.parents_parent_id_seq
@@ -869,17 +489,15 @@ CREATE SEQUENCE schoolers.parents_parent_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.parents_parent_id_seq OWNER TO ravi;
-
 --
--- Name: parents_parent_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: parents_parent_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.parents_parent_id_seq OWNED BY schoolers.parents.parent_id;
 
 
 --
--- Name: periods; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: periods; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.periods (
@@ -891,10 +509,8 @@ CREATE TABLE schoolers.periods (
 );
 
 
-ALTER TABLE schoolers.periods OWNER TO ravi;
-
 --
--- Name: periods_period_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: periods_period_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.periods_period_id_seq
@@ -906,17 +522,15 @@ CREATE SEQUENCE schoolers.periods_period_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.periods_period_id_seq OWNER TO ravi;
-
 --
--- Name: periods_period_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: periods_period_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.periods_period_id_seq OWNED BY schoolers.periods.period_id;
 
 
 --
--- Name: pilots; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: pilots; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.pilots (
@@ -930,10 +544,8 @@ CREATE TABLE schoolers.pilots (
 );
 
 
-ALTER TABLE schoolers.pilots OWNER TO ravi;
-
 --
--- Name: pilots_pilot_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: pilots_pilot_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE schoolers.pilots ALTER COLUMN pilot_id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -947,7 +559,7 @@ ALTER TABLE schoolers.pilots ALTER COLUMN pilot_id ADD GENERATED BY DEFAULT AS I
 
 
 --
--- Name: route_stops; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: route_stops; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.route_stops (
@@ -963,10 +575,8 @@ CREATE TABLE schoolers.route_stops (
 );
 
 
-ALTER TABLE schoolers.route_stops OWNER TO ravi;
-
 --
--- Name: route_stops_stop_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: route_stops_stop_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.route_stops_stop_id_seq
@@ -978,17 +588,15 @@ CREATE SEQUENCE schoolers.route_stops_stop_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.route_stops_stop_id_seq OWNER TO ravi;
-
 --
--- Name: route_stops_stop_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: route_stops_stop_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.route_stops_stop_id_seq OWNED BY schoolers.route_stops.stop_id;
 
 
 --
--- Name: route_students; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: route_students; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.route_students (
@@ -1003,10 +611,8 @@ CREATE TABLE schoolers.route_students (
 );
 
 
-ALTER TABLE schoolers.route_students OWNER TO ravi;
-
 --
--- Name: route_students_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: route_students_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.route_students_id_seq
@@ -1018,17 +624,15 @@ CREATE SEQUENCE schoolers.route_students_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.route_students_id_seq OWNER TO ravi;
-
 --
--- Name: route_students_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: route_students_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.route_students_id_seq OWNED BY schoolers.route_students.id;
 
 
 --
--- Name: routes; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: routes; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.routes (
@@ -1045,10 +649,8 @@ CREATE TABLE schoolers.routes (
 );
 
 
-ALTER TABLE schoolers.routes OWNER TO ravi;
-
 --
--- Name: routes_route_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: routes_route_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.routes_route_id_seq
@@ -1060,17 +662,15 @@ CREATE SEQUENCE schoolers.routes_route_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.routes_route_id_seq OWNER TO ravi;
-
 --
--- Name: routes_route_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: routes_route_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.routes_route_id_seq OWNED BY schoolers.routes.route_id;
 
 
 --
--- Name: school_notifications; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: school_notifications; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.school_notifications (
@@ -1087,10 +687,8 @@ CREATE TABLE schoolers.school_notifications (
 );
 
 
-ALTER TABLE schoolers.school_notifications OWNER TO ravi;
-
 --
--- Name: school_notifications_notification_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: school_notifications_notification_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.school_notifications_notification_id_seq
@@ -1102,17 +700,15 @@ CREATE SEQUENCE schoolers.school_notifications_notification_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.school_notifications_notification_id_seq OWNER TO ravi;
-
 --
--- Name: school_notifications_notification_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: school_notifications_notification_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.school_notifications_notification_id_seq OWNED BY schoolers.school_notifications.notification_id;
 
 
 --
--- Name: schools; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: schools; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.schools (
@@ -1144,10 +740,8 @@ CREATE TABLE schoolers.schools (
 );
 
 
-ALTER TABLE schoolers.schools OWNER TO ravi;
-
 --
--- Name: schools_school_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: schools_school_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.schools_school_id_seq
@@ -1159,17 +753,15 @@ CREATE SEQUENCE schoolers.schools_school_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.schools_school_id_seq OWNER TO ravi;
-
 --
--- Name: schools_school_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: schools_school_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.schools_school_id_seq OWNED BY schoolers.schools.school_id;
 
 
 --
--- Name: staff; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: staff; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.staff (
@@ -1197,10 +789,8 @@ CREATE TABLE schoolers.staff (
 );
 
 
-ALTER TABLE schoolers.staff OWNER TO ravi;
-
 --
--- Name: staff_attendance; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.staff_attendance (
@@ -1219,10 +809,8 @@ CREATE TABLE schoolers.staff_attendance (
 );
 
 
-ALTER TABLE schoolers.staff_attendance OWNER TO ravi;
-
 --
--- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.staff_attendance_attendance_id_seq
@@ -1234,17 +822,15 @@ CREATE SEQUENCE schoolers.staff_attendance_attendance_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.staff_attendance_attendance_id_seq OWNER TO ravi;
-
 --
--- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.staff_attendance_attendance_id_seq OWNED BY schoolers.staff_attendance.attendance_id;
 
 
 --
--- Name: staff_salaries; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.staff_salaries (
@@ -1262,10 +848,8 @@ CREATE TABLE schoolers.staff_salaries (
 );
 
 
-ALTER TABLE schoolers.staff_salaries OWNER TO ravi;
-
 --
--- Name: staff_salaries_salary_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries_salary_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.staff_salaries_salary_id_seq
@@ -1277,17 +861,15 @@ CREATE SEQUENCE schoolers.staff_salaries_salary_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.staff_salaries_salary_id_seq OWNER TO ravi;
-
 --
--- Name: staff_salaries_salary_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries_salary_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.staff_salaries_salary_id_seq OWNED BY schoolers.staff_salaries.salary_id;
 
 
 --
--- Name: staff_staff_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: staff_staff_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.staff_staff_id_seq
@@ -1299,17 +881,15 @@ CREATE SEQUENCE schoolers.staff_staff_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.staff_staff_id_seq OWNER TO ravi;
-
 --
--- Name: staff_staff_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: staff_staff_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.staff_staff_id_seq OWNED BY schoolers.staff.staff_id;
 
 
 --
--- Name: student_fees; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: student_fees; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.student_fees (
@@ -1327,10 +907,8 @@ CREATE TABLE schoolers.student_fees (
 );
 
 
-ALTER TABLE schoolers.student_fees OWNER TO ravi;
-
 --
--- Name: student_fees_fee_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: student_fees_fee_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.student_fees_fee_id_seq
@@ -1342,17 +920,15 @@ CREATE SEQUENCE schoolers.student_fees_fee_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.student_fees_fee_id_seq OWNER TO ravi;
-
 --
--- Name: student_fees_fee_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: student_fees_fee_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.student_fees_fee_id_seq OWNED BY schoolers.student_fees.fee_id;
 
 
 --
--- Name: students; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: students; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.students (
@@ -1376,10 +952,8 @@ CREATE TABLE schoolers.students (
 );
 
 
-ALTER TABLE schoolers.students OWNER TO ravi;
-
 --
--- Name: students_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: students_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.students_student_id_seq
@@ -1391,17 +965,15 @@ CREATE SEQUENCE schoolers.students_student_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.students_student_id_seq OWNER TO ravi;
-
 --
--- Name: students_student_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: students_student_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.students_student_id_seq OWNED BY schoolers.students.student_id;
 
 
 --
--- Name: subjects; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: subjects; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.subjects (
@@ -1414,10 +986,8 @@ CREATE TABLE schoolers.subjects (
 );
 
 
-ALTER TABLE schoolers.subjects OWNER TO ravi;
-
 --
--- Name: subjects_subject_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: subjects_subject_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.subjects_subject_id_seq
@@ -1429,17 +999,15 @@ CREATE SEQUENCE schoolers.subjects_subject_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.subjects_subject_id_seq OWNER TO ravi;
-
 --
--- Name: subjects_subject_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: subjects_subject_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.subjects_subject_id_seq OWNED BY schoolers.subjects.subject_id;
 
 
 --
--- Name: support_ticket_messages; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.support_ticket_messages (
@@ -1457,10 +1025,8 @@ CREATE TABLE schoolers.support_ticket_messages (
 );
 
 
-ALTER TABLE schoolers.support_ticket_messages OWNER TO ravi;
-
 --
--- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.support_ticket_messages_message_id_seq
@@ -1472,17 +1038,15 @@ CREATE SEQUENCE schoolers.support_ticket_messages_message_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.support_ticket_messages_message_id_seq OWNER TO ravi;
-
 --
--- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.support_ticket_messages_message_id_seq OWNED BY schoolers.support_ticket_messages.message_id;
 
 
 --
--- Name: support_tickets; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: support_tickets; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.support_tickets (
@@ -1499,10 +1063,8 @@ CREATE TABLE schoolers.support_tickets (
 );
 
 
-ALTER TABLE schoolers.support_tickets OWNER TO ravi;
-
 --
--- Name: support_tickets_ticket_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: support_tickets_ticket_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.support_tickets_ticket_id_seq
@@ -1514,17 +1076,15 @@ CREATE SEQUENCE schoolers.support_tickets_ticket_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.support_tickets_ticket_id_seq OWNER TO ravi;
-
 --
--- Name: support_tickets_ticket_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: support_tickets_ticket_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.support_tickets_ticket_id_seq OWNED BY schoolers.support_tickets.ticket_id;
 
 
 --
--- Name: teacher_class_subjects; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.teacher_class_subjects (
@@ -1538,10 +1098,8 @@ CREATE TABLE schoolers.teacher_class_subjects (
 );
 
 
-ALTER TABLE schoolers.teacher_class_subjects OWNER TO ravi;
-
 --
--- Name: teacher_class_subjects_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.teacher_class_subjects_id_seq
@@ -1553,17 +1111,15 @@ CREATE SEQUENCE schoolers.teacher_class_subjects_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.teacher_class_subjects_id_seq OWNER TO ravi;
-
 --
--- Name: teacher_class_subjects_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.teacher_class_subjects_id_seq OWNED BY schoolers.teacher_class_subjects.id;
 
 
 --
--- Name: timetable_entries; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.timetable_entries (
@@ -1585,10 +1141,8 @@ CREATE TABLE schoolers.timetable_entries (
 );
 
 
-ALTER TABLE schoolers.timetable_entries OWNER TO ravi;
-
 --
--- Name: timetable_entries_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.timetable_entries_entry_id_seq
@@ -1600,17 +1154,15 @@ CREATE SEQUENCE schoolers.timetable_entries_entry_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.timetable_entries_entry_id_seq OWNER TO ravi;
-
 --
--- Name: timetable_entries_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.timetable_entries_entry_id_seq OWNED BY schoolers.timetable_entries.entry_id;
 
 
 --
--- Name: trip_roster; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trip_roster; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trip_roster (
@@ -1625,10 +1177,8 @@ CREATE TABLE schoolers.trip_roster (
 );
 
 
-ALTER TABLE schoolers.trip_roster OWNER TO ravi;
-
 --
--- Name: trip_roster_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trip_roster_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.trip_roster_entry_id_seq
@@ -1640,17 +1190,15 @@ CREATE SEQUENCE schoolers.trip_roster_entry_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.trip_roster_entry_id_seq OWNER TO ravi;
-
 --
--- Name: trip_roster_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: trip_roster_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.trip_roster_entry_id_seq OWNED BY schoolers.trip_roster.entry_id;
 
 
 --
--- Name: trip_status_audit; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trip_status_audit (
@@ -1665,10 +1213,8 @@ CREATE TABLE schoolers.trip_status_audit (
 );
 
 
-ALTER TABLE schoolers.trip_status_audit OWNER TO ravi;
-
 --
--- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.trip_status_audit_entry_id_seq
@@ -1680,17 +1226,15 @@ CREATE SEQUENCE schoolers.trip_status_audit_entry_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.trip_status_audit_entry_id_seq OWNER TO ravi;
-
 --
--- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.trip_status_audit_entry_id_seq OWNED BY schoolers.trip_status_audit.entry_id;
 
 
 --
--- Name: trip_stop_events; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trip_stop_events (
@@ -1704,10 +1248,8 @@ CREATE TABLE schoolers.trip_stop_events (
 );
 
 
-ALTER TABLE schoolers.trip_stop_events OWNER TO ravi;
-
 --
--- Name: trip_stop_events_event_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events_event_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.trip_stop_events_event_id_seq
@@ -1719,17 +1261,15 @@ CREATE SEQUENCE schoolers.trip_stop_events_event_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.trip_stop_events_event_id_seq OWNER TO ravi;
-
 --
--- Name: trip_stop_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.trip_stop_events_event_id_seq OWNED BY schoolers.trip_stop_events.event_id;
 
 
 --
--- Name: trip_student_events; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trip_student_events (
@@ -1748,10 +1288,8 @@ CREATE TABLE schoolers.trip_student_events (
 );
 
 
-ALTER TABLE schoolers.trip_student_events OWNER TO ravi;
-
 --
--- Name: trip_student_events_event_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events_event_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.trip_student_events_event_id_seq
@@ -1763,17 +1301,15 @@ CREATE SEQUENCE schoolers.trip_student_events_event_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.trip_student_events_event_id_seq OWNER TO ravi;
-
 --
--- Name: trip_student_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events_event_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.trip_student_events_event_id_seq OWNED BY schoolers.trip_student_events.event_id;
 
 
 --
--- Name: trip_students; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trip_students; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trip_students (
@@ -1794,10 +1330,8 @@ CREATE TABLE schoolers.trip_students (
 );
 
 
-ALTER TABLE schoolers.trip_students OWNER TO ravi;
-
 --
--- Name: trip_students_trip_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trip_students_trip_student_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE schoolers.trip_students ALTER COLUMN trip_student_id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -1811,14 +1345,14 @@ ALTER TABLE schoolers.trip_students ALTER COLUMN trip_student_id ADD GENERATED B
 
 
 --
--- Name: trips; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: trips; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.trips (
     trip_id integer NOT NULL,
     school_id integer NOT NULL,
     route_id integer NOT NULL,
-    direction character varying(10) CONSTRAINT trips_trip_type_not_null NOT NULL,
+    direction character varying(10) NOT NULL,
     trip_date date NOT NULL,
     status character varying(15) DEFAULT 'scheduled'::character varying NOT NULL,
     started_at timestamp without time zone,
@@ -1842,10 +1376,8 @@ CREATE TABLE schoolers.trips (
 );
 
 
-ALTER TABLE schoolers.trips OWNER TO ravi;
-
 --
--- Name: trips_trip_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: trips_trip_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.trips_trip_id_seq
@@ -1857,17 +1389,15 @@ CREATE SEQUENCE schoolers.trips_trip_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.trips_trip_id_seq OWNER TO ravi;
-
 --
--- Name: trips_trip_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: trips_trip_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.trips_trip_id_seq OWNED BY schoolers.trips.trip_id;
 
 
 --
--- Name: users; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: users; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.users (
@@ -1890,10 +1420,8 @@ CREATE TABLE schoolers.users (
 );
 
 
-ALTER TABLE schoolers.users OWNER TO ravi;
-
 --
--- Name: users_user_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: users_user_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.users_user_id_seq
@@ -1905,17 +1433,15 @@ CREATE SEQUENCE schoolers.users_user_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.users_user_id_seq OWNER TO ravi;
-
 --
--- Name: users_user_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: users_user_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.users_user_id_seq OWNED BY schoolers.users.user_id;
 
 
 --
--- Name: vehicles; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: vehicles; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.vehicles (
@@ -1931,10 +1457,8 @@ CREATE TABLE schoolers.vehicles (
 );
 
 
-ALTER TABLE schoolers.vehicles OWNER TO ravi;
-
 --
--- Name: vehicles_vehicle_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: vehicles_vehicle_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE schoolers.vehicles ALTER COLUMN vehicle_id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -1948,7 +1472,7 @@ ALTER TABLE schoolers.vehicles ALTER COLUMN vehicle_id ADD GENERATED BY DEFAULT 
 
 
 --
--- Name: website_builder_sites; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.website_builder_sites (
@@ -1961,10 +1485,8 @@ CREATE TABLE schoolers.website_builder_sites (
 );
 
 
-ALTER TABLE schoolers.website_builder_sites OWNER TO ravi;
-
 --
--- Name: website_queries; Type: TABLE; Schema: schoolers; Owner: ravi
+-- Name: website_queries; Type: TABLE; Schema: schoolers; Owner: -
 --
 
 CREATE TABLE schoolers.website_queries (
@@ -1979,10 +1501,8 @@ CREATE TABLE schoolers.website_queries (
 );
 
 
-ALTER TABLE schoolers.website_queries OWNER TO ravi;
-
 --
--- Name: website_queries_query_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: ravi
+-- Name: website_queries_query_id_seq; Type: SEQUENCE; Schema: schoolers; Owner: -
 --
 
 CREATE SEQUENCE schoolers.website_queries_query_id_seq
@@ -1994,255 +1514,253 @@ CREATE SEQUENCE schoolers.website_queries_query_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE schoolers.website_queries_query_id_seq OWNER TO ravi;
-
 --
--- Name: website_queries_query_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: ravi
+-- Name: website_queries_query_id_seq; Type: SEQUENCE OWNED BY; Schema: schoolers; Owner: -
 --
 
 ALTER SEQUENCE schoolers.website_queries_query_id_seq OWNED BY schoolers.website_queries.query_id;
 
 
 --
--- Name: activities activity_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: activities activity_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.activities ALTER COLUMN activity_id SET DEFAULT nextval('schoolers.activities_activity_id_seq'::regclass);
 
 
 --
--- Name: attendance attendance_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance ALTER COLUMN attendance_id SET DEFAULT nextval('schoolers.attendance_attendance_id_seq'::regclass);
 
 
 --
--- Name: barter_listings listing_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: barter_listings listing_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.barter_listings ALTER COLUMN listing_id SET DEFAULT nextval('schoolers.barter_listings_listing_id_seq'::regclass);
 
 
 --
--- Name: broadcasts broadcast_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcast_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts ALTER COLUMN broadcast_id SET DEFAULT nextval('schoolers.broadcasts_broadcast_id_seq'::regclass);
 
 
 --
--- Name: classes class_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: classes class_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes ALTER COLUMN class_id SET DEFAULT nextval('schoolers.classes_class_id_seq'::regclass);
 
 
 --
--- Name: holidays holiday_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: holidays holiday_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.holidays ALTER COLUMN holiday_id SET DEFAULT nextval('schoolers.holidays_holiday_id_seq'::regclass);
 
 
 --
--- Name: leave_requests leave_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: leave_requests leave_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.leave_requests ALTER COLUMN leave_id SET DEFAULT nextval('schoolers.leave_requests_leave_id_seq'::regclass);
 
 
 --
--- Name: marks mark_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: marks mark_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks ALTER COLUMN mark_id SET DEFAULT nextval('schoolers.marks_mark_id_seq'::regclass);
 
 
 --
--- Name: media media_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: media media_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media ALTER COLUMN media_id SET DEFAULT nextval('schoolers.media_media_id_seq'::regclass);
 
 
 --
--- Name: parent_student id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: parent_student id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student ALTER COLUMN id SET DEFAULT nextval('schoolers.parent_student_id_seq'::regclass);
 
 
 --
--- Name: parents parent_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: parents parent_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parents ALTER COLUMN parent_id SET DEFAULT nextval('schoolers.parents_parent_id_seq'::regclass);
 
 
 --
--- Name: periods period_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: periods period_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.periods ALTER COLUMN period_id SET DEFAULT nextval('schoolers.periods_period_id_seq'::regclass);
 
 
 --
--- Name: route_stops stop_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: route_stops stop_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_stops ALTER COLUMN stop_id SET DEFAULT nextval('schoolers.route_stops_stop_id_seq'::regclass);
 
 
 --
--- Name: route_students id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: route_students id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students ALTER COLUMN id SET DEFAULT nextval('schoolers.route_students_id_seq'::regclass);
 
 
 --
--- Name: routes route_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: routes route_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.routes ALTER COLUMN route_id SET DEFAULT nextval('schoolers.routes_route_id_seq'::regclass);
 
 
 --
--- Name: school_notifications notification_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: school_notifications notification_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.school_notifications ALTER COLUMN notification_id SET DEFAULT nextval('schoolers.school_notifications_notification_id_seq'::regclass);
 
 
 --
--- Name: schools school_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: schools school_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.schools ALTER COLUMN school_id SET DEFAULT nextval('schoolers.schools_school_id_seq'::regclass);
 
 
 --
--- Name: staff staff_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: staff staff_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff ALTER COLUMN staff_id SET DEFAULT nextval('schoolers.staff_staff_id_seq'::regclass);
 
 
 --
--- Name: staff_attendance attendance_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance attendance_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance ALTER COLUMN attendance_id SET DEFAULT nextval('schoolers.staff_attendance_attendance_id_seq'::regclass);
 
 
 --
--- Name: staff_salaries salary_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries salary_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries ALTER COLUMN salary_id SET DEFAULT nextval('schoolers.staff_salaries_salary_id_seq'::regclass);
 
 
 --
--- Name: student_fees fee_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: student_fees fee_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees ALTER COLUMN fee_id SET DEFAULT nextval('schoolers.student_fees_fee_id_seq'::regclass);
 
 
 --
--- Name: students student_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: students student_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students ALTER COLUMN student_id SET DEFAULT nextval('schoolers.students_student_id_seq'::regclass);
 
 
 --
--- Name: subjects subject_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: subjects subject_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.subjects ALTER COLUMN subject_id SET DEFAULT nextval('schoolers.subjects_subject_id_seq'::regclass);
 
 
 --
--- Name: support_ticket_messages message_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages message_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_ticket_messages ALTER COLUMN message_id SET DEFAULT nextval('schoolers.support_ticket_messages_message_id_seq'::regclass);
 
 
 --
--- Name: support_tickets ticket_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: support_tickets ticket_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_tickets ALTER COLUMN ticket_id SET DEFAULT nextval('schoolers.support_tickets_ticket_id_seq'::regclass);
 
 
 --
--- Name: teacher_class_subjects id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects ALTER COLUMN id SET DEFAULT nextval('schoolers.teacher_class_subjects_id_seq'::regclass);
 
 
 --
--- Name: timetable_entries entry_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries entry_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries ALTER COLUMN entry_id SET DEFAULT nextval('schoolers.timetable_entries_entry_id_seq'::regclass);
 
 
 --
--- Name: trip_roster entry_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster entry_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster ALTER COLUMN entry_id SET DEFAULT nextval('schoolers.trip_roster_entry_id_seq'::regclass);
 
 
 --
--- Name: trip_status_audit entry_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit entry_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_status_audit ALTER COLUMN entry_id SET DEFAULT nextval('schoolers.trip_status_audit_entry_id_seq'::regclass);
 
 
 --
--- Name: trip_stop_events event_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events event_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events ALTER COLUMN event_id SET DEFAULT nextval('schoolers.trip_stop_events_event_id_seq'::regclass);
 
 
 --
--- Name: trip_student_events event_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events event_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events ALTER COLUMN event_id SET DEFAULT nextval('schoolers.trip_student_events_event_id_seq'::regclass);
 
 
 --
--- Name: trips trip_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: trips trip_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips ALTER COLUMN trip_id SET DEFAULT nextval('schoolers.trips_trip_id_seq'::regclass);
 
 
 --
--- Name: users user_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: users user_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.users ALTER COLUMN user_id SET DEFAULT nextval('schoolers.users_user_id_seq'::regclass);
 
 
 --
--- Name: website_queries query_id; Type: DEFAULT; Schema: schoolers; Owner: ravi
+-- Name: website_queries query_id; Type: DEFAULT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_queries ALTER COLUMN query_id SET DEFAULT nextval('schoolers.website_queries_query_id_seq'::regclass);
 
 
 --
--- Data for Name: activities; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: activities; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.activities (activity_id, school_id, tag, title, description, published_at, is_active, modified_by, modified_at) FROM stdin;
@@ -2294,7 +1812,7 @@ COPY schoolers.activities (activity_id, school_id, tag, title, description, publ
 
 
 --
--- Data for Name: attendance; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: attendance; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.attendance (attendance_id, student_id, class_id, date, status, modified_by, modified_at, marked_by) FROM stdin;
@@ -7054,7 +6572,7 @@ COPY schoolers.attendance (attendance_id, student_id, class_id, date, status, mo
 
 
 --
--- Data for Name: auth_refresh_sessions; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: auth_refresh_sessions; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.auth_refresh_sessions (session_id, jti_hash, user_id, family_id, expires_at, revoked_at, user_agent, ip, modified_by, modified_at) FROM stdin;
@@ -7062,7 +6580,7 @@ COPY schoolers.auth_refresh_sessions (session_id, jti_hash, user_id, family_id, 
 
 
 --
--- Data for Name: barter_listings; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: barter_listings; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.barter_listings (listing_id, school_id, title, price, icon, listed_by, created_at, is_active, modified_by, modified_at) FROM stdin;
@@ -7104,7 +6622,7 @@ COPY schoolers.barter_listings (listing_id, school_id, title, price, icon, liste
 
 
 --
--- Data for Name: broadcasts; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: broadcasts; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.broadcasts (broadcast_id, school_id, class_id, scope, role_name, message, created_at, is_active, sender_name, route_id, modified_by, modified_at, sender_user_id) FROM stdin;
@@ -7193,7 +6711,7 @@ COPY schoolers.broadcasts (broadcast_id, school_id, class_id, scope, role_name, 
 
 
 --
--- Data for Name: classes; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: classes; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.classes (class_id, school_id, name, class_teacher_staff_id, student_count, is_active, modified_by, modified_at) FROM stdin;
@@ -7209,11 +6727,12 @@ COPY schoolers.classes (class_id, school_id, name, class_teacher_staff_id, stude
 10	2	Grade IV	\N	0	t	301	2026-10-03 15:12:01.818457
 11	2	Grade V	\N	0	t	301	2026-10-03 15:12:01.830259
 12	2	Grade VI	\N	0	t	301	2026-10-03 15:12:01.84157
+13	1	Grade VII	7	0	t	273	2026-10-13 21:07:05.973913
 \.
 
 
 --
--- Data for Name: holidays; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: holidays; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.holidays (holiday_id, school_id, modified_by, modified_at, occasion, holiday_date) FROM stdin;
@@ -7229,7 +6748,6 @@ COPY schoolers.holidays (holiday_id, school_id, modified_by, modified_at, occasi
 10	2	301	2026-10-03 15:12:17.281243	Holi	2027-01-31
 11	1	\N	2026-10-04 21:01:48.487203	Founders Day Nov 2025	2025-11-01
 12	2	\N	2026-10-04 21:01:48.487203	Founders Day Nov 2025	2025-11-01
-13	1	\N	2026-10-04 21:01:48.487203	Founders Day Dec 2025	2025-12-01
 14	2	\N	2026-10-04 21:01:48.487203	Founders Day Dec 2025	2025-12-01
 15	1	\N	2026-10-04 21:01:48.487203	Founders Day Jan 2026	2026-01-01
 16	2	\N	2026-10-04 21:01:48.487203	Founders Day Jan 2026	2026-01-01
@@ -7249,73 +6767,88 @@ COPY schoolers.holidays (holiday_id, school_id, modified_by, modified_at, occasi
 30	2	\N	2026-10-04 21:01:48.487203	Founders Day Aug 2026	2026-08-01
 31	1	\N	2026-10-04 21:01:48.487203	Founders Day Sep 2026	2026-09-01
 32	2	\N	2026-10-04 21:01:48.487203	Founders Day Sep 2026	2026-09-01
+33	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-01
+34	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-02
+35	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-03
+36	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-04
+37	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-05
+38	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-06
+39	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-07
+40	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-08
+41	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-09
+42	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-10
+43	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-11
+44	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-12
+45	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-13
+46	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-14
+47	1	273	2026-10-13 21:26:52.355176	Founders Day Dec 2025	2025-12-15
 \.
 
 
 --
--- Data for Name: leave_requests; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: leave_requests; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
-COPY schoolers.leave_requests (leave_id, school_id, requester_type, requester_name, from_date, to_date, reason, status, created_at, is_active, modified_by, modified_at) FROM stdin;
-8	2	Teacher	Shreya Deshpande	2026-10-01	2026-10-02	Personal	Rejected	2026-09-28 15:12:17.306518	t	301	2026-10-03 15:12:17.373405
-9	2	Staff	Ramesh Gaikwad	2026-09-30	2026-10-01	Personal	Approved	2026-09-28 15:12:17.317011	t	301	2026-10-03 15:12:17.385101
-4	1	Pilot	Ganesh Pawar	2026-09-29	2026-09-30	Personal	Pending	2026-09-28 15:11:59.102861	t	273	2026-10-03 15:11:59.102861
-5	1	Student	Aadhya Rao	2026-09-28	2026-09-29	Personal	Pending	2026-09-28 15:11:59.113952	t	273	2026-10-03 15:11:59.113952
-6	1	Student	Aryan Nair	2026-09-27	2026-09-28	Personal	Pending	2026-09-28 15:11:59.125876	t	273	2026-10-03 15:11:59.125876
-1	1	Teacher	Aarav Sharma	2026-10-02	2026-10-03	Personal	Approved	2026-09-28 15:11:59.067676	t	273	2026-10-03 15:11:59.135994
-2	1	Teacher	Priya Nair	2026-10-01	2026-10-02	Personal	Rejected	2026-09-28 15:11:59.079584	t	273	2026-10-03 15:11:59.146957
-3	1	Staff	Suresh Kumar	2026-09-30	2026-10-01	Personal	Approved	2026-09-28 15:11:59.090934	t	273	2026-10-03 15:11:59.159027
-10	2	Pilot	Ramesh Jadhav	2026-09-29	2026-09-30	Personal	Pending	2026-09-28 15:12:17.327936	t	301	2026-10-03 15:12:17.327936
-11	2	Student	Ira Kulkarni	2026-09-28	2026-09-29	Personal	Pending	2026-09-28 15:12:17.339372	t	301	2026-10-03 15:12:17.339372
-12	2	Student	Arjun Deshpande	2026-09-27	2026-09-28	Personal	Pending	2026-09-28 15:12:17.350572	t	301	2026-10-03 15:12:17.350572
-7	2	Teacher	Aditya Kulkarni	2026-10-02	2026-10-03	Personal	Approved	2026-09-28 15:12:17.293751	t	301	2026-10-03 15:12:17.361964
-13	1	Student	A. Student	2026-10-01	2026-10-03	Historic leave request 1	Pending	2026-10-01 00:00:00	t	\N	2026-10-04 21:01:48.487203
-14	2	Student	A. Student	2026-10-01	2026-10-03	Historic leave request 1	Pending	2026-10-01 00:00:00	t	\N	2026-10-04 21:01:48.487203
-15	1	Staff	F. Desk	2026-09-28	2026-09-30	Historic leave request 2	Rejected	2026-09-28 00:00:00	t	\N	2026-10-04 21:01:48.487203
-16	2	Staff	F. Desk	2026-09-28	2026-09-30	Historic leave request 2	Rejected	2026-09-28 00:00:00	t	\N	2026-10-04 21:01:48.487203
-17	1	Pilot	P. One	2026-09-25	2026-09-27	Historic leave request 3	Approved	2026-09-25 00:00:00	t	\N	2026-10-04 21:01:48.487203
-18	2	Pilot	P. One	2026-09-25	2026-09-27	Historic leave request 3	Approved	2026-09-25 00:00:00	t	\N	2026-10-04 21:01:48.487203
-19	1	Teacher	T. Eacher	2026-09-22	2026-09-24	Historic leave request 4	Pending	2026-09-22 00:00:00	t	\N	2026-10-04 21:01:48.487203
-20	2	Teacher	T. Eacher	2026-09-22	2026-09-24	Historic leave request 4	Pending	2026-09-22 00:00:00	t	\N	2026-10-04 21:01:48.487203
-21	1	Student	A. Student	2026-09-19	2026-09-21	Historic leave request 5	Rejected	2026-09-19 00:00:00	t	\N	2026-10-04 21:01:48.487203
-22	2	Student	A. Student	2026-09-19	2026-09-21	Historic leave request 5	Rejected	2026-09-19 00:00:00	t	\N	2026-10-04 21:01:48.487203
-23	1	Staff	F. Desk	2026-09-16	2026-09-18	Historic leave request 6	Approved	2026-09-16 00:00:00	t	\N	2026-10-04 21:01:48.487203
-24	2	Staff	F. Desk	2026-09-16	2026-09-18	Historic leave request 6	Approved	2026-09-16 00:00:00	t	\N	2026-10-04 21:01:48.487203
-25	1	Pilot	P. One	2026-09-13	2026-09-15	Historic leave request 7	Pending	2026-09-13 00:00:00	t	\N	2026-10-04 21:01:48.487203
-26	2	Pilot	P. One	2026-09-13	2026-09-15	Historic leave request 7	Pending	2026-09-13 00:00:00	t	\N	2026-10-04 21:01:48.487203
-27	1	Teacher	T. Eacher	2026-09-10	2026-09-12	Historic leave request 8	Rejected	2026-09-10 00:00:00	t	\N	2026-10-04 21:01:48.487203
-28	2	Teacher	T. Eacher	2026-09-10	2026-09-12	Historic leave request 8	Rejected	2026-09-10 00:00:00	t	\N	2026-10-04 21:01:48.487203
-29	1	Student	A. Student	2026-09-07	2026-09-09	Historic leave request 9	Approved	2026-09-07 00:00:00	t	\N	2026-10-04 21:01:48.487203
-30	2	Student	A. Student	2026-09-07	2026-09-09	Historic leave request 9	Approved	2026-09-07 00:00:00	t	\N	2026-10-04 21:01:48.487203
-31	1	Staff	F. Desk	2026-09-04	2026-09-06	Historic leave request 10	Pending	2026-09-04 00:00:00	t	\N	2026-10-04 21:01:48.487203
-32	2	Staff	F. Desk	2026-09-04	2026-09-06	Historic leave request 10	Pending	2026-09-04 00:00:00	t	\N	2026-10-04 21:01:48.487203
-33	1	Pilot	P. One	2026-09-01	2026-09-03	Historic leave request 11	Rejected	2026-09-01 00:00:00	t	\N	2026-10-04 21:01:48.487203
-34	2	Pilot	P. One	2026-09-01	2026-09-03	Historic leave request 11	Rejected	2026-09-01 00:00:00	t	\N	2026-10-04 21:01:48.487203
-35	1	Teacher	T. Eacher	2026-08-29	2026-08-31	Historic leave request 12	Approved	2026-08-29 00:00:00	t	\N	2026-10-04 21:01:48.487203
-36	2	Teacher	T. Eacher	2026-08-29	2026-08-31	Historic leave request 12	Approved	2026-08-29 00:00:00	t	\N	2026-10-04 21:01:48.487203
-37	1	Student	A. Student	2026-08-26	2026-08-28	Historic leave request 13	Pending	2026-08-26 00:00:00	t	\N	2026-10-04 21:01:48.487203
-38	2	Student	A. Student	2026-08-26	2026-08-28	Historic leave request 13	Pending	2026-08-26 00:00:00	t	\N	2026-10-04 21:01:48.487203
-39	1	Staff	F. Desk	2026-08-23	2026-08-25	Historic leave request 14	Rejected	2026-08-23 00:00:00	t	\N	2026-10-04 21:01:48.487203
-40	2	Staff	F. Desk	2026-08-23	2026-08-25	Historic leave request 14	Rejected	2026-08-23 00:00:00	t	\N	2026-10-04 21:01:48.487203
-41	1	Pilot	P. One	2026-08-20	2026-08-22	Historic leave request 15	Approved	2026-08-20 00:00:00	t	\N	2026-10-04 21:01:48.487203
-42	2	Pilot	P. One	2026-08-20	2026-08-22	Historic leave request 15	Approved	2026-08-20 00:00:00	t	\N	2026-10-04 21:01:48.487203
-43	1	Teacher	T. Eacher	2026-08-17	2026-08-19	Historic leave request 16	Pending	2026-08-17 00:00:00	t	\N	2026-10-04 21:01:48.487203
-44	2	Teacher	T. Eacher	2026-08-17	2026-08-19	Historic leave request 16	Pending	2026-08-17 00:00:00	t	\N	2026-10-04 21:01:48.487203
-45	1	Student	A. Student	2026-08-14	2026-08-16	Historic leave request 17	Rejected	2026-08-14 00:00:00	t	\N	2026-10-04 21:01:48.487203
-46	2	Student	A. Student	2026-08-14	2026-08-16	Historic leave request 17	Rejected	2026-08-14 00:00:00	t	\N	2026-10-04 21:01:48.487203
-47	1	Staff	F. Desk	2026-08-11	2026-08-13	Historic leave request 18	Approved	2026-08-11 00:00:00	t	\N	2026-10-04 21:01:48.487203
-48	2	Staff	F. Desk	2026-08-11	2026-08-13	Historic leave request 18	Approved	2026-08-11 00:00:00	t	\N	2026-10-04 21:01:48.487203
-49	1	Pilot	P. One	2026-08-08	2026-08-10	Historic leave request 19	Pending	2026-08-08 00:00:00	t	\N	2026-10-04 21:01:48.487203
-50	2	Pilot	P. One	2026-08-08	2026-08-10	Historic leave request 19	Pending	2026-08-08 00:00:00	t	\N	2026-10-04 21:01:48.487203
-51	1	Teacher	T. Eacher	2026-08-05	2026-08-07	Historic leave request 20	Rejected	2026-08-05 00:00:00	t	\N	2026-10-04 21:01:48.487203
-52	2	Teacher	T. Eacher	2026-08-05	2026-08-07	Historic leave request 20	Rejected	2026-08-05 00:00:00	t	\N	2026-10-04 21:01:48.487203
-53	1	Student	A. Student	2026-08-02	2026-08-04	Historic leave request 21	Approved	2026-08-02 00:00:00	t	\N	2026-10-04 21:01:48.487203
-54	2	Student	A. Student	2026-08-02	2026-08-04	Historic leave request 21	Approved	2026-08-02 00:00:00	t	\N	2026-10-04 21:01:48.487203
+COPY schoolers.leave_requests (leave_id, school_id, requester_type, requester_name, from_date, to_date, reason, status, created_at, is_active, modified_by, modified_at, review_remark) FROM stdin;
+8	2	Teacher	Shreya Deshpande	2026-10-01	2026-10-02	Personal	Rejected	2026-09-28 15:12:17.306518	t	301	2026-10-03 15:12:17.373405	\N
+9	2	Staff	Ramesh Gaikwad	2026-09-30	2026-10-01	Personal	Approved	2026-09-28 15:12:17.317011	t	301	2026-10-03 15:12:17.385101	\N
+4	1	Pilot	Ganesh Pawar	2026-09-29	2026-09-30	Personal	Pending	2026-09-28 15:11:59.102861	t	273	2026-10-03 15:11:59.102861	\N
+5	1	Student	Aadhya Rao	2026-09-28	2026-09-29	Personal	Pending	2026-09-28 15:11:59.113952	t	273	2026-10-03 15:11:59.113952	\N
+1	1	Teacher	Aarav Sharma	2026-10-02	2026-10-03	Personal	Approved	2026-09-28 15:11:59.067676	t	273	2026-10-03 15:11:59.135994	\N
+2	1	Teacher	Priya Nair	2026-10-01	2026-10-02	Personal	Rejected	2026-09-28 15:11:59.079584	t	273	2026-10-03 15:11:59.146957	\N
+3	1	Staff	Suresh Kumar	2026-09-30	2026-10-01	Personal	Approved	2026-09-28 15:11:59.090934	t	273	2026-10-03 15:11:59.159027	\N
+10	2	Pilot	Ramesh Jadhav	2026-09-29	2026-09-30	Personal	Pending	2026-09-28 15:12:17.327936	t	301	2026-10-03 15:12:17.327936	\N
+11	2	Student	Ira Kulkarni	2026-09-28	2026-09-29	Personal	Pending	2026-09-28 15:12:17.339372	t	301	2026-10-03 15:12:17.339372	\N
+12	2	Student	Arjun Deshpande	2026-09-27	2026-09-28	Personal	Pending	2026-09-28 15:12:17.350572	t	301	2026-10-03 15:12:17.350572	\N
+7	2	Teacher	Aditya Kulkarni	2026-10-02	2026-10-03	Personal	Approved	2026-09-28 15:12:17.293751	t	301	2026-10-03 15:12:17.361964	\N
+14	2	Student	A. Student	2026-10-01	2026-10-03	Historic leave request 1	Pending	2026-10-01 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+15	1	Staff	F. Desk	2026-09-28	2026-09-30	Historic leave request 2	Rejected	2026-09-28 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+16	2	Staff	F. Desk	2026-09-28	2026-09-30	Historic leave request 2	Rejected	2026-09-28 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+17	1	Pilot	P. One	2026-09-25	2026-09-27	Historic leave request 3	Approved	2026-09-25 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+18	2	Pilot	P. One	2026-09-25	2026-09-27	Historic leave request 3	Approved	2026-09-25 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+19	1	Teacher	T. Eacher	2026-09-22	2026-09-24	Historic leave request 4	Pending	2026-09-22 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+20	2	Teacher	T. Eacher	2026-09-22	2026-09-24	Historic leave request 4	Pending	2026-09-22 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+21	1	Student	A. Student	2026-09-19	2026-09-21	Historic leave request 5	Rejected	2026-09-19 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+22	2	Student	A. Student	2026-09-19	2026-09-21	Historic leave request 5	Rejected	2026-09-19 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+23	1	Staff	F. Desk	2026-09-16	2026-09-18	Historic leave request 6	Approved	2026-09-16 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+24	2	Staff	F. Desk	2026-09-16	2026-09-18	Historic leave request 6	Approved	2026-09-16 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+25	1	Pilot	P. One	2026-09-13	2026-09-15	Historic leave request 7	Pending	2026-09-13 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+26	2	Pilot	P. One	2026-09-13	2026-09-15	Historic leave request 7	Pending	2026-09-13 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+27	1	Teacher	T. Eacher	2026-09-10	2026-09-12	Historic leave request 8	Rejected	2026-09-10 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+28	2	Teacher	T. Eacher	2026-09-10	2026-09-12	Historic leave request 8	Rejected	2026-09-10 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+29	1	Student	A. Student	2026-09-07	2026-09-09	Historic leave request 9	Approved	2026-09-07 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+30	2	Student	A. Student	2026-09-07	2026-09-09	Historic leave request 9	Approved	2026-09-07 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+31	1	Staff	F. Desk	2026-09-04	2026-09-06	Historic leave request 10	Pending	2026-09-04 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+32	2	Staff	F. Desk	2026-09-04	2026-09-06	Historic leave request 10	Pending	2026-09-04 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+33	1	Pilot	P. One	2026-09-01	2026-09-03	Historic leave request 11	Rejected	2026-09-01 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+34	2	Pilot	P. One	2026-09-01	2026-09-03	Historic leave request 11	Rejected	2026-09-01 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+35	1	Teacher	T. Eacher	2026-08-29	2026-08-31	Historic leave request 12	Approved	2026-08-29 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+36	2	Teacher	T. Eacher	2026-08-29	2026-08-31	Historic leave request 12	Approved	2026-08-29 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+37	1	Student	A. Student	2026-08-26	2026-08-28	Historic leave request 13	Pending	2026-08-26 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+38	2	Student	A. Student	2026-08-26	2026-08-28	Historic leave request 13	Pending	2026-08-26 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+39	1	Staff	F. Desk	2026-08-23	2026-08-25	Historic leave request 14	Rejected	2026-08-23 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+40	2	Staff	F. Desk	2026-08-23	2026-08-25	Historic leave request 14	Rejected	2026-08-23 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+41	1	Pilot	P. One	2026-08-20	2026-08-22	Historic leave request 15	Approved	2026-08-20 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+42	2	Pilot	P. One	2026-08-20	2026-08-22	Historic leave request 15	Approved	2026-08-20 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+43	1	Teacher	T. Eacher	2026-08-17	2026-08-19	Historic leave request 16	Pending	2026-08-17 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+44	2	Teacher	T. Eacher	2026-08-17	2026-08-19	Historic leave request 16	Pending	2026-08-17 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+45	1	Student	A. Student	2026-08-14	2026-08-16	Historic leave request 17	Rejected	2026-08-14 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+46	2	Student	A. Student	2026-08-14	2026-08-16	Historic leave request 17	Rejected	2026-08-14 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+47	1	Staff	F. Desk	2026-08-11	2026-08-13	Historic leave request 18	Approved	2026-08-11 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+48	2	Staff	F. Desk	2026-08-11	2026-08-13	Historic leave request 18	Approved	2026-08-11 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+49	1	Pilot	P. One	2026-08-08	2026-08-10	Historic leave request 19	Pending	2026-08-08 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+50	2	Pilot	P. One	2026-08-08	2026-08-10	Historic leave request 19	Pending	2026-08-08 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+51	1	Teacher	T. Eacher	2026-08-05	2026-08-07	Historic leave request 20	Rejected	2026-08-05 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+52	2	Teacher	T. Eacher	2026-08-05	2026-08-07	Historic leave request 20	Rejected	2026-08-05 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+53	1	Student	A. Student	2026-08-02	2026-08-04	Historic leave request 21	Approved	2026-08-02 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+54	2	Student	A. Student	2026-08-02	2026-08-04	Historic leave request 21	Approved	2026-08-02 00:00:00	t	\N	2026-10-04 21:01:48.487203	\N
+13	1	Student	A. Student	2026-10-01	2026-10-03	Historic leave request 1	Approved	2026-10-01 00:00:00	t	273	2026-10-13 20:20:00.089707	\N
+6	1	Student	Aryan Nair	2026-09-27	2026-09-28	Personal	Approved	2026-09-28 15:11:59.125876	t	273	2026-10-14 14:28:10.902217	approved
 \.
 
 
 --
--- Data for Name: marks; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: marks; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.marks (mark_id, student_id, subject_id, term, score, updated_at, updated_by_user, modified_by, modified_at, updated_by) FROM stdin;
@@ -8043,7 +7576,7 @@ COPY schoolers.marks (mark_id, student_id, subject_id, term, score, updated_at, 
 
 
 --
--- Data for Name: media; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: media; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.media (media_id, school_id, class_id, title, posted_by, icon, created_at, is_active, file_url, media_kind, modified_by, modified_at, uploader_user_id) FROM stdin;
@@ -8111,7 +7644,7 @@ COPY schoolers.media (media_id, school_id, class_id, title, posted_by, icon, cre
 
 
 --
--- Data for Name: parent_student; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: parent_student; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.parent_student (id, parent_id, student_id, relationship, modified_by, modified_at) FROM stdin;
@@ -8155,7 +7688,7 @@ COPY schoolers.parent_student (id, parent_id, student_id, relationship, modified
 
 
 --
--- Data for Name: parents; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: parents; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.parents (parent_id, school_id, name, phone, email, created_at, is_active, address, emergency_number, modified_by, modified_at) FROM stdin;
@@ -8187,7 +7720,7 @@ COPY schoolers.parents (parent_id, school_id, name, phone, email, created_at, is
 
 
 --
--- Data for Name: periods; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: periods; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.periods (period_id, period_no, period_time, modified_by, modified_at) FROM stdin;
@@ -8204,7 +7737,7 @@ COPY schoolers.periods (period_id, period_no, period_time, modified_by, modified
 
 
 --
--- Data for Name: pilots; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: pilots; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.pilots (pilot_id, is_active, staff_id, modified_by, modified_at, license_expiry, route_id) FROM stdin;
@@ -8218,7 +7751,7 @@ COPY schoolers.pilots (pilot_id, is_active, staff_id, modified_by, modified_at, 
 
 
 --
--- Data for Name: route_stops; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: route_stops; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.route_stops (stop_id, route_id, name, stop_time, stop_type, stop_order, modified_by, modified_at) FROM stdin;
@@ -8246,16 +7779,17 @@ COPY schoolers.route_stops (stop_id, route_id, name, stop_time, stop_type, stop_
 22	6	Hadapsar Stop A	04:00 PM	drop	1	301	2026-10-03 15:12:15.849014
 23	6	Hadapsar Stop B	07:35 AM	pickup	2	301	2026-10-03 15:12:15.861436
 24	6	Hadapsar Stop B	04:20 PM	drop	2	301	2026-10-03 15:12:15.861436
+25	1	Stop 2	8:00 AM	pickup	3	273	2026-10-13 17:08:33.777783
+26	1	Stop 2	5:00 PM	drop	3	273	2026-10-13 17:08:33.777783
 \.
 
 
 --
--- Data for Name: route_students; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: route_students; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.route_students (id, route_id, student_id, status, modified_by, modified_at, pickup_stop_id, drop_stop_id) FROM stdin;
 11	3	9	pending	273	2026-10-05 10:34:22.465288	\N	\N
-4	1	10	pending	273	2026-10-03 15:11:57.489264	\N	\N
 8	2	11	pending	273	2026-10-03 15:11:57.584276	\N	\N
 12	3	12	pending	273	2026-10-03 15:11:57.678683	\N	\N
 13	4	19	pending	301	2026-10-03 15:12:15.682732	\N	\N
@@ -8278,11 +7812,13 @@ COPY schoolers.route_students (id, route_id, student_id, status, modified_by, mo
 9	3	3	dropped	273	2026-10-05 10:34:22.696284	\N	\N
 10	3	6	picked	273	2026-10-05 10:34:22.703298	\N	\N
 1	1	1	picked	298	2026-10-08 20:52:56.412441	\N	\N
+25	1	13	pending	273	2026-10-12 17:10:46.006344	\N	\N
+27	1	14	pending	273	2026-10-14 02:16:07.023781	1	2
 \.
 
 
 --
--- Data for Name: routes; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: routes; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.routes (route_id, school_id, name, vehicle, status, created_at, is_active, modified_by, modified_at) FROM stdin;
@@ -8296,7 +7832,7 @@ COPY schoolers.routes (route_id, school_id, name, vehicle, status, created_at, i
 
 
 --
--- Data for Name: school_notifications; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: school_notifications; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.school_notifications (notification_id, school_id, type, message, sent_at, status, modified_by, modified_at) FROM stdin;
@@ -8342,7 +7878,7 @@ COPY schoolers.school_notifications (notification_id, school_id, type, message, 
 
 
 --
--- Data for Name: schools; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: schools; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.schools (school_id, name, address, pincode, city, state, country, primary_contact, alternative_contact, primary_email, alternative_email, status, route_enabled, website_enabled, library_enabled, fees_enabled, salary_enabled, created_at, is_active, logo_url, modified_by, modified_at, first_name, last_name) FROM stdin;
@@ -8352,7 +7888,7 @@ COPY schoolers.schools (school_id, name, address, pincode, city, state, country,
 
 
 --
--- Data for Name: staff; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: staff; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.staff (staff_id, school_id, name, role, phone, created_at, is_active, email, present_address, permanent_address, aadhaar_card, emergency_number, date_of_birth, marital_status, gender, driving_license, modified_by, modified_at, role_title, person_type) FROM stdin;
@@ -8390,7 +7926,7 @@ COPY schoolers.staff (staff_id, school_id, name, role, phone, created_at, is_act
 
 
 --
--- Data for Name: staff_attendance; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: staff_attendance; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.staff_attendance (attendance_id, school_id, staff_id, date, status, check_in, check_out, remarks, marked_by, modified_by, modified_at) FROM stdin;
@@ -12399,11 +11935,26 @@ COPY schoolers.staff_attendance (attendance_id, school_id, staff_id, date, statu
 11864	2	25	2026-09-30	Present	08:55:00	16:25:00	\N	\N	\N	2026-10-04 21:00:19.37829
 11865	2	26	2026-09-30	Present	08:56:00	16:26:00	\N	\N	\N	2026-10-04 21:00:19.37829
 11866	2	27	2026-09-30	Present	08:57:00	16:27:00	\N	\N	\N	2026-10-04 21:00:19.37829
+11867	1	1	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11868	1	6	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11869	1	8	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11870	1	13	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11871	1	7	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11872	1	10	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11873	1	11	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11874	1	2	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11875	1	14	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11876	1	12	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11877	1	3	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11878	1	4	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11879	1	9	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11880	1	15	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
+11881	1	5	2026-10-14	Present	\N	\N	\N	273	\N	2026-10-15 00:08:39.778248
 \.
 
 
 --
--- Data for Name: staff_salaries; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: staff_salaries; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.staff_salaries (salary_id, school_id, staff_id, month, amount, paid_on, note, modified_by, modified_at) FROM stdin;
@@ -12761,7 +12312,7 @@ COPY schoolers.staff_salaries (salary_id, school_id, staff_id, month, amount, pa
 
 
 --
--- Data for Name: student_fees; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: student_fees; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.student_fees (fee_id, school_id, student_id, month, amount, paid_on, note, modified_by, modified_at) FROM stdin;
@@ -13201,7 +12752,7 @@ COPY schoolers.student_fees (fee_id, school_id, student_id, month, amount, paid_
 
 
 --
--- Data for Name: students; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: students; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.students (student_id, school_id, class_id, admission_no, name, date_of_birth, gender, present_today, created_at, is_active, photo_url, aadhaar_number, birth_certificate_number, documents, modified_by, modified_at) FROM stdin;
@@ -13245,7 +12796,7 @@ COPY schoolers.students (student_id, school_id, class_id, admission_no, name, da
 
 
 --
--- Data for Name: subjects; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: subjects; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.subjects (subject_id, name, modified_by, modified_at, school_id, is_active) FROM stdin;
@@ -13269,7 +12820,7 @@ COPY schoolers.subjects (subject_id, name, modified_by, modified_at, school_id, 
 
 
 --
--- Data for Name: support_ticket_messages; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: support_ticket_messages; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.support_ticket_messages (message_id, ticket_id, author_user_id, author_role, author_name, body, attachments, created_at, modified_by, modified_at) FROM stdin;
@@ -13313,7 +12864,7 @@ COPY schoolers.support_ticket_messages (message_id, ticket_id, author_user_id, a
 
 
 --
--- Data for Name: support_tickets; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: support_tickets; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.support_tickets (ticket_id, school_id, created_by, created_by_name, subject, status, created_at, modified_by, modified_at) FROM stdin;
@@ -13355,7 +12906,7 @@ COPY schoolers.support_tickets (ticket_id, school_id, created_by, created_by_nam
 
 
 --
--- Data for Name: teacher_class_subjects; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: teacher_class_subjects; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.teacher_class_subjects (id, staff_id, class_id, subject_id, is_class_teacher, modified_by, modified_at) FROM stdin;
@@ -13459,7 +13010,7 @@ COPY schoolers.teacher_class_subjects (id, staff_id, class_id, subject_id, is_cl
 
 
 --
--- Data for Name: timetable_entries; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: timetable_entries; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.timetable_entries (entry_id, class_id, day_of_week, period_id, subject_id, staff_id, is_holiday_override, school_id, period_start_time, period_end_time, created_on, created_by, modified_by, modified_at) FROM stdin;
@@ -14007,7 +13558,7 @@ COPY schoolers.timetable_entries (entry_id, class_id, day_of_week, period_id, su
 
 
 --
--- Data for Name: trip_roster; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trip_roster; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trip_roster (entry_id, trip_id, student_id, expected_pickup_stop_id, expected_drop_stop_id, captured_at, modified_by, modified_at) FROM stdin;
@@ -14079,7 +13630,7 @@ COPY schoolers.trip_roster (entry_id, trip_id, student_id, expected_pickup_stop_
 
 
 --
--- Data for Name: trip_status_audit; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trip_status_audit; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trip_status_audit (entry_id, trip_id, from_status, to_status, reason, changed_by, changed_at) FROM stdin;
@@ -14088,7 +13639,7 @@ COPY schoolers.trip_status_audit (entry_id, trip_id, from_status, to_status, rea
 
 
 --
--- Data for Name: trip_stop_events; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trip_stop_events; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trip_stop_events (event_id, trip_id, route_stop_id, scheduled_time, actual_time, modified_by, modified_at) FROM stdin;
@@ -14122,7 +13673,7 @@ COPY schoolers.trip_stop_events (event_id, trip_id, route_stop_id, scheduled_tim
 
 
 --
--- Data for Name: trip_student_events; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trip_student_events; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trip_student_events (event_id, trip_id, student_id, boarding_stop_id, boarded_at, drop_stop_id, dropped_at, modified_by, modified_at) FROM stdin;
@@ -14161,7 +13712,7 @@ COPY schoolers.trip_student_events (event_id, trip_id, student_id, boarding_stop
 
 
 --
--- Data for Name: trip_students; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trip_students; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trip_students (trip_student_id, trip_id, student_id, boarding_status, boarding_at, boarding_stop_id, drop_status, drop_at, drop_stop_id, created_at, modified_by, modified_at) FROM stdin;
@@ -14173,7 +13724,7 @@ COPY schoolers.trip_students (trip_student_id, trip_id, student_id, boarding_sta
 
 
 --
--- Data for Name: trips; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: trips; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.trips (trip_id, school_id, route_id, direction, trip_date, status, started_at, ended_at, pilot_id, vehicle, cancellation_reason, created_by, created_at, modified_by, modified_at, driver_name, cancelled_at, cancelled_by, reopened_at, reopened_by, reopen_reason) FROM stdin;
@@ -14198,7 +13749,7 @@ COPY schoolers.trips (trip_id, school_id, route_id, direction, trip_date, status
 
 
 --
--- Data for Name: users; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: users; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.users (user_id, school_id, role, username, password_hash, linked_person_id, last_login, created_at, is_active, email, password_reset_token, password_reset_token_expires_at, modified_by, modified_at, token_version) FROM stdin;
@@ -14215,13 +13766,11 @@ COPY schoolers.users (user_id, school_id, role, username, password_hash, linked_
 311	2	staff	gv.staff2	$2b$12$7dxk.v/Z11gqSwCEngcHC..pFeeVXw5wUPByTgWykEj9X8B00.4qe	25	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 312	2	staff	gv.staff3	$2b$12$TUxuvkMD771.lFDsKKaqDOU5WX/Wpp7.GnJoMDo6CjM1E/nu9lLju	26	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 313	2	staff	gv.staff4	$2b$12$18VALGOZy3IOChZ/Wr9Kiegp6ThzP.Tj/DdZ.NBziDFzqAqBaoSie	27	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
-282	1	staff	bh.staff1	$2b$12$5iSSCBezTehQllD4Ve7akucRpHY0CDBTlziMSfrNOZBcuiMc8/lLq	9	2026-10-04 21:08:30.200386	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-04 21:08:29.855098	0
 315	2	parent	gv.parent2	$2b$12$vR7TtxoayBRjV7mItiBqe.BsGceczsWIf42prL4x8GDtAGVHbJXLO	14	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 316	2	parent	gv.parent3	$2b$12$FYAy24UKuUoKAm77KLYu/ewSPckvxWABrLfs6wBwPheOMbzMLOGwK	15	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 317	2	parent	gv.parent4	$2b$12$FKWmT4K5f8walkAtduf27es294U29Zt9twW/Vo6IgpcQDheBWQoVm	16	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 318	2	parent	gv.parent5	$2b$12$VtBoiMUOISl2PKD8Z1pr6ulgO50nDNUf1w2KnKAUX9MKwk.RukMPK	17	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 319	2	parent	gv.parent6	$2b$12$.aeM9YqgRgnzgpASZE/FiuwWzHA3XIf5Kx/0O03KaRAOqTxbR08qa	18	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
-274	1	teacher	bh.teacher1	$2b$12$PCLVTWu//ymg0MHfnucI.eYxUpC1XPI9Vyb7hvG7HBvKf3x0Fq4rC	1	2026-10-04 21:08:29.82692	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-04 21:08:29.481884	0
 275	1	teacher	bh.teacher2	$2b$12$ipTq3FTS5bdxR.lsyreLBemGJGl5czrcjNd9A5vX8zMLe29yQJWHy	2	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:23:55.272247	0
 276	1	teacher	bh.teacher3	$2b$12$GHpSwCZzrYDdoLvEh0enSeXu5jocDBDDJfHb2rpiEAX4x6ucj7dA6	3	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:25:49.230872	0
 277	1	teacher	bh.teacher4	$2b$12$wlaCGo.P19bwa3XogaG4juK.Oy9q4KhlLj8lxCzXZmKXQaQ6FmQMe	4	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:26:45.498516	0
@@ -14230,7 +13779,6 @@ COPY schoolers.users (user_id, school_id, role, username, password_hash, linked_
 280	1	teacher	bh.teacher7	$2b$12$cusKvI8ThIf2tiLXm8gG9Obbq7h0PQo2QTRcS77mu6N5aJtvLkNQS	7	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:30:20.811234	0
 292	1	parent	bh.parent7	$2b$12$BuFJFQoASJJdXU0l9/n9NeidUWjjhKM0dn4SxRRU4sybn9m/H9tt6	7	2026-10-03 21:42:11.368606	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 21:42:11.056624	0
 284	1	staff	bh.staff3	$2b$12$dczF.KAdiG/YER3UeAWIPeW2acDXgqo6d5AojiKt.Z531ycSqXf.m	11	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:32:22.669456	0
-272	\N	master	ravi	$2b$12$3qco3usbCBLVXfnMD7bvMO2CYPUzCjA4by4jThP.IbxvgfX2txYXu	\N	2026-10-03 15:12:00.210692	2026-08-29 14:37:10.305702	t	ravigupta0307@gmail.com	b85020595b7838e08526f5453ed2739b8395c81dc5d812cf34446d07a8d98737	2026-10-04 17:03:04.683648	\N	2026-10-04 22:03:04.676205	0
 289	1	parent	bh.parent4	$2b$12$IR7ji/hPeyRfC747lej3yOA2X8YwpVT.WtjhozTY98tpW29WBUt7e	4	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:35:31.212733	0
 290	1	parent	bh.parent5	$2b$12$pnvbW2s6aKGF/PGhTa/KTuAl5Un9eaPLo4XqKdNy06DE3/ZWGb1g2	5	\N	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 18:44:52.177704	0
 278	1	teacher	bh.teacher5	$2b$12$Cydq4wNg/CBd2dUj7OXTAue4wsziF9uixuIL1QRHHu3rxHMEfUXAq	5	2026-10-04 00:05:25.233598	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-04 00:05:24.863078	0
@@ -14242,8 +13790,10 @@ COPY schoolers.users (user_id, school_id, role, username, password_hash, linked_
 288	1	parent	bh.parent3	$2b$12$odoZqKgzIdHrbX7idm2EEOLJ3p4glLvMz81hV4PvHtULEDpG8zFNa	3	2026-10-08 21:23:31.661576	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-08 21:23:31.418174	0
 291	1	parent	bh.parent6	$2b$12$Pn/5VgyuNIERxTyPqrAGa.k1TWzMdqvHDicAPkgsbEUsge9N.MH3G	6	2026-10-08 19:20:21.044267	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-08 19:20:20.455801	0
 287	1	parent	bh.parent2	$2b$12$600PAamzA8arHUQ8P2TSQ.tqaMec8j1/617JM2GuXx8vnt4pCT8h.	2	2026-10-08 21:22:38.171752	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-08 21:22:37.927735	0
-286	1	parent	bh.parent1	$2b$12$k6Ds4ucP2j/TKvR/LI.rce/QlMeFppg.cVm4uf5vOd3l8D3u7wRqy	1	2026-10-08 21:25:46.57256	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-08 21:25:46.329083	0
 299	1	pilot	bh.pilot2	$2b$12$LXtlw/94fDOnKO.oust.c.OqZ0C2ymCwY4E/3pdlSC7vDnQ0Sa2h.	14	\N	2026-10-03 15:11:56.845287	t	\N	\N	\N	273	2026-10-03 15:11:56.845287	0
+286	1	parent	bh.parent1	$2b$12$PXa2y0SPFqAE3TgXpmrVVO7TqQUDMb6Cj5Mkao72lv04Y6wF7uA0q	1	2026-10-12 19:17:12.776141	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-12 19:17:12.502052	0
+282	1	staff	bh.staff1	$2b$12$5iSSCBezTehQllD4Ve7akucRpHY0CDBTlziMSfrNOZBcuiMc8/lLq	9	2026-10-14 12:57:53.305807	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-14 12:57:53.042241	0
+274	1	teacher	bh.teacher1	$2b$12$PCLVTWu//ymg0MHfnucI.eYxUpC1XPI9Vyb7hvG7HBvKf3x0Fq4rC	1	2026-10-14 12:57:51.904152	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-14 12:57:51.646594	0
 300	1	pilot	bh.pilot3	$2b$12$CTRnDiz0SEoBS1k5.LC5xuwhHk1fxIn5yMbTZHCCfIYk8wZ/PsGD.	15	\N	2026-10-03 15:11:57.129029	t	\N	\N	\N	273	2026-10-03 15:11:57.129029	0
 320	2	parent	gv.parent7	$2b$12$IZz9iXPGM66/Ca.U4YQ6s.5CUbarmNtGJkL6zHZguj4EGht7BPA92	19	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 321	2	parent	gv.parent8	$2b$12$livABylbfBjQlpbZgMOjFeZmJJQ515kEtv1UOgE86M3Buq7dZ4mpS	20	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
@@ -14251,20 +13801,21 @@ COPY schoolers.users (user_id, school_id, role, username, password_hash, linked_
 323	2	parent	gv.parent10	$2b$12$EmPAyBke70X9Br0EtpwPZOk6wcstF7M2leSvec/kSAKsC.8rNgALO	22	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 324	2	parent	gv.parent11	$2b$12$6Yo1OgtQ6UuLJdyaSovHy.Zu8oxz7oM4.m0hjlCrhhLrasPRLOP6W	23	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
 325	2	parent	gv.parent12	$2b$12$CJZ9ACER/JPniwbQz6KyH.8cufzlBkTEfS.3Jf1ZEshN3ggKA4R3m	24	\N	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:02.592715	0
-326	2	pilot	gv.pilot1	$2b$12$chiFLHigkJWlQqoMk6OlBOlT./1qOJxvv.gQzm7c5mfxV2eo3I7Z6	28	\N	2026-10-03 15:12:14.760862	t	\N	\N	\N	301	2026-10-03 15:12:14.760862	0
 327	2	pilot	gv.pilot2	$2b$12$ZBWxbY6EpvTlvek/9cWVMeFsmBAlJnCL7pkFC/fUGM69ngfh4L8DS	29	\N	2026-10-03 15:12:15.048613	t	\N	\N	\N	301	2026-10-03 15:12:15.048613	0
 328	2	pilot	gv.pilot3	$2b$12$wUyiE5mhNy3bKgBKUGwEfO809ymjKoWllstnYD6cx3aFQ47C3o/EG	30	\N	2026-10-03 15:12:15.33298	t	\N	\N	\N	301	2026-10-03 15:12:15.33298	0
 283	1	staff	bh.staff2	$2b$12$PRvw.1gNlPE/m6EmpyAT7uoLjZIIivPxm3AEaXc6wIh5GO6xVqkca	10	2026-10-05 08:52:43.566266	2026-10-03 15:11:44.051896	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-05 08:52:43.195766	0
-301	2	admin	green.valley	$2b$12$6OVwjNoUigW5Ow6PyenEIunWAGoVP1IfqS9VASRLH99F4ZtH9e1Ha	\N	2026-10-03 15:12:01.653878	2026-10-03 15:12:00.23253	t	ravigupta0307@gmail.com	\N	\N	301	2026-10-03 15:12:01.389539	0
-314	2	parent	gv.parent1	$2b$12$H0FHVr9pjDGFtnodoBWlOukw9nfTPcqqTwOjncHNVGMRTDPIjHrVy	13	2026-10-03 15:12:18.110393	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:17.843017	0
 1	\N	master	meera.nair	$2b$12$CQefkTAsiu26GbDrFENQ..19CqcZdbofHXCPra.yROLbSiEsLnIZK	\N	2026-10-04 21:08:29.095681	2026-07-31 03:29:04.273559	t	ravigupta0307@gmail.com	82c723751c141cb48812d0ee7c5846134236da7c00372ebf35436a510866e560	2026-10-03 10:04:17.72859	\N	2026-10-04 21:08:28.752181	0
-273	1	admin	blue.horizon	$2b$12$L/c2qkSscI8hT2OB9EpIweqBPxvCtP08P.FhCWuXQQOh2oO2dUB.C	\N	2026-10-08 20:56:29.76407	2026-10-03 15:11:41.756155	t	ravigupta0307@gmail.com	\N	\N	273	2026-10-08 20:56:29.520424	0
-298	1	pilot	bh.pilot1	$2b$12$ssd46PtG5wkOD3zqC4Bp5ODEuJvy97w1fpXxHKwkFYEd/dINZ2lYO	13	2026-10-09 12:26:37.150785	2026-10-03 15:11:56.555478	t	\N	\N	\N	273	2026-10-09 12:26:36.845843	0
+301	2	admin	green.valley	$2b$12$6OVwjNoUigW5Ow6PyenEIunWAGoVP1IfqS9VASRLH99F4ZtH9e1Ha	\N	2026-10-12 17:36:02.47404	2026-10-03 15:12:00.23253	t	ravigupta0307@gmail.com	\N	\N	301	2026-10-12 17:36:02.130882	0
+326	2	pilot	gv.pilot1	$2b$12$sKxBFH.Elt/nJ0VGkwbd1uj8lZOFU8C8odbZJEjAf1nmNTv1ccpFi	28	\N	2026-10-03 15:12:14.760862	t	\N	\N	\N	301	2026-10-03 15:12:14.760862	0
+314	2	parent	gv.parent1	$2b$12$XCDt1OYpGMFRYMamXeHynO4OjUmRRET2TlYUudVdB0CLXWC6n2Lmq	13	2026-10-03 15:12:18.110393	2026-10-03 15:12:02.592715	t	ravigupta0307@gmail.com	\N	\N	\N	2026-10-03 15:12:17.843017	0
+272	\N	master	ravi	$2b$12$3qco3usbCBLVXfnMD7bvMO2CYPUzCjA4by4jThP.IbxvgfX2txYXu	\N	2026-10-14 12:57:54.677801	2026-08-29 14:37:10.305702	t	ravigupta0307@gmail.com	b85020595b7838e08526f5453ed2739b8395c81dc5d812cf34446d07a8d98737	2026-10-04 17:03:04.683648	\N	2026-10-14 12:57:54.413756	0
+298	1	pilot	bh.pilot1	$2b$12$rkr89aZrS3xs0dN5vhhQL.0rwAW8c0yCpDX7tXaH0F8TIWo6OPp.W	13	2026-10-12 19:16:24.375417	2026-10-03 15:11:56.555478	t	\N	\N	\N	273	2026-10-12 19:16:23.996679	0
+273	1	admin	blue.horizon	$2b$12$L/c2qkSscI8hT2OB9EpIweqBPxvCtP08P.FhCWuXQQOh2oO2dUB.C	\N	2026-10-14 22:01:48.387	2026-10-03 15:11:41.756155	t	ravigupta0307@gmail.com	\N	\N	273	2026-10-14 22:01:48.042829	0
 \.
 
 
 --
--- Data for Name: vehicles; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: vehicles; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.vehicles (vehicle_id, school_id, vehicle_number, vehicle_type, registration_number, created_at, is_active, modified_by, modified_at) FROM stdin;
@@ -14278,291 +13829,290 @@ COPY schoolers.vehicles (vehicle_id, school_id, vehicle_number, vehicle_type, re
 
 
 --
--- Data for Name: website_builder_sites; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: website_builder_sites; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.website_builder_sites (school_id, draft, published, published_at, modified_by, modified_at) FROM stdin;
-1	{"nodes": [{"x": 0.0, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 100.0, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 10.01010101010101, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 25.98989898989899, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 36.46352417300446, "id": "home-content", "html": "<h2><font color=\\"#a03131\\">Growing bright minds, togethers</font></h2><p><font color=\\"#a03131\\">At Sunrise School, every child is known, encouraged and inspired. Our joyful classrooms combine strong foundations with hands-on discovery, helping students build the skills and confidence to shape their future.</font></p><p><font color=\\"#a03131\\">Explore a school community where learning has purpose and every day</font><img src=\\"http://localhost:8000/api/v1/website/builder/assets/website_1_20261010_201201_204654.jpg\\" alt=\\"Uploaded image\\"><font color=\\"#a03131\\">&nbsp;brings something new.</font></p>", "type": "center", "title": "Welcome to Sunrise", "width": 54.0, "height": 17.648742281179473, "labels": [], "slides": [], "variant": "minimal", "anchorId": "about", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 61.485595703125, "y": 36.39618359190045, "id": "programs-content", "html": "<h3><font color=\\"#157938\\">Learning with purpose</font></h3><ul><li><font color=\\"#157938\\">Thoughtful, student-centred teaching</font></li><li><font color=\\"#157938\\">Arts, sport and hands-on exploration</font></li><li><font color=\\"#157938\\">A safe and welcoming campus</font></li></ul>", "type": "center", "title": "Learning at Sunrise", "width": 31.0, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "programs", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 3.1028826678240744, "y": 55.39481781637566, "id": "campus-life-content", "html": "<h3><font color=\\"#4b27a0\\">More than a classroom</font></h3><p><font color=\\"#4b27a0\\">From the first note in the music room to a winning goal on the field, students have space to try, practice and find what they love.</font></p><p><strong><font color=\\"#4b27a0\\">Clubs · Arts · Sport · Community</font></strong></p>", "type": "center", "title": "A place to discover your strengths", "width": 43.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "campus-life", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 57.39918800636574, "y": 47.784511142306854, "id": "admissions-content", "html": "<h3><i><font color=\\"#832f2f\\">Come see Sunrise for yourself</font></i></h3><p><i><font color=\\"#832f2f\\">Meet our teachers, explore the campus and discover a school day designed around belonging and possibility.</font></i></p><p><strong><i><font color=\\"#832f2f\\">Now welcoming applications for the new school year.</font></i></strong></p>", "type": "center", "title": "Admissions are open", "width": 42.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "admissions", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 1.4444444444444446, "y": 65.19640835848722, "id": "testimonials", "html": "", "type": "testimonials", "title": "Families say it best", "width": 98.16459599247685, "height": 13.61616238680753, "labels": [], "slides": [], "variant": "minimal", "anchorId": "testimonials", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.19342041015625, "y": 79.57729305934551, "id": "contact", "html": "", "type": "contact", "title": "Come say hello", "width": 99.59671472620082, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "contact", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 90.38383838383838, "id": "site-footer", "html": "<p>Sunrise School · Learning together, shining brighter.</p>", "type": "footer", "title": "School footer", "width": 100.0, "height": 8.0, "labels": [{"id": "footer-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "footer-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "footer-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "footer-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "footer-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "minimal", "anchorId": "footer", "profileLogo": "", "profileName": "", "profileMotto": ""}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [{"id": "live-1", "name": "Divya Shah", "role": "Parent", "quote": "A warm, thoughtful school where our child feels seen and supported."}, {"id": "live-2", "name": "Rohan Das", "role": "Alumnus", "quote": "The teachers helped me discover what I love and gave me the confidence to pursue it."}], "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	{"nodes": [{"x": 0.0, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 100.0, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 10.01010101010101, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 25.98989898989899, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 36.46352417300446, "id": "home-content", "html": "<h2><font color=\\"#a03131\\">Growing bright minds, together</font></h2><p><font color=\\"#a03131\\">At Sunrise School, every child is known, encouraged and inspired. Our joyful classrooms combine strong foundations with hands-on discovery, helping students build the skills and confidence to shape their future.</font></p><p><font color=\\"#a03131\\">Explore a school community where learning has purpose and every day</font><img src=\\"http://localhost:8000/api/v1/website/builder/assets/website_1_20261010_201201_204654.jpg\\" alt=\\"Uploaded image\\"><font color=\\"#a03131\\">&nbsp;brings something new.</font></p>", "type": "center", "title": "Welcome to Sunrise", "width": 54.0, "height": 17.648742281179473, "labels": [], "slides": [], "variant": "minimal", "anchorId": "about", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 61.485595703125, "y": 36.39618359190045, "id": "programs-content", "html": "<h3><font color=\\"#157938\\">Learning with purpose</font></h3><ul><li><font color=\\"#157938\\">Thoughtful, student-centred teaching</font></li><li><font color=\\"#157938\\">Arts, sport and hands-on exploration</font></li><li><font color=\\"#157938\\">A safe and welcoming campus</font></li></ul>", "type": "center", "title": "Learning at Sunrise", "width": 31.0, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "programs", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 3.1028826678240744, "y": 55.39481781637566, "id": "campus-life-content", "html": "<h3><font color=\\"#4b27a0\\">More than a classroom</font></h3><p><font color=\\"#4b27a0\\">From the first note in the music room to a winning goal on the field, students have space to try, practice and find what they love.</font></p><p><strong><font color=\\"#4b27a0\\">Clubs · Arts · Sport · Community</font></strong></p>", "type": "center", "title": "A place to discover your strengths", "width": 43.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "campus-life", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 57.39918800636574, "y": 47.784511142306854, "id": "admissions-content", "html": "<h3><i><font color=\\"#832f2f\\">Come see Sunrise for yourself</font></i></h3><p><i><font color=\\"#832f2f\\">Meet our teachers, explore the campus and discover a school day designed around belonging and possibility.</font></i></p><p><strong><i><font color=\\"#832f2f\\">Now welcoming applications for the new school year.</font></i></strong></p>", "type": "center", "title": "Admissions are open", "width": 42.0, "height": 13.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "admissions", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 1.4444444444444446, "y": 65.19640835848722, "id": "testimonials", "html": "", "type": "testimonials", "title": "Families say it best", "width": 98.16459599247685, "height": 13.61616238680753, "labels": [], "slides": [], "variant": "minimal", "anchorId": "testimonials", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.19342041015625, "y": 79.57729305934551, "id": "contact", "html": "", "type": "contact", "title": "Come say hello", "width": 99.59671472620082, "height": 10.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "contact", "profileLogo": "", "profileName": "", "profileMotto": ""}, {"x": 0.0, "y": 90.38383838383838, "id": "site-footer", "html": "<p>Sunrise School · Learning together, shining brighter.</p>", "type": "footer", "title": "School footer", "width": 100.0, "height": 8.0, "labels": [{"id": "footer-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "footer-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "footer-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "footer-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "footer-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "minimal", "anchorId": "footer", "profileLogo": "", "profileName": "", "profileMotto": ""}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [{"id": "live-1", "name": "Divya Shah", "role": "Parent", "quote": "A warm, thoughtful school where our child feels seen and supported."}, {"id": "live-2", "name": "Rohan Das", "role": "Alumnus", "quote": "The teachers helped me discover what I love and gave me the confidence to pursue it."}], "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	2026-10-11 01:42:49.859846	273	2026-10-11 02:01:30.290615
+1	{"nodes": [{"x": 43.978953338457345, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 56.021046661542655, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}, {"x": 0.0, "y": 13.254027853748676, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 22.745972146251326, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}, {"x": 0.872061378089902, "y": 0.3068472746471733, "id": "school-profile-04e0ffe3-8c18-4f63-98c2-19bf7700691a", "data": {"logoUrl": "", "tagline": "A place to learn and grow", "schoolName": "Blue Horizon Academy"}, "html": "", "type": "school-identity", "title": "School Profile Info Block", "width": 33.33333333333333, "height": 8.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [], "canvas_background": "#ffffff", "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	{"nodes": [{"x": 43.978953338457345, "y": 0.49382720330748897, "id": "site-header", "html": "", "type": "header", "title": "School header", "width": 56.021046661542655, "height": 10.0, "labels": [{"id": "nav-about", "text": "About Us", "editing": false, "anchorId": "about"}, {"id": "nav-programs", "text": "Programs", "editing": false, "anchorId": "programs"}, {"id": "nav-life", "text": "Campus Life", "editing": false, "anchorId": "campus-life"}, {"id": "nav-admissions", "text": "Admissions", "editing": false, "anchorId": "admissions"}, {"id": "nav-news", "text": "News & Events", "editing": false, "anchorId": "campus-life"}, {"id": "nav-contact", "text": "Contact", "editing": false, "anchorId": "contact"}], "slides": [], "variant": "accented", "anchorId": "top", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}, {"x": 0.0, "y": 13.254027853748676, "id": "site-banner", "html": "", "type": "banner", "title": "Welcome banner", "width": 100.0, "height": 22.745972146251326, "labels": [], "slides": [{"id": "banner-slide-1", "title": "A bright beginning for every learner", "imageUrl": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1800&q=85", "subtitle": "Curiosity, confidence and community—every day at Sunrise School."}, {"id": "banner-slide-2", "title": "Learning that opens new possibilities", "imageUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85", "subtitle": "A caring environment where every student can find their spark."}], "variant": "minimal", "anchorId": "welcome", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}, {"x": 0.872061378089902, "y": 0.3068472746471733, "id": "school-profile-04e0ffe3-8c18-4f63-98c2-19bf7700691a", "data": {"logoUrl": "", "tagline": "A place to learn and grow", "schoolName": "Blue Horizon Academy"}, "html": "", "type": "school-identity", "title": "School Profile Info Block", "width": 33.33333333333333, "height": 8.0, "labels": [], "slides": [], "variant": "minimal", "anchorId": "", "backgroundColor": "#ffffff", "backgroundOpacity": 1.0}], "canvas_size": {"width": 1350, "height": 2310}, "school_name": "Blue Horizon Academy", "testimonials": [], "canvas_background": "#ffffff", "pending_testimonials": [{"id": "pending-1", "name": "Ananya Rao", "role": "Parent of Grade 4 student", "quote": "The teachers make learning joyful. Our daughter comes home excited to share what she discovered."}, {"id": "pending-2", "name": "Karthik Menon", "role": "Parent of Grade 2 student", "quote": "We have seen our son become more confident, independent, and curious since joining Sunrise."}, {"id": "pending-3", "name": "Meera Iyer", "role": "School alumna", "quote": "The supportive teachers and friendships I found here still inspire me today."}]}	2026-10-11 20:52:34.990148	273	2026-10-11 20:52:34.988881
 \.
 
 
 --
--- Data for Name: website_queries; Type: TABLE DATA; Schema: schoolers; Owner: ravi
+-- Data for Name: website_queries; Type: TABLE DATA; Schema: schoolers; Owner: -
 --
 
 COPY schoolers.website_queries (query_id, school_id, name, email, message, created_at, modified_by, modified_at) FROM stdin;
-1	1	ravi	ravigupta0307@gmail.com	test	2026-10-10 23:25:35.48501	\N	2026-10-10 23:25:41.590089
 \.
 
 
 --
--- Name: activities_activity_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: activities_activity_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.activities_activity_id_seq', 80, true);
 
 
 --
--- Name: attendance_attendance_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: attendance_attendance_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.attendance_attendance_id_seq', 14184, true);
 
 
 --
--- Name: auth_refresh_sessions_session_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions_session_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.auth_refresh_sessions_session_id_seq', 1, false);
 
 
 --
--- Name: barter_listings_listing_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: barter_listings_listing_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.barter_listings_listing_id_seq', 62, true);
 
 
 --
--- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: broadcasts_broadcast_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.broadcasts_broadcast_id_seq', 153, true);
 
 
 --
--- Name: classes_class_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: classes_class_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
-SELECT pg_catalog.setval('schoolers.classes_class_id_seq', 12, true);
-
-
---
--- Name: holidays_holiday_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
---
-
-SELECT pg_catalog.setval('schoolers.holidays_holiday_id_seq', 32, true);
+SELECT pg_catalog.setval('schoolers.classes_class_id_seq', 13, true);
 
 
 --
--- Name: leave_requests_leave_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: holidays_holiday_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
-SELECT pg_catalog.setval('schoolers.leave_requests_leave_id_seq', 54, true);
+SELECT pg_catalog.setval('schoolers.holidays_holiday_id_seq', 47, true);
 
 
 --
--- Name: marks_mark_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: leave_requests_leave_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
+--
+
+SELECT pg_catalog.setval('schoolers.leave_requests_leave_id_seq', 59, true);
+
+
+--
+-- Name: marks_mark_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.marks_mark_id_seq', 720, true);
 
 
 --
--- Name: media_media_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: media_media_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.media_media_id_seq', 108, true);
 
 
 --
--- Name: parent_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: parent_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.parent_student_id_seq', 36, true);
 
 
 --
--- Name: parents_parent_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: parents_parent_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.parents_parent_id_seq', 24, true);
 
 
 --
--- Name: periods_period_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: periods_period_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.periods_period_id_seq', 549, true);
 
 
 --
--- Name: pilots_pilot_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: pilots_pilot_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.pilots_pilot_id_seq', 6, true);
 
 
 --
--- Name: route_stops_stop_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: route_stops_stop_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
-SELECT pg_catalog.setval('schoolers.route_stops_stop_id_seq', 24, true);
-
-
---
--- Name: route_students_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
---
-
-SELECT pg_catalog.setval('schoolers.route_students_id_seq', 24, true);
+SELECT pg_catalog.setval('schoolers.route_stops_stop_id_seq', 26, true);
 
 
 --
--- Name: routes_route_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: route_students_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
+--
+
+SELECT pg_catalog.setval('schoolers.route_students_id_seq', 28, true);
+
+
+--
+-- Name: routes_route_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.routes_route_id_seq', 6, true);
 
 
 --
--- Name: school_notifications_notification_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: school_notifications_notification_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.school_notifications_notification_id_seq', 70, true);
 
 
 --
--- Name: schools_school_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: schools_school_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.schools_school_id_seq', 2, true);
 
 
 --
--- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance_attendance_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
-SELECT pg_catalog.setval('schoolers.staff_attendance_attendance_id_seq', 11866, true);
+SELECT pg_catalog.setval('schoolers.staff_attendance_attendance_id_seq', 11881, true);
 
 
 --
--- Name: staff_salaries_salary_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries_salary_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.staff_salaries_salary_id_seq', 390, true);
 
 
 --
--- Name: staff_staff_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: staff_staff_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.staff_staff_id_seq', 30, true);
 
 
 --
--- Name: student_fees_fee_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: student_fees_fee_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.student_fees_fee_id_seq', 495, true);
 
 
 --
--- Name: students_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: students_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.students_student_id_seq', 36, true);
 
 
 --
--- Name: subjects_subject_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: subjects_subject_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.subjects_subject_id_seq', 16, true);
 
 
 --
--- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages_message_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.support_ticket_messages_message_id_seq', 36, true);
 
 
 --
--- Name: support_tickets_ticket_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: support_tickets_ticket_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.support_tickets_ticket_id_seq', 34, true);
 
 
 --
--- Name: teacher_class_subjects_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.teacher_class_subjects_id_seq', 96, true);
 
 
 --
--- Name: timetable_entries_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.timetable_entries_entry_id_seq', 540, true);
 
 
 --
--- Name: trip_roster_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trip_roster_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trip_roster_entry_id_seq', 324, true);
 
 
 --
--- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit_entry_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trip_status_audit_entry_id_seq', 3, true);
 
 
 --
--- Name: trip_stop_events_event_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events_event_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trip_stop_events_event_id_seq', 164, true);
 
 
 --
--- Name: trip_student_events_event_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events_event_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trip_student_events_event_id_seq', 149, true);
 
 
 --
--- Name: trip_students_trip_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trip_students_trip_student_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trip_students_trip_student_id_seq', 4, true);
 
 
 --
--- Name: trips_trip_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: trips_trip_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.trips_trip_id_seq', 84, true);
 
 
 --
--- Name: users_user_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: users_user_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.users_user_id_seq', 328, true);
 
 
 --
--- Name: vehicles_vehicle_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: vehicles_vehicle_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.vehicles_vehicle_id_seq', 6, true);
 
 
 --
--- Name: website_queries_query_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: ravi
+-- Name: website_queries_query_id_seq; Type: SEQUENCE SET; Schema: schoolers; Owner: -
 --
 
 SELECT pg_catalog.setval('schoolers.website_queries_query_id_seq', 1, true);
 
 
 --
--- Name: activities activities_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: activities activities_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.activities
@@ -14570,7 +14120,7 @@ ALTER TABLE ONLY schoolers.activities
 
 
 --
--- Name: attendance attendance_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -14578,7 +14128,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: attendance attendance_student_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_student_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -14586,7 +14136,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: auth_refresh_sessions auth_refresh_sessions_jti_hash_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions auth_refresh_sessions_jti_hash_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.auth_refresh_sessions
@@ -14594,7 +14144,7 @@ ALTER TABLE ONLY schoolers.auth_refresh_sessions
 
 
 --
--- Name: auth_refresh_sessions auth_refresh_sessions_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions auth_refresh_sessions_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.auth_refresh_sessions
@@ -14602,7 +14152,7 @@ ALTER TABLE ONLY schoolers.auth_refresh_sessions
 
 
 --
--- Name: broadcasts broadcasts_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -14610,7 +14160,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: classes classes_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: classes classes_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes
@@ -14618,7 +14168,7 @@ ALTER TABLE ONLY schoolers.classes
 
 
 --
--- Name: classes classes_school_id_name_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: classes classes_school_id_name_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes
@@ -14626,7 +14176,7 @@ ALTER TABLE ONLY schoolers.classes
 
 
 --
--- Name: holidays holidays_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: holidays holidays_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.holidays
@@ -14634,7 +14184,7 @@ ALTER TABLE ONLY schoolers.holidays
 
 
 --
--- Name: holidays holidays_school_id_holiday_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: holidays holidays_school_id_holiday_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.holidays
@@ -14642,7 +14192,7 @@ ALTER TABLE ONLY schoolers.holidays
 
 
 --
--- Name: leave_requests leave_requests_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: leave_requests leave_requests_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.leave_requests
@@ -14650,7 +14200,7 @@ ALTER TABLE ONLY schoolers.leave_requests
 
 
 --
--- Name: marks marks_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -14658,7 +14208,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: marks marks_student_id_subject_id_term_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_student_id_subject_id_term_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -14666,7 +14216,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: media media_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: media media_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media
@@ -14674,7 +14224,7 @@ ALTER TABLE ONLY schoolers.media
 
 
 --
--- Name: parent_student parent_student_parent_id_student_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parent_student parent_student_parent_id_student_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student
@@ -14682,7 +14232,7 @@ ALTER TABLE ONLY schoolers.parent_student
 
 
 --
--- Name: parent_student parent_student_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parent_student parent_student_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student
@@ -14690,7 +14240,7 @@ ALTER TABLE ONLY schoolers.parent_student
 
 
 --
--- Name: parents parents_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parents parents_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parents
@@ -14698,7 +14248,7 @@ ALTER TABLE ONLY schoolers.parents
 
 
 --
--- Name: periods periods_period_no_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: periods periods_period_no_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.periods
@@ -14706,7 +14256,7 @@ ALTER TABLE ONLY schoolers.periods
 
 
 --
--- Name: periods periods_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: periods periods_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.periods
@@ -14714,7 +14264,7 @@ ALTER TABLE ONLY schoolers.periods
 
 
 --
--- Name: pilots pilots_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: pilots pilots_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.pilots
@@ -14722,7 +14272,7 @@ ALTER TABLE ONLY schoolers.pilots
 
 
 --
--- Name: pilots pilots_staff_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: pilots pilots_staff_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.pilots
@@ -14730,7 +14280,7 @@ ALTER TABLE ONLY schoolers.pilots
 
 
 --
--- Name: route_stops route_stops_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_stops route_stops_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_stops
@@ -14738,7 +14288,7 @@ ALTER TABLE ONLY schoolers.route_stops
 
 
 --
--- Name: route_students route_students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -14746,7 +14296,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: route_students route_students_route_id_student_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_route_id_student_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -14754,7 +14304,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: routes routes_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: routes routes_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.routes
@@ -14762,7 +14312,7 @@ ALTER TABLE ONLY schoolers.routes
 
 
 --
--- Name: school_notifications school_notifications_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: school_notifications school_notifications_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.school_notifications
@@ -14770,7 +14320,7 @@ ALTER TABLE ONLY schoolers.school_notifications
 
 
 --
--- Name: schools schools_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: schools schools_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.schools
@@ -14778,7 +14328,7 @@ ALTER TABLE ONLY schoolers.schools
 
 
 --
--- Name: staff_attendance staff_attendance_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -14786,7 +14336,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff_attendance staff_attendance_staff_id_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_staff_id_date_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -14794,7 +14344,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff staff_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff staff_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff
@@ -14802,7 +14352,7 @@ ALTER TABLE ONLY schoolers.staff
 
 
 --
--- Name: staff_salaries staff_salaries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries staff_salaries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries
@@ -14810,7 +14360,7 @@ ALTER TABLE ONLY schoolers.staff_salaries
 
 
 --
--- Name: staff_salaries staff_salaries_staff_id_month_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries staff_salaries_staff_id_month_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries
@@ -14818,7 +14368,7 @@ ALTER TABLE ONLY schoolers.staff_salaries
 
 
 --
--- Name: student_fees student_fees_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: student_fees student_fees_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees
@@ -14826,7 +14376,7 @@ ALTER TABLE ONLY schoolers.student_fees
 
 
 --
--- Name: student_fees student_fees_student_id_month_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: student_fees student_fees_student_id_month_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees
@@ -14834,7 +14384,7 @@ ALTER TABLE ONLY schoolers.student_fees
 
 
 --
--- Name: students students_admission_no_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: students students_admission_no_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students
@@ -14842,7 +14392,7 @@ ALTER TABLE ONLY schoolers.students
 
 
 --
--- Name: students students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: students students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students
@@ -14850,7 +14400,7 @@ ALTER TABLE ONLY schoolers.students
 
 
 --
--- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.subjects
@@ -14858,7 +14408,7 @@ ALTER TABLE ONLY schoolers.subjects
 
 
 --
--- Name: subjects subjects_school_id_name_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: subjects subjects_school_id_name_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.subjects
@@ -14866,7 +14416,7 @@ ALTER TABLE ONLY schoolers.subjects
 
 
 --
--- Name: support_ticket_messages support_ticket_messages_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages support_ticket_messages_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_ticket_messages
@@ -14874,7 +14424,7 @@ ALTER TABLE ONLY schoolers.support_ticket_messages
 
 
 --
--- Name: support_tickets support_tickets_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_tickets support_tickets_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_tickets
@@ -14882,7 +14432,7 @@ ALTER TABLE ONLY schoolers.support_tickets
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -14890,7 +14440,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_staff_id_class_id_subject_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_staff_id_class_id_subject_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -14898,7 +14448,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: timetable_entries timetable_entries_class_id_day_of_week_period_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_class_id_day_of_week_period_id_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -14906,7 +14456,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -14914,7 +14464,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: trip_roster trip_roster_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -14922,7 +14472,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_roster trip_roster_trip_student_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_trip_student_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -14930,7 +14480,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_status_audit trip_status_audit_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit trip_status_audit_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_status_audit
@@ -14938,7 +14488,7 @@ ALTER TABLE ONLY schoolers.trip_status_audit
 
 
 --
--- Name: trip_stop_events trip_stop_events_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events trip_stop_events_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events
@@ -14946,7 +14496,7 @@ ALTER TABLE ONLY schoolers.trip_stop_events
 
 
 --
--- Name: trip_stop_events trip_stop_events_trip_stop_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events trip_stop_events_trip_stop_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events
@@ -14954,7 +14504,7 @@ ALTER TABLE ONLY schoolers.trip_stop_events
 
 
 --
--- Name: trip_student_events trip_student_events_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -14962,7 +14512,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_student_events trip_student_events_trip_student_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_trip_student_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -14970,7 +14520,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_students trip_students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -14978,7 +14528,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trips trips_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -14986,7 +14536,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips uq_trips_route_date_direction; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips uq_trips_route_date_direction; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -14994,7 +14544,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.users
@@ -15002,7 +14552,7 @@ ALTER TABLE ONLY schoolers.users
 
 
 --
--- Name: users users_username_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.users
@@ -15010,7 +14560,7 @@ ALTER TABLE ONLY schoolers.users
 
 
 --
--- Name: vehicles vehicles_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: vehicles vehicles_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.vehicles
@@ -15018,7 +14568,7 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: vehicles vehicles_school_vehicle_number_key; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: vehicles vehicles_school_vehicle_number_key; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.vehicles
@@ -15026,7 +14576,7 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: website_builder_sites website_builder_sites_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_builder_sites
@@ -15034,7 +14584,7 @@ ALTER TABLE ONLY schoolers.website_builder_sites
 
 
 --
--- Name: website_queries website_queries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_pkey; Type: CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_queries
@@ -15042,308 +14592,301 @@ ALTER TABLE ONLY schoolers.website_queries
 
 
 --
--- Name: broadcasts_sender_user_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: broadcasts_sender_user_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX broadcasts_sender_user_idx ON schoolers.broadcasts USING btree (sender_user_id);
 
 
 --
--- Name: idx_attendance_student_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_attendance_student_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_attendance_student_date ON schoolers.attendance USING btree (student_id, date);
 
 
 --
--- Name: idx_broadcasts_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_broadcasts_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_broadcasts_school ON schoolers.broadcasts USING btree (school_id);
 
 
 --
--- Name: idx_classes_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_classes_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_classes_school ON schoolers.classes USING btree (school_id);
 
 
 --
--- Name: idx_leave_requests_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_leave_requests_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_leave_requests_school ON schoolers.leave_requests USING btree (school_id);
 
 
 --
--- Name: idx_marks_student; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_marks_student; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_marks_student ON schoolers.marks USING btree (student_id);
 
 
 --
--- Name: idx_parents_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_parents_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_parents_school ON schoolers.parents USING btree (school_id);
 
 
 --
--- Name: idx_route_stops_route; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_route_stops_route; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_route_stops_route ON schoolers.route_stops USING btree (route_id);
 
 
 --
--- Name: idx_routes_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_routes_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_routes_school ON schoolers.routes USING btree (school_id);
 
 
 --
--- Name: idx_staff_attendance_school_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_staff_attendance_school_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_staff_attendance_school_date ON schoolers.staff_attendance USING btree (school_id, date);
 
 
 --
--- Name: idx_staff_person_type; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_staff_person_type; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_staff_person_type ON schoolers.staff USING btree (school_id, person_type);
 
 
 --
--- Name: idx_staff_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_staff_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_staff_school ON schoolers.staff USING btree (school_id);
 
 
 --
--- Name: idx_students_class; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_students_class; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_students_class ON schoolers.students USING btree (class_id);
 
 
 --
--- Name: idx_students_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_students_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_students_school ON schoolers.students USING btree (school_id);
 
 
 --
--- Name: idx_timetable_class; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_timetable_class; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_timetable_class ON schoolers.timetable_entries USING btree (class_id);
 
 
 --
--- Name: idx_trip_students_trip_student; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_trip_students_trip_student; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_trip_students_trip_student ON schoolers.trip_students USING btree (trip_id, student_id);
 
 
 --
--- Name: idx_trips_pilot_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_trips_pilot_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_trips_pilot_date ON schoolers.trips USING btree (pilot_id, trip_date);
 
 
 --
--- Name: idx_trips_route_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_trips_route_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_trips_route_date ON schoolers.trips USING btree (route_id, trip_date);
 
 
 --
--- Name: idx_trips_school_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_trips_school_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_trips_school_date ON schoolers.trips USING btree (school_id, trip_date);
 
 
 --
--- Name: idx_trips_status_date; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_trips_status_date; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_trips_status_date ON schoolers.trips USING btree (status, trip_date);
 
 
 --
--- Name: idx_users_school; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: idx_users_school; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX idx_users_school ON schoolers.users USING btree (school_id);
 
 
 --
--- Name: ix_auth_refresh_sessions_expires_at; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: ix_auth_refresh_sessions_expires_at; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX ix_auth_refresh_sessions_expires_at ON schoolers.auth_refresh_sessions USING btree (expires_at);
 
 
 --
--- Name: ix_auth_refresh_sessions_family_id; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: ix_auth_refresh_sessions_family_id; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX ix_auth_refresh_sessions_family_id ON schoolers.auth_refresh_sessions USING btree (family_id);
 
 
 --
--- Name: ix_auth_refresh_sessions_user_id; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: ix_auth_refresh_sessions_user_id; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX ix_auth_refresh_sessions_user_id ON schoolers.auth_refresh_sessions USING btree (user_id);
 
 
 --
--- Name: media_uploader_user_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: media_uploader_user_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX media_uploader_user_idx ON schoolers.media USING btree (uploader_user_id);
 
 
 --
--- Name: route_students_student_id_key; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: route_students_student_id_key; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE UNIQUE INDEX route_students_student_id_key ON schoolers.route_students USING btree (student_id);
 
 
 --
--- Name: staff_salaries_school_month_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries_school_month_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX staff_salaries_school_month_idx ON schoolers.staff_salaries USING btree (school_id, month);
 
 
 --
--- Name: student_fees_school_month_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: student_fees_school_month_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX student_fees_school_month_idx ON schoolers.student_fees USING btree (school_id, month);
 
 
 --
--- Name: support_ticket_messages_ticket_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages_ticket_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX support_ticket_messages_ticket_idx ON schoolers.support_ticket_messages USING btree (ticket_id, created_at);
 
 
 --
--- Name: support_tickets_school_status_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: support_tickets_school_status_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX support_tickets_school_status_idx ON schoolers.support_tickets USING btree (school_id, status, created_at DESC);
 
 
 --
--- Name: support_tickets_status_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: support_tickets_status_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX support_tickets_status_idx ON schoolers.support_tickets USING btree (status, created_at DESC);
 
 
 --
--- Name: trip_roster_student_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trip_roster_student_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trip_roster_student_idx ON schoolers.trip_roster USING btree (student_id);
 
 
 --
--- Name: trip_roster_trip_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trip_roster_trip_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trip_roster_trip_idx ON schoolers.trip_roster USING btree (trip_id);
 
 
 --
--- Name: trip_status_audit_trip_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit_trip_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trip_status_audit_trip_idx ON schoolers.trip_status_audit USING btree (trip_id, entry_id);
 
 
 --
--- Name: trip_stop_events_trip_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events_trip_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trip_stop_events_trip_idx ON schoolers.trip_stop_events USING btree (trip_id);
 
 
 --
--- Name: trip_student_events_student_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events_student_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trip_student_events_student_idx ON schoolers.trip_student_events USING btree (student_id, trip_id);
 
 
 --
--- Name: trips_pilot_date_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trips_pilot_date_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trips_pilot_date_idx ON schoolers.trips USING btree (pilot_id, trip_date DESC);
 
 
 --
--- Name: trips_route_date_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trips_route_date_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trips_route_date_idx ON schoolers.trips USING btree (route_id, trip_date DESC);
 
 
 --
--- Name: trips_school_date_idx; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: trips_school_date_idx; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE INDEX trips_school_date_idx ON schoolers.trips USING btree (school_id, trip_date DESC);
 
 
 --
--- Name: uq_pilots_route_id; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: uq_pilots_route_id; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_pilots_route_id ON schoolers.pilots USING btree (route_id) WHERE (route_id IS NOT NULL);
 
 
 --
--- Name: uq_trip_students_trip_student; Type: INDEX; Schema: schoolers; Owner: ravi
+-- Name: uq_trip_students_trip_student; Type: INDEX; Schema: schoolers; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_trip_students_trip_student ON schoolers.trip_students USING btree (trip_id, student_id);
 
 
 --
--- Name: website_queries_school_created_idx; Type: INDEX; Schema: schoolers; Owner: ravi
---
-
-CREATE INDEX website_queries_school_created_idx ON schoolers.website_queries USING btree (school_id, created_at DESC, query_id DESC);
-
-
---
--- Name: broadcasts broadcasts_set_created_at_ist; Type: TRIGGER; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_set_created_at_ist; Type: TRIGGER; Schema: schoolers; Owner: -
 --
 
 CREATE TRIGGER broadcasts_set_created_at_ist BEFORE UPDATE ON schoolers.broadcasts FOR EACH ROW EXECUTE FUNCTION schoolers.set_broadcast_created_at_ist();
 
 
 --
--- Name: activities activities_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: activities activities_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.activities
@@ -15351,7 +14894,7 @@ ALTER TABLE ONLY schoolers.activities
 
 
 --
--- Name: activities activities_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: activities activities_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.activities
@@ -15359,7 +14902,7 @@ ALTER TABLE ONLY schoolers.activities
 
 
 --
--- Name: attendance attendance_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -15367,7 +14910,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: attendance attendance_marked_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_marked_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -15375,7 +14918,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: attendance attendance_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -15383,7 +14926,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: attendance attendance_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: attendance attendance_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.attendance
@@ -15391,7 +14934,7 @@ ALTER TABLE ONLY schoolers.attendance
 
 
 --
--- Name: auth_refresh_sessions auth_refresh_sessions_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions auth_refresh_sessions_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.auth_refresh_sessions
@@ -15399,7 +14942,7 @@ ALTER TABLE ONLY schoolers.auth_refresh_sessions
 
 
 --
--- Name: auth_refresh_sessions auth_refresh_sessions_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: auth_refresh_sessions auth_refresh_sessions_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.auth_refresh_sessions
@@ -15407,7 +14950,7 @@ ALTER TABLE ONLY schoolers.auth_refresh_sessions
 
 
 --
--- Name: barter_listings barter_listings_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: barter_listings barter_listings_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.barter_listings
@@ -15415,7 +14958,7 @@ ALTER TABLE ONLY schoolers.barter_listings
 
 
 --
--- Name: barter_listings barter_listings_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: barter_listings barter_listings_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.barter_listings
@@ -15423,7 +14966,7 @@ ALTER TABLE ONLY schoolers.barter_listings
 
 
 --
--- Name: broadcasts broadcasts_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -15431,7 +14974,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: broadcasts broadcasts_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -15439,7 +14982,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: broadcasts broadcasts_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -15447,7 +14990,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: broadcasts broadcasts_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -15455,7 +14998,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: broadcasts broadcasts_sender_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: broadcasts broadcasts_sender_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.broadcasts
@@ -15463,7 +15006,7 @@ ALTER TABLE ONLY schoolers.broadcasts
 
 
 --
--- Name: classes classes_class_teacher_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: classes classes_class_teacher_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes
@@ -15471,7 +15014,7 @@ ALTER TABLE ONLY schoolers.classes
 
 
 --
--- Name: classes classes_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: classes classes_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes
@@ -15479,7 +15022,7 @@ ALTER TABLE ONLY schoolers.classes
 
 
 --
--- Name: classes classes_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: classes classes_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.classes
@@ -15487,7 +15030,7 @@ ALTER TABLE ONLY schoolers.classes
 
 
 --
--- Name: holidays holidays_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: holidays holidays_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.holidays
@@ -15495,7 +15038,7 @@ ALTER TABLE ONLY schoolers.holidays
 
 
 --
--- Name: holidays holidays_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: holidays holidays_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.holidays
@@ -15503,7 +15046,7 @@ ALTER TABLE ONLY schoolers.holidays
 
 
 --
--- Name: leave_requests leave_requests_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: leave_requests leave_requests_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.leave_requests
@@ -15511,7 +15054,7 @@ ALTER TABLE ONLY schoolers.leave_requests
 
 
 --
--- Name: leave_requests leave_requests_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: leave_requests leave_requests_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.leave_requests
@@ -15519,7 +15062,7 @@ ALTER TABLE ONLY schoolers.leave_requests
 
 
 --
--- Name: marks marks_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -15527,7 +15070,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: marks marks_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -15535,7 +15078,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: marks marks_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -15543,7 +15086,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: marks marks_updated_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_updated_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -15551,7 +15094,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: marks marks_updated_by_user_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: marks marks_updated_by_user_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.marks
@@ -15559,7 +15102,7 @@ ALTER TABLE ONLY schoolers.marks
 
 
 --
--- Name: media media_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: media media_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media
@@ -15567,7 +15110,7 @@ ALTER TABLE ONLY schoolers.media
 
 
 --
--- Name: media media_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: media media_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media
@@ -15575,7 +15118,7 @@ ALTER TABLE ONLY schoolers.media
 
 
 --
--- Name: media media_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: media media_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media
@@ -15583,7 +15126,7 @@ ALTER TABLE ONLY schoolers.media
 
 
 --
--- Name: media media_uploader_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: media media_uploader_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.media
@@ -15591,7 +15134,7 @@ ALTER TABLE ONLY schoolers.media
 
 
 --
--- Name: parent_student parent_student_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parent_student parent_student_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student
@@ -15599,7 +15142,7 @@ ALTER TABLE ONLY schoolers.parent_student
 
 
 --
--- Name: parent_student parent_student_parent_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parent_student parent_student_parent_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student
@@ -15607,7 +15150,7 @@ ALTER TABLE ONLY schoolers.parent_student
 
 
 --
--- Name: parent_student parent_student_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parent_student parent_student_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parent_student
@@ -15615,7 +15158,7 @@ ALTER TABLE ONLY schoolers.parent_student
 
 
 --
--- Name: parents parents_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parents parents_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parents
@@ -15623,7 +15166,7 @@ ALTER TABLE ONLY schoolers.parents
 
 
 --
--- Name: parents parents_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: parents parents_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.parents
@@ -15631,7 +15174,7 @@ ALTER TABLE ONLY schoolers.parents
 
 
 --
--- Name: periods periods_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: periods periods_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.periods
@@ -15639,7 +15182,7 @@ ALTER TABLE ONLY schoolers.periods
 
 
 --
--- Name: pilots pilots_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: pilots pilots_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.pilots
@@ -15647,7 +15190,7 @@ ALTER TABLE ONLY schoolers.pilots
 
 
 --
--- Name: pilots pilots_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: pilots pilots_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.pilots
@@ -15655,7 +15198,7 @@ ALTER TABLE ONLY schoolers.pilots
 
 
 --
--- Name: pilots pilots_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: pilots pilots_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.pilots
@@ -15663,7 +15206,7 @@ ALTER TABLE ONLY schoolers.pilots
 
 
 --
--- Name: route_stops route_stops_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_stops route_stops_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_stops
@@ -15671,7 +15214,7 @@ ALTER TABLE ONLY schoolers.route_stops
 
 
 --
--- Name: route_stops route_stops_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_stops route_stops_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_stops
@@ -15679,7 +15222,7 @@ ALTER TABLE ONLY schoolers.route_stops
 
 
 --
--- Name: route_students route_students_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -15687,7 +15230,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: route_students route_students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -15695,7 +15238,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: route_students route_students_pickup_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_pickup_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -15703,7 +15246,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: route_students route_students_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -15711,7 +15254,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: route_students route_students_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: route_students route_students_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.route_students
@@ -15719,7 +15262,7 @@ ALTER TABLE ONLY schoolers.route_students
 
 
 --
--- Name: routes routes_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: routes routes_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.routes
@@ -15727,7 +15270,7 @@ ALTER TABLE ONLY schoolers.routes
 
 
 --
--- Name: routes routes_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: routes routes_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.routes
@@ -15735,7 +15278,7 @@ ALTER TABLE ONLY schoolers.routes
 
 
 --
--- Name: school_notifications school_notifications_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: school_notifications school_notifications_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.school_notifications
@@ -15743,7 +15286,7 @@ ALTER TABLE ONLY schoolers.school_notifications
 
 
 --
--- Name: school_notifications school_notifications_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: school_notifications school_notifications_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.school_notifications
@@ -15751,7 +15294,7 @@ ALTER TABLE ONLY schoolers.school_notifications
 
 
 --
--- Name: schools schools_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: schools schools_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.schools
@@ -15759,7 +15302,7 @@ ALTER TABLE ONLY schoolers.schools
 
 
 --
--- Name: staff_attendance staff_attendance_marked_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_marked_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -15767,7 +15310,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff_attendance staff_attendance_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -15775,7 +15318,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff_attendance staff_attendance_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -15783,7 +15326,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff_attendance staff_attendance_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_attendance staff_attendance_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_attendance
@@ -15791,7 +15334,7 @@ ALTER TABLE ONLY schoolers.staff_attendance
 
 
 --
--- Name: staff staff_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff staff_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff
@@ -15799,7 +15342,7 @@ ALTER TABLE ONLY schoolers.staff
 
 
 --
--- Name: staff_salaries staff_salaries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries staff_salaries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries
@@ -15807,7 +15350,7 @@ ALTER TABLE ONLY schoolers.staff_salaries
 
 
 --
--- Name: staff_salaries staff_salaries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries staff_salaries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries
@@ -15815,7 +15358,7 @@ ALTER TABLE ONLY schoolers.staff_salaries
 
 
 --
--- Name: staff_salaries staff_salaries_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff_salaries staff_salaries_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff_salaries
@@ -15823,7 +15366,7 @@ ALTER TABLE ONLY schoolers.staff_salaries
 
 
 --
--- Name: staff staff_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: staff staff_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.staff
@@ -15831,7 +15374,7 @@ ALTER TABLE ONLY schoolers.staff
 
 
 --
--- Name: student_fees student_fees_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: student_fees student_fees_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees
@@ -15839,7 +15382,7 @@ ALTER TABLE ONLY schoolers.student_fees
 
 
 --
--- Name: student_fees student_fees_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: student_fees student_fees_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees
@@ -15847,7 +15390,7 @@ ALTER TABLE ONLY schoolers.student_fees
 
 
 --
--- Name: student_fees student_fees_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: student_fees student_fees_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.student_fees
@@ -15855,7 +15398,7 @@ ALTER TABLE ONLY schoolers.student_fees
 
 
 --
--- Name: students students_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: students students_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students
@@ -15863,7 +15406,7 @@ ALTER TABLE ONLY schoolers.students
 
 
 --
--- Name: students students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: students students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students
@@ -15871,7 +15414,7 @@ ALTER TABLE ONLY schoolers.students
 
 
 --
--- Name: students students_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: students students_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.students
@@ -15879,7 +15422,7 @@ ALTER TABLE ONLY schoolers.students
 
 
 --
--- Name: subjects subjects_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: subjects subjects_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.subjects
@@ -15887,7 +15430,7 @@ ALTER TABLE ONLY schoolers.subjects
 
 
 --
--- Name: subjects subjects_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: subjects subjects_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.subjects
@@ -15895,7 +15438,7 @@ ALTER TABLE ONLY schoolers.subjects
 
 
 --
--- Name: support_ticket_messages support_ticket_messages_author_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages support_ticket_messages_author_user_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_ticket_messages
@@ -15903,7 +15446,7 @@ ALTER TABLE ONLY schoolers.support_ticket_messages
 
 
 --
--- Name: support_ticket_messages support_ticket_messages_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages support_ticket_messages_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_ticket_messages
@@ -15911,7 +15454,7 @@ ALTER TABLE ONLY schoolers.support_ticket_messages
 
 
 --
--- Name: support_ticket_messages support_ticket_messages_ticket_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_ticket_messages support_ticket_messages_ticket_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_ticket_messages
@@ -15919,7 +15462,7 @@ ALTER TABLE ONLY schoolers.support_ticket_messages
 
 
 --
--- Name: support_tickets support_tickets_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_tickets support_tickets_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_tickets
@@ -15927,7 +15470,7 @@ ALTER TABLE ONLY schoolers.support_tickets
 
 
 --
--- Name: support_tickets support_tickets_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_tickets support_tickets_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_tickets
@@ -15935,7 +15478,7 @@ ALTER TABLE ONLY schoolers.support_tickets
 
 
 --
--- Name: support_tickets support_tickets_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: support_tickets support_tickets_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.support_tickets
@@ -15943,7 +15486,7 @@ ALTER TABLE ONLY schoolers.support_tickets
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -15951,7 +15494,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -15959,7 +15502,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -15967,7 +15510,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: teacher_class_subjects teacher_class_subjects_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: teacher_class_subjects teacher_class_subjects_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.teacher_class_subjects
@@ -15975,7 +15518,7 @@ ALTER TABLE ONLY schoolers.teacher_class_subjects
 
 
 --
--- Name: timetable_entries timetable_entries_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_class_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -15983,7 +15526,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -15991,7 +15534,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -15999,7 +15542,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_period_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_period_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -16007,7 +15550,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -16015,7 +15558,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_staff_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -16023,7 +15566,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: timetable_entries timetable_entries_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: timetable_entries timetable_entries_subject_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.timetable_entries
@@ -16031,7 +15574,7 @@ ALTER TABLE ONLY schoolers.timetable_entries
 
 
 --
--- Name: trip_roster trip_roster_expected_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_expected_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -16039,7 +15582,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_roster trip_roster_expected_pickup_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_expected_pickup_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -16047,7 +15590,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_roster trip_roster_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -16055,7 +15598,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_roster trip_roster_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -16063,7 +15606,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_roster trip_roster_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_roster trip_roster_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_roster
@@ -16071,7 +15614,7 @@ ALTER TABLE ONLY schoolers.trip_roster
 
 
 --
--- Name: trip_status_audit trip_status_audit_changed_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit trip_status_audit_changed_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_status_audit
@@ -16079,7 +15622,7 @@ ALTER TABLE ONLY schoolers.trip_status_audit
 
 
 --
--- Name: trip_status_audit trip_status_audit_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_status_audit trip_status_audit_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_status_audit
@@ -16087,7 +15630,7 @@ ALTER TABLE ONLY schoolers.trip_status_audit
 
 
 --
--- Name: trip_stop_events trip_stop_events_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events trip_stop_events_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events
@@ -16095,7 +15638,7 @@ ALTER TABLE ONLY schoolers.trip_stop_events
 
 
 --
--- Name: trip_stop_events trip_stop_events_route_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events trip_stop_events_route_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events
@@ -16103,7 +15646,7 @@ ALTER TABLE ONLY schoolers.trip_stop_events
 
 
 --
--- Name: trip_stop_events trip_stop_events_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_stop_events trip_stop_events_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_stop_events
@@ -16111,7 +15654,7 @@ ALTER TABLE ONLY schoolers.trip_stop_events
 
 
 --
--- Name: trip_student_events trip_student_events_boarding_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_boarding_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -16119,7 +15662,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_student_events trip_student_events_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -16127,7 +15670,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_student_events trip_student_events_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -16135,7 +15678,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_student_events trip_student_events_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -16143,7 +15686,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_student_events trip_student_events_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_student_events trip_student_events_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_student_events
@@ -16151,7 +15694,7 @@ ALTER TABLE ONLY schoolers.trip_student_events
 
 
 --
--- Name: trip_students trip_students_boarding_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_boarding_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -16159,7 +15702,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trip_students trip_students_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_drop_stop_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -16167,7 +15710,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trip_students trip_students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -16175,7 +15718,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trip_students trip_students_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_student_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -16183,7 +15726,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trip_students trip_students_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trip_students trip_students_trip_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trip_students
@@ -16191,7 +15734,7 @@ ALTER TABLE ONLY schoolers.trip_students
 
 
 --
--- Name: trips trips_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16199,7 +15742,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_created_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16207,7 +15750,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16215,7 +15758,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_pilot_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_pilot_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16223,7 +15766,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_reopened_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_reopened_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16231,7 +15774,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_route_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16239,7 +15782,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: trips trips_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: trips trips_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.trips
@@ -16247,7 +15790,7 @@ ALTER TABLE ONLY schoolers.trips
 
 
 --
--- Name: users users_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: users users_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.users
@@ -16255,7 +15798,7 @@ ALTER TABLE ONLY schoolers.users
 
 
 --
--- Name: users users_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: users users_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.users
@@ -16263,7 +15806,7 @@ ALTER TABLE ONLY schoolers.users
 
 
 --
--- Name: vehicles vehicles_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: vehicles vehicles_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.vehicles
@@ -16271,7 +15814,7 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: vehicles vehicles_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: vehicles vehicles_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.vehicles
@@ -16279,7 +15822,7 @@ ALTER TABLE ONLY schoolers.vehicles
 
 
 --
--- Name: website_builder_sites website_builder_sites_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_builder_sites
@@ -16287,7 +15830,7 @@ ALTER TABLE ONLY schoolers.website_builder_sites
 
 
 --
--- Name: website_builder_sites website_builder_sites_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_builder_sites website_builder_sites_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_builder_sites
@@ -16295,7 +15838,7 @@ ALTER TABLE ONLY schoolers.website_builder_sites
 
 
 --
--- Name: website_queries website_queries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_modified_by_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_queries
@@ -16303,7 +15846,7 @@ ALTER TABLE ONLY schoolers.website_queries
 
 
 --
--- Name: website_queries website_queries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: ravi
+-- Name: website_queries website_queries_school_id_fkey; Type: FK CONSTRAINT; Schema: schoolers; Owner: -
 --
 
 ALTER TABLE ONLY schoolers.website_queries
@@ -16314,5 +15857,5 @@ ALTER TABLE ONLY schoolers.website_queries
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jaacC1PZwmbSwjg7dm9aWfUJIZ87EEZZxTlhnTnGur3OlfUFH3HbYsejz98Pl86
+\unrestrict Ho4MgR2WRcTcbnQnl6Oe2XL6dgZW9XHZnUCJKaLW4GhZsLnxsnloOkDhFQkXQaX
 
