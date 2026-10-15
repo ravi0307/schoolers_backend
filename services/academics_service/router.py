@@ -11,6 +11,9 @@ from schemas import (
     AcademicYearCreate, AcademicYearUpdate, AcademicYearRead,
     AcademicPeriodCreate, AcademicPeriodUpdate, AcademicPeriodRead,
     AcademicEventCreate, AcademicEventUpdate, AcademicEventRead,
+    ExaminationTypeCreate, ExaminationTypeUpdate, ExaminationTypeRead,
+    GradeScaleCreate, GradeScaleUpdate, GradeScaleRead,
+    GradeLevelCreate, GradeLevelUpdate, GradeLevelRead,
 )
 
 router = APIRouter(tags=["academics"])
@@ -338,4 +341,140 @@ def delete_academic_event(
     if event is None:
         raise NotFoundError("Academic event not found")
     repo.delete_event(db, event)
+    return Response(status_code=204)
+
+
+# ---- Examination setup (Phase 2): types, grade scales ----
+
+
+@router.get("/examination-types", response_model=list[ExaminationTypeRead])
+def list_examination_types(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    return repo.list_examination_types(db, school_id)
+
+
+@router.post("/examination-types", response_model=ExaminationTypeRead, status_code=201)
+def create_examination_type(
+    payload: ExaminationTypeCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_examination_type(db, school_id, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/examination-types/{type_id}", response_model=ExaminationTypeRead)
+def update_examination_type(
+    type_id: int,
+    payload: ExaminationTypeUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    exam_type = repo.get_examination_type(db, school_id, type_id)
+    if exam_type is None:
+        raise NotFoundError("Examination type not found")
+    return repo.update_examination_type(db, exam_type, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/grade-scales", response_model=list[GradeScaleRead])
+def list_grade_scales(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    return repo.list_grade_scales(db, school_id)
+
+
+@router.post("/grade-scales", response_model=GradeScaleRead, status_code=201)
+def create_grade_scale(
+    payload: GradeScaleCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_grade_scale(db, school_id, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/grade-scales/{scale_id}", response_model=GradeScaleRead)
+def update_grade_scale(
+    scale_id: int,
+    payload: GradeScaleUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    scale = repo.get_grade_scale(db, school_id, scale_id)
+    if scale is None:
+        raise NotFoundError("Grade scale not found")
+    return repo.update_grade_scale(db, scale, payload.model_dump(exclude_unset=True))
+
+
+@router.post("/grade-scales/{scale_id}/new-version", response_model=GradeScaleRead, status_code=201)
+def new_grade_scale_version(
+    scale_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Copy-on-write: freeze the current version, open the next with copied levels."""
+    scale = repo.get_grade_scale(db, school_id, scale_id)
+    if scale is None:
+        raise NotFoundError("Grade scale not found")
+    return repo.new_grade_scale_version(db, scale)
+
+
+@router.get("/grade-scales/{scale_id}/levels", response_model=list[GradeLevelRead])
+def list_grade_levels(
+    scale_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    if repo.get_grade_scale(db, school_id, scale_id) is None:
+        raise NotFoundError("Grade scale not found")
+    return repo.list_grade_levels(db, scale_id)
+
+
+@router.post("/grade-scales/{scale_id}/levels", response_model=GradeLevelRead, status_code=201)
+def create_grade_level(
+    scale_id: int,
+    payload: GradeLevelCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if repo.get_grade_scale(db, school_id, scale_id) is None:
+        raise NotFoundError("Grade scale not found")
+    return repo.create_grade_level(db, scale_id, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/grade-levels/{level_id}", response_model=GradeLevelRead)
+def update_grade_level(
+    level_id: int,
+    payload: GradeLevelUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    level = repo.get_grade_level_in_school(db, school_id, level_id)
+    if level is None:
+        raise NotFoundError("Grade level not found")
+    return repo.update_grade_level(db, level, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/grade-levels/{level_id}", status_code=204)
+def delete_grade_level(
+    level_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    level = repo.get_grade_level_in_school(db, school_id, level_id)
+    if level is None:
+        raise NotFoundError("Grade level not found")
+    repo.delete_grade_level(db, level)
     return Response(status_code=204)

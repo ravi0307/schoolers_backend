@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from common.models import (
     SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
     AcademicYear, AcademicPeriod, AcademicEvent,
+    ExaminationType, GradeScale, GradeLevel,
 )
 from common.holidays import (
     expand_holiday_range,
@@ -597,4 +598,199 @@ def update_event(db: Session, event: AcademicEvent, data: dict) -> AcademicEvent
 
 def delete_event(db: Session, event: AcademicEvent) -> None:
     db.delete(event)
+    db.commit()
+
+
+# ---- Examination setup (Phase 2): types, grade scales ----
+
+
+def list_examination_types(db: Session, school_id: int):
+    return (
+        db.query(ExaminationType)
+        .filter(ExaminationType.school_id == school_id)
+        .order_by(ExaminationType.name)
+        .all()
+    )
+
+
+def get_examination_type(db: Session, school_id: int, type_id: int):
+    return (
+        db.query(ExaminationType)
+        .filter(ExaminationType.school_id == school_id, ExaminationType.type_id == type_id)
+        .first()
+    )
+
+
+def type_name_taken(db: Session, school_id: int, name: str, exclude_id: int | None = None) -> bool:
+    query = db.query(ExaminationType).filter(
+        ExaminationType.school_id == school_id, ExaminationType.name == name
+    )
+    if exclude_id is not None:
+        query = query.filter(ExaminationType.type_id != exclude_id)
+    return query.first() is not None
+
+
+def create_examination_type(db: Session, school_id: int, data: dict):
+    if type_name_taken(db, school_id, data["name"]):
+        raise ConflictError("An examination type with this name already exists for this school")
+    exam_type = ExaminationType(school_id=school_id, **data)
+    db.add(exam_type)
+    db.commit()
+    db.refresh(exam_type)
+    return exam_type
+
+
+def update_examination_type(db: Session, exam_type, data: dict):
+    name = data.get("name")
+    if name and type_name_taken(db, exam_type.school_id, name, exclude_id=exam_type.type_id):
+        raise ConflictError("An examination type with this name already exists for this school")
+    for k, v in data.items():
+        if v is not None:
+            setattr(exam_type, k, v)
+    db.commit()
+    db.refresh(exam_type)
+    return exam_type
+
+
+def list_grade_scales(db: Session, school_id: int):
+    return (
+        db.query(GradeScale)
+        .filter(GradeScale.school_id == school_id)
+        .order_by(GradeScale.name, GradeScale.version.desc())
+        .all()
+    )
+
+
+def get_grade_scale(db: Session, school_id: int, scale_id: int):
+    return (
+        db.query(GradeScale)
+        .filter(GradeScale.school_id == school_id, GradeScale.scale_id == scale_id)
+        .first()
+    )
+
+
+def scale_name_taken(
+    db: Session, school_id: int, name: str, exclude_id: int | None = None
+) -> bool:
+    query = db.query(GradeScale).filter(
+        GradeScale.school_id == school_id, GradeScale.name == name
+    )
+    if exclude_id is not None:
+        query = query.filter(GradeScale.scale_id != exclude_id)
+    return query.first() is not None
+
+
+def create_grade_scale(db: Session, school_id: int, data: dict):
+    if scale_name_taken(db, school_id, data["name"]):
+        raise ConflictError("A grade scale with this name already exists for this school")
+    scale = GradeScale(school_id=school_id, **data)
+    db.add(scale)
+    db.commit()
+    db.refresh(scale)
+    return scale
+
+
+def update_grade_scale(db: Session, scale, data: dict):
+    name = data.get("name")
+    if name and scale_name_taken(db, scale.school_id, name, exclude_id=scale.scale_id):
+        raise ConflictError("A grade scale with this name already exists for this school")
+    for k, v in data.items():
+        if v is not None:
+            setattr(scale, k, v)
+    db.commit()
+    db.refresh(scale)
+    return scale
+
+
+def new_grade_scale_version(db: Session, scale) -> GradeScale:
+    """Copy-on-write: freeze the current version and open the next one.
+
+    The old row (and its levels) stays exactly as published history
+    references it; edits happen on the fresh version. The published-mark
+    reference guard lands with marks.grade_level_id (Phase 4); until then
+    every scale is freely versionable.
+    """
+    latest = (
+        db.query(GradeScale.version)
+        .filter(GradeScale.school_id == scale.school_id, GradeScale.name == scale.name)
+        .order_by(GradeScale.version.desc())
+        .first()
+    )
+    nxt = GradeScale(
+        school_id=scale.school_id,
+        name=scale.name,
+        version=(latest[0] if latest else scale.version) + 1,
+        supersedes_id=scale.scale_id,
+        is_active=True,
+    )
+    db.add(nxt)
+    db.flush()
+    for level in list_grade_levels(db, scale.scale_id):
+        db.add(GradeLevel(
+            scale_id=nxt.scale_id,
+            label=level.label,
+            rank=level.rank,
+            min_score=level.min_score,
+            max_score=level.max_score,
+            description=level.description,
+        ))
+    scale.is_active = False
+    db.commit()
+    db.refresh(nxt)
+    return nxt
+
+
+def get_grade_level_in_school(db: Session, school_id: int, level_id: int):
+    """A level plus its scale, both constrained to the caller's school."""
+    return (
+        db.query(GradeLevel)
+        .join(GradeScale, GradeScale.scale_id == GradeLevel.scale_id)
+        .filter(GradeLevel.level_id == level_id, GradeScale.school_id == school_id)
+        .first()
+    )
+
+
+def list_grade_levels(db: Session, scale_id: int):   return (
+        db.query(GradeLevel)
+        .filter(GradeLevel.scale_id == scale_id)
+        .order_by(GradeLevel.rank, GradeLevel.label)
+        .all()
+    )
+
+
+def level_label_taken(
+    db: Session, scale_id: int, label: str, exclude_id: int | None = None
+) -> bool:
+    query = db.query(GradeLevel).filter(
+        GradeLevel.scale_id == scale_id, GradeLevel.label == label
+    )
+    if exclude_id is not None:
+        query = query.filter(GradeLevel.level_id != exclude_id)
+    return query.first() is not None
+
+
+def create_grade_level(db: Session, scale_id: int, data: dict):
+    if level_label_taken(db, scale_id, data["label"]):
+        raise ConflictError("This grade label already exists in this scale")
+    level = GradeLevel(scale_id=scale_id, **data)
+    db.add(level)
+    db.commit()
+    db.refresh(level)
+    return level
+
+
+def update_grade_level(db: Session, level, data: dict):
+    label = data.get("label")
+    if label and level_label_taken(db, level.scale_id, label, exclude_id=level.level_id):
+        raise ConflictError("This grade label already exists in this scale")
+    for k, v in data.items():
+        if v is not None:
+            setattr(level, k, v)
+    db.commit()
+    db.refresh(level)
+    return level
+
+
+def delete_grade_level(db: Session, level) -> None:
+    db.delete(level)
     db.commit()

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import AliasChoices, BaseModel, Field
 
 
@@ -64,6 +66,7 @@ class SchoolStatusUpdate(BaseModel):
 class SchoolRead(SchoolBase):
     school_id: int
     status: str
+    marking_system: str = "marks"
     route_enabled: bool
     website_enabled: bool
     library_enabled: bool
@@ -90,3 +93,15 @@ class SchoolStats(BaseModel):
     staff: int
     students: int
     parents: int
+
+class MarkingSystemUpdate(BaseModel):
+    """Switch the school's marking system.
+
+    `confirm` is required when the school already has marks or published
+    examinations: switching only affects NEW examinations and entries
+    (published history keeps its captured format), and the confirmation
+    proves the admin saw the impact counts from the 409 response.
+    """
+
+    marking_system: Literal["marks", "grades"]
+    confirm: bool = False

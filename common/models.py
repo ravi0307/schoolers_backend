@@ -61,8 +61,15 @@ class School(AuditColumnsMixin, Base):
     library_enabled = Column(Boolean, nullable=False, default=False)
     fees_enabled = Column(Boolean, nullable=False, default=False)
     salary_enabled = Column(Boolean, nullable=False, default=False)
+    # Phase 2 (marks_feature): per-school marking system. 'marks' is the
+    # legacy behavior (numeric entry, global grade display); 'grades' uses
+    # the school's own grade scale. Published history keeps its own format
+    # per mark row, so switching never reinterprets the past.
+    marking_system = Column(String(10), nullable=False, default="marks", server_default="marks")
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (CheckConstraint("marking_system IN ('marks', 'grades')"),)
 
 
 class SchoolNotification(AuditColumnsMixin, Base):
@@ -198,6 +205,60 @@ class AcademicEvent(AuditColumnsMixin, Base):
         CheckConstraint("end_date >= start_date"),
         CheckConstraint("event_type IN ('exam_period', 'revision', 'result_date', 'other')"),
     )
+
+
+# ============================================================================
+# 2c. EXAMINATION CONFIG (Phase 2, marks_feature)
+# ============================================================================
+# School-owned examination types and grade scales. Grade scales are
+# versioned by copy-on-write: a scale row referenced (via its levels) by
+# published marks is frozen, and further edits require a new version.
+# Nothing here existed before; numeric entry assumed global 0-100 maxima
+# and ParentMarks hardcoded its grade bands.
+
+
+class ExaminationType(AuditColumnsMixin, Base):
+    __tablename__ = "examination_types"
+
+    type_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(60), nullable=False)
+    description = Column(String(255))
+    default_max_marks = Column(Integer, nullable=False, default=100, server_default="100")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "name"),
+        CheckConstraint("default_max_marks > 0"),
+    )
+
+
+class GradeScale(AuditColumnsMixin, Base):
+    __tablename__ = "grade_scales"
+
+    scale_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(60), nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    supersedes_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="SET NULL"))
+    effective_from = Column(Date)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (UniqueConstraint("school_id", "name", "version"),)
+
+
+class GradeLevel(AuditColumnsMixin, Base):
+    __tablename__ = "grade_levels"
+
+    level_id = Column(Integer, primary_key=True)
+    scale_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="CASCADE"), nullable=False)
+    label = Column(String(10), nullable=False)
+    rank = Column(Integer, nullable=False, default=0, server_default="0")
+    min_score = Column(Integer, nullable=True)
+    max_score = Column(Integer, nullable=True)
+    description = Column(String(255))
+
+    __table_args__ = (UniqueConstraint("scale_id", "label"),)
 
 
 # ============================================================================

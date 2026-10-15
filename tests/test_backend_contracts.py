@@ -169,6 +169,9 @@ class BackendContractTests(unittest.TestCase):
             "academic-years",
             "academic-periods",
             "academic-events",
+            "examination-types",
+            "grade-scales",
+            "grade-levels",
             "teachers",
             "staff",
             "students",
@@ -500,6 +503,41 @@ class BackendContractTests(unittest.TestCase):
             "academic_events",
             "IF NOT EXISTS",
             "event_type IN ('exam_period', 'revision', 'result_date', 'other')",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_examination_setup_endpoints_and_migration_contract(self):
+        """Phase 2: marking setting, types, and versioned scales are scoped."""
+        academics_router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        schools_router = (ROOT / "services" / "schools_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            "/examination-types",
+            "/grade-scales",
+            "/grade-scales/{scale_id}/new-version",
+            "/grade-levels/{level_id}",
+        ):
+            self.assertIn(f'"{route}"', academics_router)
+        self.assertIn('"/{school_id}/marking-system"', schools_router)
+        self.assertIn('require_role("master", "admin")', schools_router)
+        # The generic school update cannot smuggle the setting: only the
+        # dedicated marking-system endpoint carries it.
+        schemas_src = (ROOT / "services" / "schools_service" / "schemas.py").read_text(
+            encoding="utf-8"
+        )
+        update_body = schemas_src.split("class SchoolUpdate", 1)[1].split("\n\nclass ", 1)[0]
+        self.assertNotIn("marking_system", update_body)
+        migration = (ROOT / "db-migration-examination-setup.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "marking_system",
+            "examination_types",
+            "grade_scales",
+            "grade_levels",
+            "IF NOT EXISTS",
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, migration)

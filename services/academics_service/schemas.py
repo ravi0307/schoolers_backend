@@ -322,3 +322,143 @@ class AcademicEventRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---- Examination setup (Phase 2): types, grade scales ----
+
+
+def _clean_type_name(value: str) -> str:
+    return _clean_calendar_name(value, "Examination type name", 60)
+
+
+def _clean_optional_type_name(value: str | None) -> str | None:
+    return None if value is None else _clean_calendar_name(value, "Examination type name", 60)
+
+
+class ExaminationTypeCreate(BaseModel):
+    name: str
+    description: str | None = None
+    default_max_marks: int = 100
+
+    _validate_name = field_validator("name")(_clean_type_name)
+
+    @model_validator(mode="after")
+    def _positive_max(self):
+        if self.default_max_marks <= 0:
+            raise ValueError("Default maximum marks must be positive")
+        return self
+
+
+class ExaminationTypeUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    default_max_marks: int | None = None
+    is_active: bool | None = None
+
+    _validate_name = field_validator("name")(_clean_optional_type_name)
+
+    @model_validator(mode="after")
+    def _positive_max(self):
+        if self.default_max_marks is not None and self.default_max_marks <= 0:
+            raise ValueError("Default maximum marks must be positive")
+        return self
+
+
+class ExaminationTypeRead(BaseModel):
+    type_id: int
+    school_id: int
+    name: str
+    description: str | None
+    default_max_marks: int
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+def _clean_scale_name(value: str) -> str:
+    return _clean_calendar_name(value, "Grade scale name", 60)
+
+
+def _clean_optional_scale_name(value: str | None) -> str | None:
+    return None if value is None else _clean_calendar_name(value, "Grade scale name", 60)
+
+
+def _clean_grade_label(value: str) -> str:
+    label = value.strip()
+    if not label:
+        raise ValueError("Grade label cannot be blank")
+    if len(label) > 10:
+        raise ValueError("Grade label must be at most 10 characters")
+    return label
+
+
+class GradeScaleCreate(BaseModel):
+    name: str
+
+    _validate_name = field_validator("name")(_clean_scale_name)
+
+
+class GradeScaleUpdate(BaseModel):
+    name: str | None = None
+    is_active: bool | None = None
+
+    _validate_name = field_validator("name")(_clean_optional_scale_name)
+
+
+class GradeScaleRead(BaseModel):
+    scale_id: int
+    school_id: int
+    name: str
+    version: int
+    supersedes_id: int | None
+    effective_from: date | None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class GradeLevelCreate(BaseModel):
+    label: str
+    rank: int = 0
+    min_score: int | None = None
+    max_score: int | None = None
+    description: str | None = None
+
+    _validate_label = field_validator("label")(_clean_grade_label)
+
+    @model_validator(mode="after")
+    def _band_order(self):
+        if (
+            self.min_score is not None
+            and self.max_score is not None
+            and self.max_score < self.min_score
+        ):
+            raise ValueError("Grade max score cannot be below min score")
+        return self
+
+
+class GradeLevelUpdate(BaseModel):
+    label: str | None = None
+    rank: int | None = None
+    min_score: int | None = None
+    max_score: int | None = None
+    description: str | None = None
+
+    _validate_label = field_validator("label")(classmethod(
+        lambda cls, v: None if v is None else _clean_grade_label(v)
+    ))
+
+
+class GradeLevelRead(BaseModel):
+    level_id: int
+    scale_id: int
+    label: str
+    rank: int
+    min_score: int | None
+    max_score: int | None
+    description: str | None
+
+    class Config:
+        from_attributes = True
