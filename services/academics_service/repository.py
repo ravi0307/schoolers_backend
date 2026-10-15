@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from common.models import (
     SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
+    AcademicYear, AcademicPeriod, AcademicEvent,
 )
 from common.holidays import (
     expand_holiday_range,
@@ -403,3 +404,197 @@ def delete_holiday_group(db: Session, holiday: Holiday) -> int:
     return len(group)
     db.commit()
 
+
+
+# ---- Academic calendar (Phase 1): years, periods, dated events ----
+
+
+def list_years(db: Session, school_id: int) -> list[AcademicYear]:
+    """The school's academic years, newest first."""
+    return (
+        db.query(AcademicYear)
+        .filter(AcademicYear.school_id == school_id)
+        .order_by(AcademicYear.start_date.desc())
+        .all()
+    )
+
+
+def get_year(db: Session, school_id: int, year_id: int) -> AcademicYear | None:
+    return (
+        db.query(AcademicYear)
+        .filter(AcademicYear.school_id == school_id, AcademicYear.year_id == year_id)
+        .first()
+    )
+
+
+def year_name_taken(db: Session, school_id: int, name: str, exclude_id: int | None = None) -> bool:
+    query = db.query(AcademicYear).filter(
+        AcademicYear.school_id == school_id, AcademicYear.name == name
+    )
+    if exclude_id is not None:
+        query = query.filter(AcademicYear.year_id != exclude_id)
+    return query.first() is not None
+
+
+def create_year(db: Session, school_id: int, data: dict) -> AcademicYear:
+    if year_name_taken(db, school_id, data["name"]):
+        raise ConflictError("An academic year with this name already exists for this school")
+    year = AcademicYear(school_id=school_id, **data)
+    db.add(year)
+    db.commit()
+    db.refresh(year)
+    return year
+
+
+def update_year(db: Session, year: AcademicYear, data: dict) -> AcademicYear:
+    name = data.get("name")
+    if name and year_name_taken(db, year.school_id, name, exclude_id=year.year_id):
+        raise ConflictError("An academic year with this name already exists for this school")
+    start = data.get("start_date", year.start_date)
+    end = data.get("end_date", year.end_date)
+    if end <= start:
+        raise AppError("The year end date must be after the start date", status_code=400)
+    for k, v in data.items():
+        if v is not None:
+            setattr(year, k, v)
+    db.commit()
+    db.refresh(year)
+    return year
+
+
+def list_periods(db: Session, year_id: int) -> list[AcademicPeriod]:
+    return (
+        db.query(AcademicPeriod)
+        .filter(AcademicPeriod.year_id == year_id)
+        .order_by(AcademicPeriod.start_date)
+        .all()
+    )
+
+
+def get_period_in_school(db: Session, school_id: int, period_id: int) -> AcademicPeriod | None:
+    """A period plus its year, both constrained to the caller's school."""
+    return (
+        db.query(AcademicPeriod)
+        .join(AcademicYear, AcademicYear.year_id == AcademicPeriod.year_id)
+        .filter(AcademicPeriod.period_id == period_id, AcademicYear.school_id == school_id)
+        .first()
+    )
+
+
+def period_name_taken(
+    db: Session, year_id: int, name: str, exclude_id: int | None = None
+) -> bool:
+    query = db.query(AcademicPeriod).filter(
+        AcademicPeriod.year_id == year_id, AcademicPeriod.name == name
+    )
+    if exclude_id is not None:
+        query = query.filter(AcademicPeriod.period_id != exclude_id)
+    return query.first() is not None
+
+
+def period_overlaps(
+    db: Session,
+    year_id: int,
+    start_date,
+    end_date,
+    exclude_id: int | None = None,
+) -> bool:
+    """True when [start_date, end_date] intersects any sibling period."""
+    query = db.query(AcademicPeriod).filter(
+        AcademicPeriod.year_id == year_id,
+        AcademicPeriod.start_date <= end_date,
+        AcademicPeriod.end_date >= start_date,
+    )
+    if exclude_id is not None:
+        query = query.filter(AcademicPeriod.period_id != exclude_id)
+    return query.first() is not None
+
+
+def create_period(db: Session, year: AcademicYear, data: dict) -> AcademicPeriod:
+    if period_name_taken(db, year.year_id, data["name"]):
+        raise ConflictError("A period with this name already exists for this academic year")
+    if data["start_date"] < year.start_date or data["end_date"] > year.end_date:
+        raise AppError("The period must fall within its academic year", status_code=400)
+    if period_overlaps(db, year.year_id, data["start_date"], data["end_date"]):
+        raise ConflictError("The period overlaps another period in this academic year")
+    period = AcademicPeriod(year_id=year.year_id, **data)
+    db.add(period)
+    db.commit()
+    db.refresh(period)
+    return period
+
+
+def update_period_entry(db: Session, period: AcademicPeriod, data: dict) -> AcademicPeriod:
+    name = data.get("name")
+    if name and period_name_taken(db, period.year_id, name, exclude_id=period.period_id):
+        raise ConflictError("A period with this name already exists for this academic year")
+    start = data.get("start_date", period.start_date)
+    end = data.get("end_date", period.end_date)
+    year = db.query(AcademicYear).filter(AcademicYear.year_id == period.year_id).first()
+    if year is not None and (start < year.start_date or end > year.end_date):
+        raise AppError("The period must fall within its academic year", status_code=400)
+    if period_overlaps(db, period.year_id, start, end, exclude_id=period.period_id):
+        raise ConflictError("The period overlaps another period in this academic year")
+    for k, v in data.items():
+        if v is not None:
+            setattr(period, k, v)
+    db.commit()
+    db.refresh(period)
+    return period
+
+
+def list_events(
+    db: Session, school_id: int, year_id: int | None = None
+) -> list[AcademicEvent]:
+    """Dated non-closure events, soonest first, optionally for one year."""
+    query = db.query(AcademicEvent).filter(AcademicEvent.school_id == school_id)
+    if year_id is not None:
+        query = query.filter(AcademicEvent.year_id == year_id)
+    return query.order_by(AcademicEvent.start_date).all()
+
+
+def get_event(db: Session, school_id: int, event_id: int) -> AcademicEvent | None:
+    return (
+        db.query(AcademicEvent)
+        .filter(AcademicEvent.school_id == school_id, AcademicEvent.event_id == event_id)
+        .first()
+    )
+
+
+def create_event(db: Session, school_id: int, data: dict) -> AcademicEvent:
+    year_id = data.get("year_id")
+    if year_id is not None and get_year(db, school_id, year_id) is None:
+        raise NotFoundError("Academic year not found")
+    end = data.get("end_date") or data["start_date"]
+    event = AcademicEvent(
+        school_id=school_id,
+        year_id=year_id,
+        event_type=data["event_type"],
+        title=data["title"],
+        start_date=data["start_date"],
+        end_date=end,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def update_event(db: Session, event: AcademicEvent, data: dict) -> AcademicEvent:
+    if "year_id" in data and data["year_id"] is not None:
+        if get_year(db, event.school_id, data["year_id"]) is None:
+            raise NotFoundError("Academic year not found")
+    for k, v in data.items():
+        # year_id may be explicitly cleared (unlink from the year).
+        if v is not None or k == "year_id":
+            setattr(event, k, v)
+    if event.end_date < event.start_date:
+        raise AppError("The event end date cannot be before the start date", status_code=400)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def delete_event(db: Session, event: AcademicEvent) -> None:
+    db.delete(event)
+    db.commit()

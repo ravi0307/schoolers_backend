@@ -166,6 +166,9 @@ class BackendContractTests(unittest.TestCase):
             "subjects",
             "periods",
             "holidays",
+            "academic-years",
+            "academic-periods",
+            "academic-events",
             "teachers",
             "staff",
             "students",
@@ -471,6 +474,35 @@ class BackendContractTests(unittest.TestCase):
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, migrations)
+
+    def test_academic_calendar_endpoints_and_migration_contract(self):
+        """Phase 1: years/periods/events are school-scoped with admin writes."""
+        router = (ROOT / "services" / "academics_service" / "router.py").read_text(encoding="utf-8")
+        for route in ("/academic-years", "/academic-periods", "/academic-events"):
+            self.assertIn(f'"{route}"', router)
+        # Writes are admin-only; reads include parent/teacher/admin.
+        self.assertIn('require_role("admin")', router)
+        self.assertIn('require_role("parent", "teacher", "admin")', router)
+        self.assertIn("require_school_scope", router)
+        # Years/periods deactivate instead of deleting; only events delete.
+        deletes = re.findall(r'@router\.delete\("([^"]+)"', router)
+        self.assertIn("/academic-events/{event_id}", deletes)
+        for path in deletes:
+            self.assertFalse(
+                path.startswith("/academic-years/") or path.startswith("/academic-periods/"),
+                f"unexpected delete route {path}: years/periods deactivate, never delete",
+            )
+        # The migration is a separate idempotent file (repo convention).
+        migration = (ROOT / "db-migration-academic-calendar.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "academic_years",
+            "academic_periods",
+            "academic_events",
+            "IF NOT EXISTS",
+            "event_type IN ('exam_period', 'revision', 'result_date', 'other')",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
 
     def test_media_read_schema_exposes_created_at(self):
         """MediaRead must carry created_at so gallery albums display timestamps."""

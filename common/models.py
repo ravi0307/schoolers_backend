@@ -140,6 +140,67 @@ class Holiday(AuditColumnsMixin, Base):
 
 
 # ============================================================================
+# 2b. ACADEMIC CALENDAR (Phase 1, marks_feature)
+# ============================================================================
+# Years and periods give examinations their temporal context. Nothing here
+# existed before: terms were free-text on marks rows and `Period` is the
+# daily bell schedule, not an academic term. Events cover dated non-closure
+# periods (exam windows, revision weeks, result dates); the holidays table
+# stays exactly as it is (closures only).
+
+
+class AcademicYear(AuditColumnsMixin, Base):
+    __tablename__ = "academic_years"
+
+    year_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(20), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    is_founding = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "name"),
+        CheckConstraint("end_date > start_date"),
+    )
+
+
+class AcademicPeriod(AuditColumnsMixin, Base):
+    __tablename__ = "academic_periods"
+
+    period_id = Column(Integer, primary_key=True)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(40), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        UniqueConstraint("year_id", "name"),
+        CheckConstraint("end_date > start_date"),
+    )
+
+
+class AcademicEvent(AuditColumnsMixin, Base):
+    __tablename__ = "academic_events"
+
+    event_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="SET NULL"), nullable=True)
+    event_type = Column(String(20), nullable=False)
+    title = Column(String(150), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        CheckConstraint("end_date >= start_date"),
+        CheckConstraint("event_type IN ('exam_period', 'revision', 'result_date', 'other')"),
+    )
+
+
+# ============================================================================
 # 3. PEOPLE
 # ============================================================================
 

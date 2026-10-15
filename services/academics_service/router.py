@@ -8,6 +8,9 @@ import repository as repo
 from schemas import (
     ClassCreate, ClassUpdate, ClassRead, SubjectRead, SubjectCreate, SubjectUpdate,
     PeriodRead, PeriodUpdate, HolidayRead, HolidayCreate, HolidayUpdate,
+    AcademicYearCreate, AcademicYearUpdate, AcademicYearRead,
+    AcademicPeriodCreate, AcademicPeriodUpdate, AcademicPeriodRead,
+    AcademicEventCreate, AcademicEventUpdate, AcademicEventRead,
 )
 
 router = APIRouter(tags=["academics"])
@@ -209,4 +212,130 @@ def delete_holiday(
     if holiday is None:
         raise NotFoundError("Holiday not found")
     repo.delete_holiday_group(db, holiday)
+    return Response(status_code=204)
+
+
+# ---- Academic calendar (Phase 1): years, periods, dated events ----
+
+
+@router.get("/academic-years", response_model=list[AcademicYearRead])
+def list_academic_years(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    return repo.list_years(db, school_id)
+
+
+@router.post("/academic-years", response_model=AcademicYearRead, status_code=201)
+def create_academic_year(
+    payload: AcademicYearCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_year(db, school_id, payload.model_dump())
+
+
+@router.patch("/academic-years/{year_id}", response_model=AcademicYearRead)
+def update_academic_year(
+    year_id: int,
+    payload: AcademicYearUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    year = repo.get_year(db, school_id, year_id)
+    if year is None:
+        raise NotFoundError("Academic year not found")
+    return repo.update_year(db, year, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/academic-periods", response_model=list[AcademicPeriodRead])
+def list_academic_periods(
+    year_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    # The year must belong to the caller's school before its periods are read.
+    if repo.get_year(db, school_id, year_id) is None:
+        raise NotFoundError("Academic year not found")
+    return repo.list_periods(db, year_id)
+
+
+@router.post("/academic-periods", response_model=AcademicPeriodRead, status_code=201)
+def create_academic_period(
+    payload: AcademicPeriodCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    year = repo.get_year(db, school_id, payload.year_id)
+    if year is None:
+        raise NotFoundError("Academic year not found")
+    return repo.create_period(db, year, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/academic-periods/{period_id}", response_model=AcademicPeriodRead)
+def update_academic_period(
+    period_id: int,
+    payload: AcademicPeriodUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    period = repo.get_period_in_school(db, school_id, period_id)
+    if period is None:
+        raise NotFoundError("Academic period not found")
+    return repo.update_period_entry(db, period, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/academic-events", response_model=list[AcademicEventRead])
+def list_academic_events(
+    year_id: int | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    if year_id is not None and repo.get_year(db, school_id, year_id) is None:
+        raise NotFoundError("Academic year not found")
+    return repo.list_events(db, school_id, year_id)
+
+
+@router.post("/academic-events", response_model=AcademicEventRead, status_code=201)
+def create_academic_event(
+    payload: AcademicEventCreate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    return repo.create_event(db, school_id, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/academic-events/{event_id}", response_model=AcademicEventRead)
+def update_academic_event(
+    event_id: int,
+    payload: AcademicEventUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    event = repo.get_event(db, school_id, event_id)
+    if event is None:
+        raise NotFoundError("Academic event not found")
+    return repo.update_event(db, event, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/academic-events/{event_id}", status_code=204)
+def delete_academic_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    event = repo.get_event(db, school_id, event_id)
+    if event is None:
+        raise NotFoundError("Academic event not found")
+    repo.delete_event(db, event)
     return Response(status_code=204)
