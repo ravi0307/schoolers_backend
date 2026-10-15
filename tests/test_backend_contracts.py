@@ -375,11 +375,26 @@ class BackendContractTests(unittest.TestCase):
         self.assertIn("updated_by_user=current_user.user_id", router)
 
         # Existence + per-role scope helpers used by the read/write guards.
-        for helper in ("student_exists", "subject_exists", "student_in_school", "teacher_teaches_student"):
+        for helper in ("subject_exists", "student_in_school", "teacher_teaches_student"):
             self.assertIn(helper, repository)
             self.assertIn(helper, router)
         self.assertIn("NotFoundError", router)
         self.assertIn('current_user.role == "teacher"', router)
+
+        # Phase 0 existence-oracle fix: the marks router must not run an
+        # unscoped existence probe before the school/role checks, or unknown
+        # ids (404) become distinguishable from out-of-school ids (403).
+        # The helper stays in the repository (other callers use it); the
+        # router reaches it through scoped checks only.
+        self.assertIn("student_exists", repository)
+        self.assertNotIn("repo.student_exists", router)
+
+        # Phase 0 master read-only access: reads name the school explicitly,
+        # writes stay teacher/admin-only.
+        self.assertIn('"master"', router)
+        self.assertIn("Master access requires an explicit school_id", router)
+        put_decorator = router.split("def upsert_mark")[0].rsplit("@router.put(", 1)[1]
+        self.assertNotIn("master", put_decorator)
 
     def test_attendance_status_and_teacher_scope_contract(self):
         schema = (ROOT / "services" / "attendance_service" / "schemas.py").read_text(encoding="utf-8")

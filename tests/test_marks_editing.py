@@ -125,6 +125,17 @@ class MarksEditingTests(unittest.TestCase):
         got = {(r.student_id, r.subject_id) for r in rows}
         self.assertEqual(got, {(1, 3), (1, 5)})
 
+    def test_get_for_class_term_filter_applies_in_query(self):
+        # Phase 0: the term filter moved from Python post-filtering into the
+        # query so scoped reads never over-fetch before filtering.
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=70, updated_by=7)
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 2", score=75, updated_by=7)
+        t1 = repo.get_for_class(self.db, class_id=1, term="Term 1")
+        self.assertEqual([(r.term, r.score) for r in t1], [("Term 1", 70)])
+        t2 = repo.get_for_class(self.db, class_id=1, term="Term 2")
+        self.assertEqual([(r.term, r.score) for r in t2], [("Term 2", 75)])
+        self.assertEqual(len(repo.get_for_class(self.db, class_id=1)), 2)
+
     def test_upsert_records_admin_audit_as_user_id_only(self):
         # Admins have no teacher row, so updated_by stays None while the
         # acting user id is still recorded for the audit trail.

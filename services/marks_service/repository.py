@@ -77,12 +77,21 @@ def get_subject_ids_for_class(db: Session, teacher_id: int, class_id: int) -> li
     return [row[0] for row in rows]
 
 
-def get_for_class(db: Session, class_id: int, subject_ids: list[int] | None = None) -> list[Mark]:
-    """All marks for students of one class, optionally limited to subjects."""
+def get_for_class(
+    db: Session,
+    class_id: int,
+    subject_ids: list[int] | None = None,
+    term: str | None = None,
+) -> list[Mark]:
+    """All marks for students of one class, optionally limited to subjects
+    and term. The term filter lives in the query (not Python post-filtering)
+    so scoped reads never over-fetch before filtering."""
     student_ids = db.query(Student.student_id).filter(Student.class_id == class_id)
     q = db.query(Mark).filter(Mark.student_id.in_(student_ids))
     if subject_ids is not None:
         q = q.filter(Mark.subject_id.in_(subject_ids))
+    if term is not None:
+        q = q.filter(Mark.term == term)
     return q.all()
 
 

@@ -548,10 +548,19 @@ def link_parent_student(db: Session, parent_id: int, student_id: int) -> None:
 
 
 def children_of_parent(db: Session, parent_id: int) -> list[Student]:
+    # Phase 0 school guard: a linkage row alone is not trusted across
+    # schools. The join requires parent and student to share a school, so
+    # corrupt or guessed linkages spanning schools return nothing instead
+    # of leaking the other school's children.
     return (
         db.query(Student)
         .join(ParentStudent, ParentStudent.student_id == Student.student_id)
-        .filter(ParentStudent.parent_id == parent_id, Student.is_active.is_(True))
+        .join(Parent, Parent.parent_id == ParentStudent.parent_id)
+        .filter(
+            ParentStudent.parent_id == parent_id,
+            Student.is_active.is_(True),
+            Student.school_id == Parent.school_id,
+        )
         .all()
     )
 
