@@ -352,10 +352,15 @@ class BackendContractTests(unittest.TestCase):
         self.assertIn("upsert_mark", repository)
 
         # Shared schema guarantees: term default "Term 1" and score 0..100,
-        # riding on the (student_id, subject_id, term) unique upsert target.
+        # riding on the legacy session-less upsert target. Phase 4 splits
+        # identity into two partial uniques (legacy vs session rows) plus a
+        # payload-coherence check; the old bare unique is gone by design.
         self.assertIn('term: str = "Term 1"', schema)
         self.assertIn("ge=0, le=100", schema)
-        self.assertIn('UniqueConstraint("student_id", "subject_id", "term")', model)
+        self.assertIn('"marks_legacy_unique"', model)
+        self.assertIn('"marks_session_unique"', model)
+        self.assertIn("marks_payload_coherence", model)
+        self.assertIn("examination_session_id IS NULL", model)
 
     def test_parent_reads_are_scoped_to_own_children(self):
         """Parents must not read other families' marks/attendance/children."""
@@ -572,6 +577,38 @@ class BackendContractTests(unittest.TestCase):
             "examinations",
             "examination_sessions",
             "examination_session_versions",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_marks_lifecycle_endpoints_and_migration_contract(self):
+        """Phase 4: session lifecycle, corrections, and bulk pipeline exist."""
+        router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/session-marks"',
+            '"/sessions/{session_id}/submit"',
+            '"/sessions/{session_id}/publish"',
+            '"/withhold"',
+            '"/unwithhold"',
+            '"/{mark_id}/correct"',
+            '"/import/template"',
+            '"/import"',
+            '"/import/{batch_id}/commit"',
+            '"/export"',
+        ):
+            self.assertIn(route, router)
+        migration = (ROOT / "db-migration-marks-lifecycle.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "marks_legacy_unique",
+            "marks_session_unique",
+            "marks_payload_coherence",
+            "mark_corrections",
+            "mark_import_batches",
+            "mark_import_rows",
+            "WHERE examination_session_id IS NULL",
             "IF NOT EXISTS",
         ):
             with self.subTest(fragment=fragment):

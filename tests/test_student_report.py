@@ -97,7 +97,9 @@ class StudentReportTests(unittest.TestCase):
 
     def add_marks(self, student_id, term, subject_id, score):
         self.db.add(Mark(student_id=student_id, subject_id=subject_id,
-                         term=term, score=score))
+                         term=term, score=score, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False))
         self.db.commit()
 
     def add_attendance(self, student_id, day, status, class_id=1):

@@ -1,11 +1,16 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
+import bulk
 import repository as repo
-from schemas import MarkUpsert, MarkRead
+from schemas import (
+    MarkUpsert, MarkRead, SessionMarkCreate, SessionMarkUpdate,
+    WithholdPayload, UnwithholdPayload, CorrectMarkPayload, MarkReadV2,
+)
 
 router = APIRouter(prefix="/marks", tags=["marks"])
 
@@ -53,6 +58,10 @@ def get_student_marks(
     elif not repo.student_in_school(db, student_id, current_user.school_id):
         raise NotFoundError("Student not found")
 
+    # Parents see published results only, never drafts and never withheld
+    # rows; staff views keep everything so drafts carry visible badges.
+    if current_user.role == "parent":
+        return repo.get_for_student(db, student_id, published_only=True, include_withheld=False)
     return repo.get_for_student(db, student_id)
 
 
@@ -114,4 +123,219 @@ def upsert_mark(
     return repo.upsert_mark(
         db, student_id, subject_id, payload.term, payload.score,
         updated_by, updated_by_user=current_user.user_id,
+    )
+
+
+# ---- Session marks lifecycle (Phase 4) ----
+
+
+def _session_and_exam(db: Session, school_id: int, session_id: int):
+    session, exam = repo.get_session_in_school(db, school_id, session_id)
+    if session is None or exam is None:
+        raise NotFoundError("Examination session not found")
+    return session, exam
+
+
+def _require_session_grader(db: Session, current_user: CurrentUser, session) -> None:
+    """Teacher assigned to the session's class+subject, or own-school admin."""
+    if current_user.role == "teacher":
+        if not current_user.linked_person_id or not repo.teacher_assigned(
+            db, current_user.linked_person_id, session.class_id, session.subject_id
+        ):
+            raise ForbiddenError("You don't teach this examination session")
+
+
+@router.post("/session-marks", response_model=MarkReadV2, status_code=201)
+def create_session_mark(
+    payload: SessionMarkCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    session, exam = _session_and_exam(db, current_user.school_id, payload.session_id)
+    _require_session_grader(db, current_user, session)
+    return repo.create_session_mark(
+        db, session, exam, payload.student_id, payload.subject_id,
+        payload.model_dump(exclude_unset=True), current_user.user_id,
+    )
+
+
+@router.patch("/{mark_id}", response_model=MarkReadV2)
+def update_mark(
+    mark_id: int,
+    payload: SessionMarkUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    mark = repo.get_mark_in_school(db, current_user.school_id, mark_id)
+    if mark is None:
+        raise NotFoundError("Mark not found")
+    if mark.examination_session_id is None:
+        raise ForbiddenError("Term marks use PUT /marks/{student_id}/{subject_id}")
+    session, _ = _session_and_exam(db, current_user.school_id, mark.examination_session_id)
+    _require_session_grader(db, current_user, session)
+    return repo.update_session_mark(db, mark, payload.model_dump(exclude_unset=True))
+
+
+@router.post("/sessions/{session_id}/submit")
+def submit_session_marks(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    session, _ = _session_and_exam(db, current_user.school_id, session_id)
+    _require_session_grader(db, current_user, session)
+    return repo.submit_session_marks(db, session)
+
+
+@router.post("/sessions/{session_id}/publish")
+def publish_session_marks(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    # Publishing is admin-only; require_school_scope is folded into the
+    # session lookup so cross-school ids are a uniform 404.
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    session, _ = _session_and_exam(db, current_user.school_id, session_id)
+    return repo.publish_session_marks(db, session)
+
+
+@router.post("/withhold")
+def withhold_marks(
+    payload: WithholdPayload,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    rows = repo.get_marks_in_school(db, current_user.school_id, payload.mark_ids)
+    if len(rows) != len(set(payload.mark_ids)):
+        raise NotFoundError("Mark not found")
+    return repo.withhold_marks(db, [m.mark_id for m in rows], payload.reason, current_user.user_id)
+
+
+@router.post("/unwithhold")
+def unwithhold_marks(
+    payload: UnwithholdPayload,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    rows = repo.get_marks_in_school(db, current_user.school_id, payload.mark_ids)
+    if len(rows) != len(set(payload.mark_ids)):
+        raise NotFoundError("Mark not found")
+    return repo.unwithhold_marks(db, [m.mark_id for m in rows])
+
+
+@router.post("/{mark_id}/correct", response_model=MarkReadV2)
+def correct_mark(
+    mark_id: int,
+    payload: CorrectMarkPayload,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    mark = repo.get_mark_in_school(db, current_user.school_id, mark_id)
+    if mark is None:
+        raise NotFoundError("Mark not found")
+    if mark.examination_session_id is None:
+        raise ForbiddenError("Term marks use PUT /marks/{student_id}/{subject_id}")
+    data = payload.model_dump(exclude_unset=True)
+    mark, _ = repo.correct_mark(db, mark, data, payload.reason, current_user.user_id)
+    return mark
+
+
+# ---- Bulk CSV import/export (Phase 4) ----
+
+
+@router.get("/import/template", response_class=PlainTextResponse)
+def import_template(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    """Starter CSV for a session: one row per active class student."""
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    session, _ = _session_and_exam(db, current_user.school_id, session_id)
+    _require_session_grader(db, current_user, session)
+    return PlainTextResponse(
+        bulk.render_template(db, session),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=marks-session-{session_id}.csv"},
+    )
+
+
+@router.post("/import")
+def preview_import(
+    session_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    """Validate a spreadsheet, write a preview batch, commit nothing."""
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    session, exam = _session_and_exam(db, current_user.school_id, session_id)
+    _require_session_grader(db, current_user, session)
+    batch, receipt = bulk.preview_upload(
+        db, current_user.school_id, session, exam,
+        file.filename or "upload.csv", file.file.read(), current_user.user_id,
+    )
+    return {
+        "batch_id": batch.batch_id,
+        "status": batch.status,
+        "rows": receipt,
+        "summary": {
+            verdict: sum(1 for r in receipt if r["verdict"] == verdict)
+            for verdict in ("valid", "invalid", "warning")
+        },
+    }
+
+
+@router.post("/import/{batch_id}/commit")
+def commit_import(
+    batch_id: int,
+    apply_partial: bool = False,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    """Commit a previewed batch. All-or-nothing unless an admin explicitly
+    opts into partial application; invalid rows never write either way."""
+    batch = (
+        db.query(bulk.MarkImportBatch)
+        .filter(bulk.MarkImportBatch.batch_id == batch_id)
+        .first()
+    )
+    if batch is None or (
+        current_user.school_id is not None and batch.school_id != current_user.school_id
+    ):
+        raise NotFoundError("Import batch not found")
+    session, _ = _session_and_exam(db, batch.school_id, batch.session_id)
+    _require_session_grader(db, current_user, session)
+    return bulk.commit_batch(
+        db, batch, apply_partial, is_admin=(current_user.role == "admin")
+    )
+
+
+@router.get("/export", response_class=PlainTextResponse)
+def export_marks(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    """Authorized CSV export for one session, formula-injection guarded."""
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    session, _ = _session_and_exam(db, current_user.school_id, session_id)
+    _require_session_grader(db, current_user, session)
+    rows = repo.get_for_class(db, session.class_id)
+    rows = [m for m in rows if m.examination_session_id == session_id]
+    return PlainTextResponse(
+        bulk.export_session_csv(db, session, rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=marks-session-{session_id}.csv"},
     )

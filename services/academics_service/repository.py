@@ -8,6 +8,7 @@ from common.models import (
     AcademicYear, AcademicPeriod, AcademicEvent,
     ExaminationType, GradeScale, GradeLevel,
     Examination, ExaminationSession, ExaminationSessionVersion,
+    Mark,
 )
 from common.holidays import (
     expand_holiday_range,
@@ -793,6 +794,17 @@ def update_grade_level(db: Session, level, data: dict):
 
 
 def delete_grade_level(db: Session, level) -> None:
+    # A level referenced by ANY mark cannot be removed: draft references
+    # would dangle (the DB RESTRICT backstop agrees), and submitted or
+    # published references are frozen history. Clear or reassign the marks
+    # first, then delete. Copy-on-write new versions for scale evolution.
+    refs = (
+        db.query(Mark.mark_id).filter(Mark.grade_level_id == level.level_id).count()
+    )
+    if refs:
+        raise ConflictError(
+            "This grade is used by existing results and cannot be deleted"
+        )
     db.delete(level)
     db.commit()
 
@@ -1097,6 +1109,23 @@ def update_session(db: Session, exam, session, user_id: int | None, data: dict, 
     blocking, warnings = check_session_conflicts(db, exam.school_id, **merged)
     if blocking:
         raise ConflictError("; ".join(blocking))
+    # Phase 4 guard: entered scores are captured on their mark rows, so
+    # lowering the session maximum below an entered score is refused here
+    # rather than silently invalidating published results.
+    if "max_marks" in changes:
+        top = (
+            db.query(func.max(Mark.score))
+            .filter(
+                Mark.examination_session_id == session.session_id,
+                Mark.assessment_status == "present",
+                Mark.score.is_not(None),
+            )
+            .scalar()
+        )
+        if top is not None and changes["max_marks"] < top:
+            raise ConflictError(
+                f"Maximum marks cannot drop below the highest entered score ({top})"
+            )
     # Touching date/time/venue of a published session marks it rescheduled.
     if exam.status != "draft" and any(k in changes for k in ("date", "start_time", "end_time", "venue")):
         changes["status"] = "rescheduled"

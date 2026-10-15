@@ -512,8 +512,12 @@ class MarksOracleAndMasterTests(unittest.TestCase):
             Parent(parent_id=225, school_id=1, name="Mrs Sinha", phone="9000000001"),
             ParentStudent(parent_id=225, student_id=1),
             TeacherClassSubject(staff_id=7, class_id=1, subject_id=3),
-            Mark(student_id=1, subject_id=3, term="Term 1", score=80),
-            Mark(student_id=1, subject_id=3, term="Term 2", score=85),
+            Mark(student_id=1, subject_id=3, term="Term 1", score=80, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
+            Mark(student_id=1, subject_id=3, term="Term 2", score=85, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
         ])
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)

@@ -55,12 +55,20 @@ class MarksEditingTests(unittest.TestCase):
         self.db.rollback()
         self.db.close()
 
-    def test_schema_declares_unique_constraint_for_upsert_target(self):
-        """The upsert target (student_id, subject_id, term) must be unique."""
+    def test_schema_declares_partial_uniques_for_legacy_and_session_marks(self):
+        """Phase 4: legacy (student, subject, term) uniqueness applies only
+        to session-less rows; session rows are unique per (session, student).
+        Two examinations can now hold marks for one student+subject+term."""
         inspector = inspect(self.engine)
-        uniques = inspector.get_unique_constraints("marks")
-        names = {tuple(sorted(u["column_names"])) for u in uniques}
-        self.assertIn(("student_id", "subject_id", "term"), names)
+        indexes = {ix["name"]: ix for ix in inspector.get_indexes("marks")}
+        legacy = indexes["marks_legacy_unique"]
+        self.assertTrue(legacy["unique"])
+        self.assertEqual(sorted(legacy["column_names"]), ["student_id", "subject_id", "term"])
+        session_ix = indexes["marks_session_unique"]
+        self.assertTrue(session_ix["unique"])
+        self.assertEqual(
+            sorted(session_ix["column_names"]), ["examination_session_id", "student_id"]
+        )
 
     def test_upsert_creates_mark(self):
         mark = repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=88, updated_by=7)

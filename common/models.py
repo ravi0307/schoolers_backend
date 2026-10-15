@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
-    Numeric, UniqueConstraint, CheckConstraint, func, text, JSON
+    Numeric, UniqueConstraint, CheckConstraint, Index, func, text, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -685,21 +685,143 @@ class Attendance(AuditColumnsMixin, Base):
 
 
 class Mark(AuditColumnsMixin, Base):
+    """One student's assessment in one subject.
+
+    Two disjoint identity scopes (Phase 4, marks_feature):
+    - legacy rows (examination_session_id IS NULL) keep the original
+      (student_id, subject_id, term) uniqueness and 0-100 behavior;
+    - session rows belong to exactly one examination session and are
+      unique per (session, student); the subject is the session's own.
+    Workflow (draft/submitted/published) is independent from assessment
+    (present/absent/missing/exempt); is_withheld suppresses a published
+    row without touching either status. result_format/max_marks are
+    captured at publish so later edits cannot rewrite history.
+    """
+
     __tablename__ = "marks"
 
     mark_id = Column(Integer, primary_key=True)
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
     term = Column(String(20), nullable=False, default="Term 1")
-    score = Column(Integer, nullable=False)
+    score = Column(Integer, nullable=True)
+    max_marks = Column(Integer, nullable=True)
+    grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"), nullable=True)
+    result_format = Column(String(10), nullable=False, default="marks", server_default="marks")
+    workflow_status = Column(String(20), nullable=False, default="draft", server_default="draft")
+    assessment_status = Column(String(20), nullable=False, default="present", server_default="present")
+    is_withheld = Column(Boolean, nullable=False, default=False, server_default="false")
+    withheld_reason = Column(String(255))
+    withheld_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    withheld_at = Column(DateTime)
+    examination_session_id = Column(
+        Integer, ForeignKey("examination_sessions.session_id", ondelete="RESTRICT"), nullable=True
+    )
     updated_by = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
     updated_by_user = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
-        UniqueConstraint("student_id", "subject_id", "term"),
-        CheckConstraint("score BETWEEN 0 AND 100"),
+        # Legacy identity survives only for session-less rows.
+        Index(
+            "marks_legacy_unique", "student_id", "subject_id", "term",
+            unique=True,
+            postgresql_where=text("examination_session_id IS NULL"),
+            sqlite_where=text("examination_session_id IS NULL"),
+        ),
+        # Session identity: one mark per student per session.
+        Index(
+            "marks_session_unique", "examination_session_id", "student_id",
+            unique=True,
+            postgresql_where=text("examination_session_id IS NOT NULL"),
+            sqlite_where=text("examination_session_id IS NOT NULL"),
+        ),
+        CheckConstraint("score IS NULL OR score >= 0", name="marks_score_nonnegative"),
+        CheckConstraint("max_marks IS NULL OR max_marks > 0", name="marks_max_positive"),
+        CheckConstraint("result_format IN ('marks', 'grade')", name="marks_format_check"),
+        CheckConstraint(
+            "workflow_status IN ('draft', 'submitted', 'published')",
+            name="marks_workflow_check",
+        ),
+        CheckConstraint(
+            "assessment_status IN ('present', 'absent', 'missing', 'exempt')",
+            name="marks_assessment_check",
+        ),
+        # Payload coherence per format: exactly one payload kind, and
+        # non-present assessments carry neither score nor grade.
+        CheckConstraint(
+            "(assessment_status = 'present' AND result_format = 'marks'"
+            " AND score IS NOT NULL AND max_marks IS NOT NULL AND grade_level_id IS NULL)"
+            " OR (assessment_status = 'present' AND result_format = 'grade'"
+            " AND grade_level_id IS NOT NULL AND score IS NULL)"
+            " OR (assessment_status IN ('absent', 'missing', 'exempt')"
+            " AND score IS NULL AND grade_level_id IS NULL)",
+            name="marks_payload_coherence",
+        ),
     )
+
+
+class MarkCorrection(AuditColumnsMixin, Base):
+    """Append-only record of every post-publish mark change (Phase 4).
+
+    Published rows change ONLY through this flow: the correction stores
+    both sides, who reasoned it, and who approved it. The original value
+    stays auditable here even after the mark row moves on.
+    """
+
+    __tablename__ = "mark_corrections"
+
+    correction_id = Column(Integer, primary_key=True)
+    mark_id = Column(Integer, ForeignKey("marks.mark_id", ondelete="CASCADE"), nullable=False)
+    old_score = Column(Integer, nullable=True)
+    old_grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"))
+    new_score = Column(Integer, nullable=True)
+    new_grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"))
+    reason = Column(String(255), nullable=False)
+    corrected_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    corrected_at = Column(DateTime, server_default=func.now())
+    approved_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    approved_at = Column(DateTime)
+
+
+class MarkImportBatch(AuditColumnsMixin, Base):
+    """One spreadsheet upload: previewed, then committed atomically (Phase 4).
+
+    Idempotent retry: (school_id, file_hash, scope-hash) is unique, so a
+    repeated upload returns the prior receipt instead of duplicating rows.
+    """
+
+    __tablename__ = "mark_import_batches"
+
+    batch_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    source_filename = Column(String(255), nullable=False)
+    file_hash = Column(String(64), nullable=False)
+    scope_hash = Column(String(64), nullable=False)
+    session_id = Column(Integer, ForeignKey("examination_sessions.session_id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False, default="preview", server_default="preview")
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "file_hash", "scope_hash"),
+        CheckConstraint("status IN ('preview', 'committed', 'failed')"),
+    )
+
+
+class MarkImportRow(AuditColumnsMixin, Base):
+    __tablename__ = "mark_import_rows"
+
+    row_id = Column(Integer, primary_key=True)
+    batch_id = Column(Integer, ForeignKey("mark_import_batches.batch_id", ondelete="CASCADE"), nullable=False)
+    row_no = Column(Integer, nullable=False)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"))
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"))
+    payload = Column(JSON)
+    verdict = Column(String(20), nullable=False)
+    errors = Column(JSON)
+
+    __table_args__ = (CheckConstraint("verdict IN ('valid', 'invalid', 'warning')"),)
 
 
 # ============================================================================

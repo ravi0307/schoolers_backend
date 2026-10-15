@@ -87,7 +87,9 @@ class MarkingSystemTests(unittest.TestCase):
         self.db.add_all([
             Student(student_id=1, school_id=1, class_id=1, admission_no="A1", name="Riya"),
             Subject(subject_id=3, school_id=1, name="Maths"),
-            Mark(student_id=1, subject_id=3, term="Term 1", score=80),
+            Mark(student_id=1, subject_id=3, term="Term 1", score=80, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
         ])
         self.db.commit()
         with self.assertRaises(ConflictError) as ctx:
@@ -100,7 +102,9 @@ class MarkingSystemTests(unittest.TestCase):
         self.db.add_all([
             Student(student_id=1, school_id=1, class_id=1, admission_no="A1", name="Riya"),
             Subject(subject_id=3, school_id=1, name="Maths"),
-            Mark(student_id=1, subject_id=3, term="Term 1", score=80),
+            Mark(student_id=1, subject_id=3, term="Term 1", score=80, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
         ])
         self.db.commit()
         school = schools_repo.set_marking_system(self.db, self._school(1), "marks")
