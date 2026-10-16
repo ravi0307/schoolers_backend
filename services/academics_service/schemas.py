@@ -613,3 +613,23 @@ class ExaminationCancel(BaseModel):
     _validate_reason = field_validator("reason")(classmethod(
         lambda cls, v: _clean_calendar_name(v, "Cancellation reason", 255)
     ))
+
+
+# ---- Subject offerings and enrollment (Phase 5) ----
+
+
+class ClassSubjectSet(BaseModel):
+    subject_id: int
+    is_required: bool = True
+
+
+class ClassSubjectRead(BaseModel):
+    class_id: int
+    subject_id: int
+    subject_name: str | None = None
+    is_required: bool
+
+    class Config:
+        from_attributes = True
+
+

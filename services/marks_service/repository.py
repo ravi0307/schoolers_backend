@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from common.models import (
     Mark, MarkCorrection, SchoolClass, Student, Subject, TeacherClassSubject,
     ParentStudent, Examination, ExaminationSession, AcademicPeriod, GradeLevel,
+    StudentSubject,
 )
 from common.exceptions import AppError, ConflictError, NotFoundError
 
@@ -173,6 +174,36 @@ def teacher_assigned(db: Session, staff_id: int, class_id: int, subject_id: int)
     )
 
 
+def student_enrolled_for_session(
+    db: Session, student_id: int, subject_id: int, year_id: int
+) -> bool:
+    """Opt-in enrollment gate (Phase 5): students with NO rows for the year
+    pass (school hasn't adopted enrollment); students with rows need an
+    enrolled row for the subject. A non-enrolled student is therefore never
+    recorded as zero or missing — entry refuses them outright."""
+    any_rows = (
+        db.query(StudentSubject)
+        .filter(
+            StudentSubject.student_id == student_id,
+            StudentSubject.academic_year_id == year_id,
+        )
+        .first()
+    )
+    if any_rows is None:
+        return True
+    return (
+        db.query(StudentSubject)
+        .filter(
+            StudentSubject.student_id == student_id,
+            StudentSubject.subject_id == subject_id,
+            StudentSubject.academic_year_id == year_id,
+            StudentSubject.state == "enrolled",
+        )
+        .first()
+        is not None
+    )
+
+
 def get_session_with_exam(db: Session, session_id: int):
     """A session plus its examination, or (None, None)."""
     session = (
@@ -264,6 +295,11 @@ def create_session_mark(
     student = db.query(Student).filter(Student.student_id == student_id).first()
     if student is None or student.class_id != session.class_id:
         raise AppError("Student is not in the session's class", status_code=400)
+    if not student_enrolled_for_session(db, student_id, subject_id, exam.year_id):
+        raise AppError(
+            "Student is not enrolled in this subject for the academic year",
+            status_code=400,
+        )
     if (
         db.query(Mark)
         .filter(Mark.examination_session_id == session.session_id, Mark.student_id == student_id)

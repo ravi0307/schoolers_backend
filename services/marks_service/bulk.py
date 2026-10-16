@@ -82,6 +82,10 @@ def _validate_row(db: Session, session, exam, row_no: int, row: dict):
     student = db.query(Student).filter(Student.student_id == student_id).first()
     if student is None or student.class_id != session.class_id or not student.is_active:
         return "invalid", None, ["student is not in the session's class"]
+    if not repo.student_enrolled_for_session(
+        db, student_id, session.subject_id, exam.year_id
+    ):
+        return "invalid", None, ["student is not enrolled in this subject for the academic year"]
     admission = str(row.get("admission_no") or "").strip()
     if admission and admission != (student.admission_no or ""):
         return "invalid", None, ["admission_no does not match student_id"]

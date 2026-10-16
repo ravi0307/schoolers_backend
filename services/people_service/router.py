@@ -12,6 +12,8 @@ from schemas import (
     ParentCreate, ParentRead,
     StudentCreate, StudentUpdate, StudentRead,
     TeacherClassSubjectCreate,
+    PromotionPreview, PromotionCommit, PromotionBatchRead,
+    StudentSubjectEnroll, StudentSubjectUpdate, StudentSubjectRead,
 )
 
 router = APIRouter(tags=["people"])
@@ -279,3 +281,168 @@ def delete_student(
     if not student:
         raise NotFoundError("Student not found")
     repo.delete_student(db, student)
+
+
+# ---- Promotion and carry-forward (Phase 5) ----
+
+
+@router.post("/promotions/preview")
+def preview_promotion(
+    payload: PromotionPreview,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Dry run: proposed moves plus exceptions. Writes nothing.
+
+    With no source year and an empty map this is the founding-year
+    reconciliation roster: every active student proposed into their
+    current class as `enrolled` in the target year.
+    """
+    class_map = {entry.from_class_id: entry.to_class_id for entry in payload.class_map}
+    return repo.preview_promotion(
+        db, school_id, payload.source_year_id, payload.target_year_id, class_map
+    )
+
+
+@router.post("/promotions/commit")
+def commit_promotion(
+    payload: PromotionCommit,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Apply enrollment rows plus the class-cache update in one transaction.
+    Retries with the same idempotency key return the prior receipt."""
+    return repo.commit_promotion(
+        db, school_id, current_user.user_id,
+        payload.source_year_id, payload.target_year_id,
+        [a.model_dump() for a in payload.assignments],
+        payload.idempotency_key,
+    )
+
+
+@router.get("/promotions/batches", response_model=list[PromotionBatchRead])
+def list_promotion_batches(
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    batches = repo.list_promotion_batches(db, school_id)
+    out = []
+    for batch in batches:
+        receipt = repo._promotion_receipt(db, batch, duplicate=False)
+        out.append({
+            "batch_id": batch.batch_id,
+            "school_id": batch.school_id,
+            "source_year_id": batch.source_year_id,
+            "target_year_id": batch.target_year_id,
+            "status": batch.status,
+            "applied": receipt["applied"],
+        })
+    return out
+
+
+@router.get("/promotions/batches/{batch_id}")
+def get_promotion_batch(
+    batch_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    batch = repo.get_promotion_batch(db, school_id, batch_id)
+    if batch is None:
+        raise NotFoundError("Promotion batch not found")
+    return repo._promotion_receipt(db, batch, duplicate=False)
+@router.get("/students/{student_id}/subjects", response_model=list[StudentSubjectRead])
+def list_student_subjects(
+    student_id: int,
+    year_id: int | None = None,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin")),
+):
+    from services.academics_service import repository as acad_repo
+
+    if repo.get_student(db, school_id, student_id) is None:
+        raise NotFoundError("Student not found")
+    rows = acad_repo.list_student_subjects(db, student_id, year_id)
+    subjects = {s.subject_id: s.name for s in acad_repo.list_subjects(db, school_id)}
+    return [
+        {
+            "student_id": r.student_id,
+            "subject_id": r.subject_id,
+            "subject_name": subjects.get(r.subject_id),
+            "academic_year_id": r.academic_year_id,
+            "state": r.state,
+            "is_optional": r.is_optional,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/students/{student_id}/subjects", response_model=StudentSubjectRead, status_code=201)
+def enroll_student_subject(
+    student_id: int,
+    payload: StudentSubjectEnroll,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    from services.academics_service import repository as acad_repo
+
+    if repo.get_student(db, school_id, student_id) is None:
+        raise NotFoundError("Student not found")
+    if acad_repo.get_subject(db, school_id, payload.subject_id) is None:
+        raise NotFoundError("Subject not found")
+    if acad_repo.get_year(db, school_id, payload.year_id) is None:
+        raise NotFoundError("Academic year not found")
+    row = acad_repo.enroll_student_subject(
+        db, student_id, payload.subject_id, payload.year_id, payload.is_optional
+    )
+    return {
+        "student_id": row.student_id,
+        "subject_id": row.subject_id,
+        "subject_name": acad_repo.get_subject(db, school_id, row.subject_id).name,
+        "academic_year_id": row.academic_year_id,
+        "state": row.state,
+        "is_optional": row.is_optional,
+    }
+
+
+@router.patch("/students/{student_id}/subjects/{subject_id}", response_model=StudentSubjectRead)
+def update_student_subject(
+    student_id: int,
+    subject_id: int,
+    payload: StudentSubjectUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    from services.academics_service import repository as acad_repo
+    from common.models import StudentSubject as StudentSubjectModel
+
+    if repo.get_student(db, school_id, student_id) is None:
+        raise NotFoundError("Student not found")
+    row = (
+        db.query(StudentSubjectModel)
+        .filter(
+            StudentSubjectModel.student_id == student_id,
+            StudentSubjectModel.subject_id == subject_id,
+        )
+        .order_by(StudentSubjectModel.academic_year_id.desc())
+        .first()
+    )
+    if row is None:
+        raise NotFoundError("Subject enrollment not found")
+    row.state = payload.state
+    db.commit()
+    db.refresh(row)
+    return {
+        "student_id": row.student_id,
+        "subject_id": row.subject_id,
+        "subject_name": acad_repo.get_subject(db, school_id, row.subject_id).name,
+        "academic_year_id": row.academic_year_id,
+        "state": row.state,
+        "is_optional": row.is_optional,
+    }

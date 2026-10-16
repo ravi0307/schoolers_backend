@@ -260,3 +260,83 @@ class TeacherClassSubjectCreate(BaseModel):
     class_id: int
     subject_id: int
     is_class_teacher: bool = False
+
+
+# ---- Promotion and carry-forward (Phase 5) ----
+
+
+class ClassMapEntry(BaseModel):
+    from_class_id: int
+    to_class_id: int
+
+
+class PromotionPreview(BaseModel):
+    source_year_id: int | None = None
+    target_year_id: int
+    class_map: list[ClassMapEntry] = []
+
+
+class PromotionProposedRow(BaseModel):
+    student_id: int
+    student_name: str
+    from_class_id: int | None
+    to_class_id: int | None
+    suggested_status: str
+
+
+class PromotionPreviewResult(BaseModel):
+    proposed: list[PromotionProposedRow]
+    exceptions: list[dict]
+    already_done: list[int]
+
+
+class PromotionAssignment(BaseModel):
+    student_id: int
+    to_class_id: int | None = None
+    status: Literal["promoted", "retained", "transferred", "withdrawn", "new", "enrolled"]
+
+
+class PromotionCommit(BaseModel):
+    source_year_id: int | None = None
+    target_year_id: int
+    assignments: list[PromotionAssignment]
+    idempotency_key: str
+
+
+class PromotionBatchRead(BaseModel):
+    batch_id: int
+    school_id: int
+    source_year_id: int | None
+    target_year_id: int
+    status: str
+    applied: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+# ---- Student subject enrollment reads/writes (Phase 5) ----
+# Shapes live here because the routes live under /students (people service);
+# the storage functions stay in the academics repository next to offerings.
+
+
+class StudentSubjectEnroll(BaseModel):
+    subject_id: int
+    year_id: int
+    is_optional: bool = False
+
+
+class StudentSubjectUpdate(BaseModel):
+    state: Literal["enrolled", "dropped"]
+
+
+class StudentSubjectRead(BaseModel):
+    student_id: int
+    subject_id: int
+    subject_name: str | None = None
+    academic_year_id: int
+    state: str
+    is_optional: bool
+
+    class Config:
+        from_attributes = True

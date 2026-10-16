@@ -4,11 +4,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.models import (
-    SchoolClass, Staff, Subject, Period, Holiday, TimetableEntry,
+    SchoolClass, Staff, Student, Subject, Period, Holiday, TimetableEntry,
     AcademicYear, AcademicPeriod, AcademicEvent,
     ExaminationType, GradeScale, GradeLevel,
     Examination, ExaminationSession, ExaminationSessionVersion,
-    Mark,
+    Mark, ClassSubject, StudentSubject,
 )
 from common.holidays import (
     expand_holiday_range,
@@ -1068,6 +1068,8 @@ def create_session(db: Session, exam, user_id: int | None, data: dict):
         raise NotFoundError("Class not found")
     if get_subject(db, exam.school_id, data["subject_id"]) is None:
         raise NotFoundError("Subject not found")
+    if not subject_offered(db, data["class_id"], data["subject_id"]):
+        raise AppError("Subject is not offered to this class", status_code=400)
     blocking, warnings = check_session_conflicts(
         db,
         exam.school_id,
@@ -1106,6 +1108,8 @@ def update_session(db: Session, exam, session, user_id: int | None, data: dict, 
         "exam_id": exam.exam_id,
         "exclude_session_id": session.session_id,
     }
+    if not subject_offered(db, merged["class_id"], merged["subject_id"]):
+        raise AppError("Subject is not offered to this class", status_code=400)
     blocking, warnings = check_session_conflicts(db, exam.school_id, **merged)
     if blocking:
         raise ConflictError("; ".join(blocking))
@@ -1199,3 +1203,156 @@ def timetable(
             ExaminationSession.date, ExaminationSession.start_time
         ).all()
     ]
+
+
+# ---- Subject offerings and enrollment (Phase 5) ----
+# Opt-in semantics: checks apply only where offering/enrollment rows exist.
+# Classes and students without rows keep exact legacy behavior.
+
+
+def list_offerings(db: Session, class_id: int):
+    rows = (
+        db.query(ClassSubject, Subject.name)
+        .join(Subject, Subject.subject_id == ClassSubject.subject_id)
+        .filter(ClassSubject.class_id == class_id)
+        .order_by(Subject.name)
+        .all()
+    )
+    return [
+        {"class_id": class_id, "subject_id": sub, "subject_name": name, "is_required": req}
+        for (off, name) in rows
+        for sub, req in [(off.subject_id, off.is_required)]
+    ]
+
+
+def set_offering(db: Session, class_id: int, subject_id: int, is_required: bool = True):
+    row = (
+        db.query(ClassSubject)
+        .filter(ClassSubject.class_id == class_id, ClassSubject.subject_id == subject_id)
+        .first()
+    )
+    if row is None:
+        row = ClassSubject(class_id=class_id, subject_id=subject_id, is_required=is_required)
+        db.add(row)
+    else:
+        row.is_required = is_required
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_offering(db: Session, class_id: int, subject_id: int) -> None:
+    live = (
+        db.query(ExaminationSession.session_id)
+        .filter(
+            ExaminationSession.class_id == class_id,
+            ExaminationSession.subject_id == subject_id,
+            ExaminationSession.status != "cancelled",
+        )
+        .first()
+    )
+    if live is not None:
+        raise ConflictError("This subject has scheduled sessions and cannot be unoffered")
+    db.query(ClassSubject).filter(
+        ClassSubject.class_id == class_id, ClassSubject.subject_id == subject_id
+    ).delete()
+    db.commit()
+
+
+def class_has_offerings(db: Session, class_id: int) -> bool:
+    return (
+        db.query(ClassSubject.class_id).filter(ClassSubject.class_id == class_id).first()
+        is not None
+    )
+
+
+def subject_offered(db: Session, class_id: int, subject_id: int) -> bool:
+    if not class_has_offerings(db, class_id):
+        return True
+    return (
+        db.query(ClassSubject)
+        .filter(ClassSubject.class_id == class_id, ClassSubject.subject_id == subject_id)
+        .first()
+        is not None
+    )
+
+
+def enrollment_class_for_year(db: Session, student_id: int, year_id: int):
+    """The student's class in a year: enrollment row wins, else the cache."""
+    from common.models import ClassEnrollment
+
+    row = (
+        db.query(ClassEnrollment)
+        .filter(
+            ClassEnrollment.student_id == student_id,
+            ClassEnrollment.academic_year_id == year_id,
+            ClassEnrollment.status.in_(("enrolled", "promoted", "retained", "new")),
+        )
+        .first()
+    )
+    if row is not None:
+        return row.class_id
+    student = db.query(Student).filter(Student.student_id == student_id).first()
+    return student.class_id if student is not None else None
+
+
+def list_student_subjects(db: Session, student_id: int, year_id: int | None = None):
+    query = db.query(StudentSubject).filter(StudentSubject.student_id == student_id)
+    if year_id is not None:
+        query = query.filter(StudentSubject.academic_year_id == year_id)
+    return query.all()
+
+
+def enroll_student_subject(
+    db: Session, student_id: int, subject_id: int, year_id: int, is_optional: bool = False
+):
+    existing = (
+        db.query(StudentSubject)
+        .filter(
+            StudentSubject.student_id == student_id,
+            StudentSubject.subject_id == subject_id,
+            StudentSubject.academic_year_id == year_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        existing.state = "enrolled"
+        existing.is_optional = is_optional
+        db.commit()
+        db.refresh(existing)
+        return existing
+    row = StudentSubject(
+        student_id=student_id, subject_id=subject_id,
+        academic_year_id=year_id, state="enrolled", is_optional=is_optional,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def student_enrolled_in(db: Session, student_id: int, subject_id: int, year_id: int) -> bool:
+    """Opt-in gate for entry grids: students with NO rows for the year pass
+    (school hasn't adopted enrollment); students with rows need an enrolled
+    row for the subject. Non-enrolled is therefore never zero or missing."""
+    any_rows = (
+        db.query(StudentSubject)
+        .filter(
+            StudentSubject.student_id == student_id,
+            StudentSubject.academic_year_id == year_id,
+        )
+        .first()
+    )
+    if any_rows is None:
+        return True
+    return (
+        db.query(StudentSubject)
+        .filter(
+            StudentSubject.student_id == student_id,
+            StudentSubject.subject_id == subject_id,
+            StudentSubject.academic_year_id == year_id,
+            StudentSubject.state == "enrolled",
+        )
+        .first()
+        is not None
+    )

@@ -47,6 +47,7 @@ ROUTE_MAP = {
     "staff": "people",
     "parents": "people",
     "students": "people",
+    "promotions": "people",
     "attendance": "attendance",
     "marks": "marks",
     "timetable": "timetable",

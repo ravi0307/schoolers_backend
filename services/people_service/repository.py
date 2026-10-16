@@ -16,9 +16,12 @@ from common.models import (
     School,
     User,
     Subject,
+    AcademicYear,
+    ClassEnrollment,
+    PromotionBatch,
 )
 from common.audit import bulk_modified_columns
-from common.exceptions import ConflictError
+from common.exceptions import AppError, ConflictError, NotFoundError
 from common.email import (
     FIELD_LABELS,
     send_record_updated_email,
@@ -648,3 +651,226 @@ def delete_student(db: Session, student: Student) -> None:
     db.commit()
     if parent_email:
         send_student_removed_email(school, student.name, [parent_email])
+
+
+# ---- Promotion and carry-forward (Phase 5) ----
+# students.class_id is the CURRENT-class cache; class_enrollments is the
+# history. Promotion writes enrollment rows plus the cache update in ONE
+# transaction; published marks/sessions keep pointing at student_id (and
+# sessions embed class-at-time), so history is never rewritten.
+
+
+_ACTIVE_ENROLLMENT = ("enrolled", "promoted", "retained", "new")
+
+
+def get_academic_year(db: Session, school_id: int, year_id: int):
+    return (
+        db.query(AcademicYear)
+        .filter(AcademicYear.school_id == school_id, AcademicYear.year_id == year_id)
+        .first()
+    )
+
+
+def active_enrollment(db: Session, student_id: int, year_id: int):
+    return (
+        db.query(ClassEnrollment)
+        .filter(
+            ClassEnrollment.student_id == student_id,
+            ClassEnrollment.academic_year_id == year_id,
+            ClassEnrollment.status.in_(_ACTIVE_ENROLLMENT),
+        )
+        .first()
+    )
+
+
+def students_in_class_year(db: Session, class_id: int, year_id: int) -> list[Student]:
+    """Prior-year class views filter by enrollment, not the current cache."""
+    return (
+        db.query(Student)
+        .join(
+            ClassEnrollment,
+            (ClassEnrollment.student_id == Student.student_id)
+            & (ClassEnrollment.academic_year_id == year_id)
+            & (ClassEnrollment.class_id == class_id)
+            & (ClassEnrollment.status.in_(_ACTIVE_ENROLLMENT)),
+        )
+        .order_by(Student.name)
+        .all()
+    )
+
+
+def preview_promotion(
+    db: Session, school_id: int, source_year_id: int | None,
+    target_year_id: int, class_map: dict[int, int],
+) -> dict:
+    """Dry run: no writes. Suggests per-student moves, lists exceptions."""
+    if get_academic_year(db, school_id, target_year_id) is None:
+        raise NotFoundError("Target academic year not found")
+    if source_year_id is not None and get_academic_year(db, school_id, source_year_id) is None:
+        raise NotFoundError("Source academic year not found")
+    query = db.query(Student).filter(
+        Student.school_id == school_id, Student.is_active.is_(True)
+    )
+    # NOTE: no class pre-filter here. Students outside the mapping surface
+    # as exceptions below instead of vanishing silently from the preview.
+    proposed, exceptions, already_done = [], [], []
+    for student in query.order_by(Student.name).all():
+        if active_enrollment(db, student.student_id, target_year_id) is not None:
+            already_done.append(student.student_id)
+            continue
+        to_class = class_map.get(student.class_id)
+        suggested = "promoted"
+        if to_class is None and source_year_id is None and not class_map:
+            # Founding-year reconciliation: no mapping to apply, so every
+            # active student is proposed into their current class as enrolled.
+            to_class, suggested = student.class_id, "enrolled"
+        if to_class is None:
+            exceptions.append({
+                "student_id": student.student_id,
+                "reason": "no target class mapped; assign one at commit",
+            })
+            continue
+        to_row = (
+            db.query(SchoolClass)
+            .filter(SchoolClass.school_id == school_id, SchoolClass.class_id == to_class)
+            .first()
+        )
+        if to_row is None:
+            exceptions.append({
+                "student_id": student.student_id,
+                "reason": f"target class {to_class} is not in this school",
+            })
+            continue
+        if suggested == "enrolled":
+            final_status = "enrolled"
+        else:
+            final_status = "retained" if to_class == student.class_id else "promoted"
+        proposed.append({
+            "student_id": student.student_id,
+            "student_name": student.name,
+            "from_class_id": student.class_id,
+            "to_class_id": to_class,
+            "suggested_status": final_status,
+        })
+    return {"proposed": proposed, "exceptions": exceptions, "already_done": already_done}
+
+
+def commit_promotion(
+    db: Session, school_id: int, user_id: int | None, source_year_id: int | None,
+    target_year_id: int, assignments: list[dict], idempotency_key: str,
+) -> dict:
+    """Apply enrollment rows + class-cache updates atomically. Idempotent by
+    (school, idempotency_key): retries return the prior receipt."""
+    from sqlalchemy.exc import IntegrityError
+
+    if get_academic_year(db, school_id, target_year_id) is None:
+        raise NotFoundError("Target academic year not found")
+    if source_year_id is not None and get_academic_year(db, school_id, source_year_id) is None:
+        raise NotFoundError("Source academic year not found")
+    prior = (
+        db.query(PromotionBatch)
+        .filter(
+            PromotionBatch.school_id == school_id,
+            PromotionBatch.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+    if prior is not None:
+        return _promotion_receipt(db, prior, duplicate=True)
+    batch = PromotionBatch(
+        school_id=school_id, source_year_id=source_year_id,
+        target_year_id=target_year_id, created_by=user_id,
+        status="committed", idempotency_key=idempotency_key,
+    )
+    db.add(batch)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        prior = (
+            db.query(PromotionBatch)
+            .filter(
+                PromotionBatch.school_id == school_id,
+                PromotionBatch.idempotency_key == idempotency_key,
+            )
+            .first()
+        )
+        return _promotion_receipt(db, prior, duplicate=True)
+    applied = []
+    for item in assignments:
+        student = (
+            db.query(Student)
+            .filter(Student.student_id == item["student_id"], Student.school_id == school_id)
+            .first()
+        )
+        if student is None or not student.is_active:
+            raise NotFoundError(f"Student {item['student_id']} not found")
+        status = item["status"]
+        to_class = item.get("to_class_id")
+        if status in ("promoted", "retained", "enrolled", "new"):
+            if to_class is None:
+                raise AppError("A target class is required for this status", status_code=400)
+            if (
+                db.query(SchoolClass)
+                .filter(SchoolClass.school_id == school_id, SchoolClass.class_id == to_class)
+                .first()
+                is None
+            ):
+                raise NotFoundError(f"Class {to_class} not found")
+        elif to_class is not None:
+            raise AppError("Transferred/withdrawn students take no target class", status_code=400)
+        if active_enrollment(db, student.student_id, target_year_id) is not None:
+            raise ConflictError(f"Student {student.student_id} is already enrolled for the year")
+        db.add(ClassEnrollment(
+            student_id=student.student_id,
+            class_id=to_class if to_class is not None else student.class_id,
+            academic_year_id=target_year_id,
+            status=status,
+            batch_id=batch.batch_id,
+            decided_by=user_id,
+        ))
+        if status in ("promoted", "retained", "enrolled", "new"):
+            student.class_id = to_class
+        applied.append({
+            "student_id": student.student_id,
+            "class_id": to_class,
+            "status": status,
+        })
+    db.commit()
+    return {"batch_id": batch.batch_id, "status": "committed",
+            "applied": len(applied), "rows": applied, "duplicate_receipt": False}
+
+
+def _promotion_receipt(db: Session, batch, duplicate: bool) -> dict:
+    rows = (
+        db.query(ClassEnrollment)
+        .filter(ClassEnrollment.batch_id == batch.batch_id)
+        .all()
+    )
+    return {
+        "batch_id": batch.batch_id,
+        "status": batch.status,
+        "applied": len(rows),
+        "rows": [
+            {"student_id": r.student_id, "class_id": r.class_id, "status": r.status}
+            for r in rows
+        ],
+        "duplicate_receipt": duplicate,
+    }
+
+
+def get_promotion_batch(db: Session, school_id: int, batch_id: int):
+    return (
+        db.query(PromotionBatch)
+        .filter(PromotionBatch.school_id == school_id, PromotionBatch.batch_id == batch_id)
+        .first()
+    )
+
+
+def list_promotion_batches(db: Session, school_id: int):
+    return (
+        db.query(PromotionBatch)
+        .filter(PromotionBatch.school_id == school_id)
+        .order_by(PromotionBatch.batch_id.desc())
+        .all()
+    )

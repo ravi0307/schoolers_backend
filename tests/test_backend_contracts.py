@@ -174,6 +174,7 @@ class BackendContractTests(unittest.TestCase):
             "grade-levels",
             "examinations",
             "sessions",
+            "promotions",
             "teachers",
             "staff",
             "students",
@@ -609,6 +610,35 @@ class BackendContractTests(unittest.TestCase):
             "mark_import_batches",
             "mark_import_rows",
             "WHERE examination_session_id IS NULL",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_promotion_enrollment_endpoints_and_migration_contract(self):
+        """Phase 5: preview/commit promotion, offerings, enrollment reads."""
+        people_router = (ROOT / "services" / "people_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        academics_router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/promotions/preview"',
+            '"/promotions/commit"',
+            '"/promotions/batches"',
+            '"/students/{student_id}/subjects"',
+        ):
+            self.assertIn(route, people_router)
+        for route in ('"/classes/{class_id}/subjects"',):
+            self.assertIn(route, academics_router)
+        migration = (ROOT / "db-migration-enrollment-promotion.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "promotion_batches",
+            "class_enrollments",
+            "class_enrollments_active_unique",
+            "class_subjects",
+            "student_subjects",
             "IF NOT EXISTS",
         ):
             with self.subTest(fragment=fragment):

@@ -19,6 +19,7 @@ from schemas import (
     ExaminationCreate, ExaminationUpdate, ExaminationRead, ExaminationCancel,
     SessionCreate, SessionUpdate, SessionRead, SessionWriteResult,
     SessionTimetableRow, SessionVersionRead,
+    ClassSubjectSet, ClassSubjectRead,
 )
 
 router = APIRouter(tags=["academics"])
@@ -699,3 +700,55 @@ def list_session_versions(
 ):
     session, _ = _session_in_scope(db, school_id, session_id)
     return repo.list_session_versions(db, session.session_id)
+
+
+# ---- Subject offerings and enrollment (Phase 5) ----
+
+
+@router.get("/classes/{class_id}/subjects", response_model=list[ClassSubjectRead])
+def list_class_offerings(
+    class_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
+):
+    if repo.get_class(db, school_id, class_id) is None:
+        raise NotFoundError("Class not found")
+    return repo.list_offerings(db, class_id)
+
+
+@router.post("/classes/{class_id}/subjects", response_model=ClassSubjectRead, status_code=201)
+def set_class_offering(
+    class_id: int,
+    payload: ClassSubjectSet,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if repo.get_class(db, school_id, class_id) is None:
+        raise NotFoundError("Class not found")
+    if repo.get_subject(db, school_id, payload.subject_id) is None:
+        raise NotFoundError("Subject not found")
+    row = repo.set_offering(db, class_id, payload.subject_id, payload.is_required)
+    return {
+        "class_id": class_id,
+        "subject_id": row.subject_id,
+        "subject_name": repo.get_subject(db, school_id, row.subject_id).name,
+        "is_required": row.is_required,
+    }
+
+
+@router.delete("/classes/{class_id}/subjects/{subject_id}", status_code=204)
+def delete_class_offering(
+    class_id: int,
+    subject_id: int,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(require_school_scope),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    if repo.get_class(db, school_id, class_id) is None:
+        raise NotFoundError("Class not found")
+    repo.delete_offering(db, class_id, subject_id)
+    return Response(status_code=204)
+
+

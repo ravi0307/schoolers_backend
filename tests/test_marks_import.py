@@ -24,6 +24,7 @@ TABLES = [
     "academic_years", "examination_types", "examinations", "examination_sessions",
     "grade_scales", "grade_levels", "students", "subjects",
     "teacher_class_subjects", "marks", "mark_import_batches", "mark_import_rows",
+    "class_subjects", "student_subjects",
 ]
 
 

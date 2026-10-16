@@ -422,6 +422,94 @@ class Student(AuditColumnsMixin, Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
 
+# ============================================================================
+# 3b. ENROLLMENT AND PROMOTION (Phase 5, marks_feature)
+# ============================================================================
+# students.class_id is the CURRENT class cache. class_enrollments is the
+# history: one active row per (student, year); promotion writes enrollment
+# rows plus the cache update in a single transaction. Published marks,
+# sessions, and report inputs keep pointing at student_id (and sessions
+# embed class-at-time), so promotion never rewrites history.
+
+
+class PromotionBatch(AuditColumnsMixin, Base):
+    __tablename__ = "promotion_batches"
+
+    batch_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    source_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="SET NULL"))
+    target_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    created_at = Column(DateTime, server_default=func.now())
+    status = Column(String(20), nullable=False, default="committed", server_default="committed")
+    idempotency_key = Column(String(64), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "idempotency_key"),
+        CheckConstraint("status IN ('committed', 'failed')"),
+    )
+
+
+class ClassEnrollment(AuditColumnsMixin, Base):
+    __tablename__ = "class_enrollments"
+
+    enroll_id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="RESTRICT"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False)
+    batch_id = Column(Integer, ForeignKey("promotion_batches.batch_id", ondelete="SET NULL"))
+    decided_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    decided_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        # One active enrollment per student-year; transferred/withdrawn are
+        # terminal history rows outside this index (re-admission allowed).
+        Index(
+            "class_enrollments_active_unique", "student_id", "academic_year_id",
+            unique=True,
+            postgresql_where=text("status IN ('enrolled', 'promoted', 'retained', 'new')"),
+            sqlite_where=text("status IN ('enrolled', 'promoted', 'retained', 'new')"),
+        ),
+        CheckConstraint(
+            "status IN ('enrolled', 'promoted', 'retained', 'transferred', 'withdrawn', 'new')"
+        ),
+    )
+
+
+class ClassSubject(AuditColumnsMixin, Base):
+    """What each class actually offers (Phase 5). The subjects catalog stays
+    school-scoped; this table says which of them a class teaches, and which
+    are required. Sessions and enrollments validate against it once a class
+    has any offering rows (opt-in: classes without rows keep legacy behavior)."""
+
+    __tablename__ = "class_subjects"
+
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"), primary_key=True)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), primary_key=True)
+    is_required = Column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class StudentSubject(AuditColumnsMixin, Base):
+    """Per-student subject enrollment for a year (Phase 5). Non-enrolled
+    subjects are excluded from entry grids and aggregates — never zero,
+    never missing."""
+
+    __tablename__ = "student_subjects"
+
+    id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    state = Column(String(20), nullable=False, default="enrolled", server_default="enrolled")
+    is_optional = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "subject_id", "academic_year_id"),
+        CheckConstraint("state IN ('enrolled', 'dropped')"),
+    )
+
+
 class ParentStudent(AuditColumnsMixin, Base):
     __tablename__ = "parent_student"
 

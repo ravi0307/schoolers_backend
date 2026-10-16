@@ -25,6 +25,7 @@ TABLES = [
     "academic_years", "academic_periods", "examination_types", "examinations",
     "examination_sessions", "examination_session_versions",
     "classes", "subjects", "holidays", "academic_events", "grade_scales",
+    "class_subjects", "student_subjects",
 ]
 
 
