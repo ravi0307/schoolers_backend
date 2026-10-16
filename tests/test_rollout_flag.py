@@ -25,7 +25,7 @@ TABLES = [
     "schools", "academic_years", "academic_periods", "examination_types", "examinations",
     "examination_sessions", "classes", "students", "subjects",
     "teacher_class_subjects", "marks", "holidays", "academic_events",
-    "class_subjects", "student_subjects",
+    "class_subjects", "student_subjects", "mark_import_batches", "mark_import_rows",
 ]
 
 
@@ -179,8 +179,7 @@ class RolloutFlagTests(unittest.TestCase):
         # practice; the model default is False (fail safe).
         self.assertFalse(School.__table__.c.examinations_enabled.default.arg)
 
-    def test_master_flips_flag_via_features_endpoint(self):
-        # Role gating lives in Depends (like every endpoint in this file),
+    def test_master_flips_flag_via_features_endpoint(self):        # Role gating lives in Depends (like every endpoint in this file),
         # so this exercises the master success path; master-only access is
         # pinned by the contract test below.
         _school(self.db, 1, "Green Valley", False)
@@ -202,6 +201,120 @@ class RolloutFlagTests(unittest.TestCase):
             self.db, self.master,
         )
         self.assertTrue(school.examinations_enabled)
+
+    def _second_school_with_session(self):
+        """School 2 pilot scope: its own year, class, subject, student,
+        exam, and session. Returns (session, exam)."""
+        _school(self.db, 2, "Blue Horizon", True)
+        self.db.add_all([
+            AcademicYear(year_id=9, school_id=2, name="2026-27",
+                         start_date=date(2026, 6, 1), end_date=date(2027, 5, 31)),
+            SchoolClass(class_id=9, school_id=2, name="8-A"),
+            Subject(subject_id=7, school_id=2, name="Maths"),
+            Student(student_id=9, school_id=2, class_id=9, admission_no="B1", name="Zara"),
+        ])
+        self.db.commit()
+        import services.academics_service.repository as acad_repo
+        year = acad_repo.get_year(self.db, 2, 9)
+        etype = acad_repo.create_examination_type(self.db, 2, {"name": "Half-Yearly"})
+        exam = acad_repo.create_examination(
+            self.db, 2, 12,
+            {"type_id": etype.type_id, "year_id": year.year_id, "name": "HY",
+             "result_format_expectation": "marks"})
+        session, _ = acad_repo.create_session(
+            self.db, exam, 12,
+            {"class_id": 9, "subject_id": 7, "date": date(2026, 12, 15),
+             "start_time": time(9, 0), "end_time": time(12, 0), "max_marks": 100})
+        return session, exam
+
+    def test_cross_school_batch_commit_is_notfound_without_writes(self):
+        from common.models import Mark
+        self._pilot_school()
+        session2, exam2 = self._second_school_with_session()
+        sys.path.insert(0, "services/marks_service")
+        try:
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+            from services.marks_service import router as marks_router
+            from services.marks_service import bulk as bulk_mod
+        finally:
+            sys.path.pop(0)
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+        csv_text = ("student_id,admission_no,student_name,score_or_grade,assessment_status\n"
+                    "9,B1,Zara,70,present\n")
+        batch2, receipt = bulk_mod.preview_upload(
+            self.db, 2, session2, exam2, "s2.csv", csv_text.encode(), 12)
+        self.assertEqual([r["verdict"] for r in receipt], ["valid"])
+        # School 1's admin presenting School 2's batch id gets a uniform
+        # 404, and nothing is written anywhere.
+        with self.assertRaises(NotFoundError):
+            marks_router.commit_import(batch2.batch_id, False, self.db, self.admin1)
+        self.assertEqual(self.db.query(Mark).count(), 0)
+        # The legitimate owner can still commit its own batch.
+        out = marks_router.commit_import(batch2.batch_id, False, self.db, self.admin2)
+        self.assertEqual((out["applied"], out["skipped"]), (1, 0))
+        self.assertEqual(self.db.query(Mark).count(), 1)
+
+    def test_disable_between_preview_and_commit_denies(self):
+        from common.models import Mark
+        self._pilot_school()
+        sys.path.insert(0, "services/marks_service")
+        try:
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+            from services.marks_service import router as marks_router
+            from services.marks_service import bulk as bulk_mod
+        finally:
+            sys.path.pop(0)
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+        session = self.db.query(ExaminationSession).filter_by(session_id=1).one_or_none()
+        if session is None:
+            import services.academics_service.repository as acad_repo
+            from common.models import Examination as ExamModel
+            year = acad_repo.get_year(self.db, 1, 1)
+            if year is None:
+                year = acad_repo.create_year(
+                    self.db, 1, {"name": "2026-27", "start_date": date(2026, 6, 1),
+                                 "end_date": date(2027, 5, 31)})
+            etype = acad_repo.create_examination_type(self.db, 1, {"name": "Half-Yearly"})
+            exam = acad_repo.create_examination(
+                self.db, 1, 11,
+                {"type_id": etype.type_id, "year_id": year.year_id, "name": "HY",
+                 "result_format_expectation": "marks"})
+            session, _ = acad_repo.create_session(
+                self.db, exam, 11,
+                {"class_id": 1, "subject_id": 3, "date": date(2026, 12, 15),
+                 "start_time": time(9, 0), "end_time": time(12, 0), "max_marks": 100})
+        else:
+            from common.models import Examination as ExamModel
+            exam = self.db.query(ExamModel).filter_by(exam_id=session.exam_id).one()
+        csv_text = ("student_id,admission_no,student_name,score_or_grade,assessment_status\n"
+                    "1,A1,Riya,80,present\n")
+        batch, receipt = bulk_mod.preview_upload(
+            self.db, 1, session, exam, "s1.csv", csv_text.encode(), 11)
+        self.assertEqual([r["verdict"] for r in receipt], ["valid"])
+        # Disable through the authorized feature-toggle path.
+        sys.path.insert(0, "services/schools_service")
+        try:
+            for mod in ("repository", "schemas"):
+                sys.modules.pop(mod, None)
+            from services.schools_service import router as schools_router
+            from services.schools_service import schemas as schools_schemas
+        finally:
+            sys.path.pop(0)
+            for mod in ("repository", "schemas"):
+                sys.modules.pop(mod, None)
+        schools_router.update_features(
+            1, schools_schemas.FeatureFlags(examinations_enabled=False),
+            self.db, self.master)
+        # The pending commit is now denied; nothing written, batch intact.
+        with self.assertRaises(ForbiddenError):
+            marks_router.commit_import(batch.batch_id, False, self.db, self.admin1)
+        self.assertEqual(self.db.query(Mark).count(), 0)
+        kept = self.db.query(bulk_mod.MarkImportBatch).filter_by(batch_id=batch.batch_id).one()
+        self.assertEqual(kept.status, "preview")
 
 
 if __name__ == "__main__":
