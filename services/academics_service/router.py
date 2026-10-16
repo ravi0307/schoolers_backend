@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.dependencies import require_role, require_examinations_enabled, require_school_scope, CurrentUser
 from common.exceptions import ConflictError, NotFoundError
 import repository as repo
 from schemas import (
@@ -233,6 +233,7 @@ def list_academic_years(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.list_years(db, school_id)
 
 
@@ -243,6 +244,7 @@ def create_academic_year(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.create_year(db, school_id, payload.model_dump())
 
 
@@ -254,6 +256,7 @@ def update_academic_year(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     year = repo.get_year(db, school_id, year_id)
     if year is None:
         raise NotFoundError("Academic year not found")
@@ -268,6 +271,7 @@ def list_academic_periods(
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
     # The year must belong to the caller's school before its periods are read.
+    require_examinations_enabled(db, school_id)
     if repo.get_year(db, school_id, year_id) is None:
         raise NotFoundError("Academic year not found")
     return repo.list_periods(db, year_id)
@@ -280,6 +284,7 @@ def create_academic_period(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     year = repo.get_year(db, school_id, payload.year_id)
     if year is None:
         raise NotFoundError("Academic year not found")
@@ -294,6 +299,7 @@ def update_academic_period(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     period = repo.get_period_in_school(db, school_id, period_id)
     if period is None:
         raise NotFoundError("Academic period not found")
@@ -307,6 +313,7 @@ def list_academic_events(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if year_id is not None and repo.get_year(db, school_id, year_id) is None:
         raise NotFoundError("Academic year not found")
     return repo.list_events(db, school_id, year_id)
@@ -319,6 +326,7 @@ def create_academic_event(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.create_event(db, school_id, payload.model_dump(exclude_unset=True))
 
 
@@ -330,6 +338,7 @@ def update_academic_event(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     event = repo.get_event(db, school_id, event_id)
     if event is None:
         raise NotFoundError("Academic event not found")
@@ -343,6 +352,7 @@ def delete_academic_event(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     event = repo.get_event(db, school_id, event_id)
     if event is None:
         raise NotFoundError("Academic event not found")
@@ -359,6 +369,7 @@ def list_examination_types(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.list_examination_types(db, school_id)
 
 
@@ -369,6 +380,7 @@ def create_examination_type(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.create_examination_type(db, school_id, payload.model_dump(exclude_unset=True))
 
 
@@ -380,6 +392,7 @@ def update_examination_type(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam_type = repo.get_examination_type(db, school_id, type_id)
     if exam_type is None:
         raise NotFoundError("Examination type not found")
@@ -392,6 +405,7 @@ def list_grade_scales(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.list_grade_scales(db, school_id)
 
 
@@ -402,6 +416,7 @@ def create_grade_scale(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.create_grade_scale(db, school_id, payload.model_dump(exclude_unset=True))
 
 
@@ -413,6 +428,7 @@ def update_grade_scale(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     scale = repo.get_grade_scale(db, school_id, scale_id)
     if scale is None:
         raise NotFoundError("Grade scale not found")
@@ -427,6 +443,7 @@ def new_grade_scale_version(
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """Copy-on-write: freeze the current version, open the next with copied levels."""
+    require_examinations_enabled(db, school_id)
     scale = repo.get_grade_scale(db, school_id, scale_id)
     if scale is None:
         raise NotFoundError("Grade scale not found")
@@ -440,6 +457,7 @@ def list_grade_levels(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_grade_scale(db, school_id, scale_id) is None:
         raise NotFoundError("Grade scale not found")
     return repo.list_grade_levels(db, scale_id)
@@ -453,6 +471,7 @@ def create_grade_level(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_grade_scale(db, school_id, scale_id) is None:
         raise NotFoundError("Grade scale not found")
     return repo.create_grade_level(db, scale_id, payload.model_dump(exclude_unset=True))
@@ -466,6 +485,7 @@ def update_grade_level(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     level = repo.get_grade_level_in_school(db, school_id, level_id)
     if level is None:
         raise NotFoundError("Grade level not found")
@@ -479,6 +499,7 @@ def delete_grade_level(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     level = repo.get_grade_level_in_school(db, school_id, level_id)
     if level is None:
         raise NotFoundError("Grade level not found")
@@ -496,6 +517,7 @@ def create_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     return repo.create_examination(
         db, school_id, current_user.user_id, payload.model_dump(exclude_unset=True)
     )
@@ -508,6 +530,7 @@ def list_examinations(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if year_id is not None and repo.get_year(db, school_id, year_id) is None:
         raise NotFoundError("Academic year not found")
     return repo.list_examinations(db, school_id, year_id)
@@ -525,6 +548,7 @@ def examination_timetable(
 ):
     # NOTE: defined before /examinations/{exam_id} so "timetable" is not
     # captured as an exam id.
+    require_examinations_enabled(db, school_id)
     return repo.timetable(db, school_id, year_id, class_id, date_from, date_to)
 
 
@@ -535,6 +559,7 @@ def get_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -549,6 +574,7 @@ def update_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -562,6 +588,7 @@ def publish_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -575,6 +602,7 @@ def unpublish_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -589,6 +617,7 @@ def cancel_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -602,6 +631,7 @@ def delete_examination(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -619,6 +649,7 @@ def list_examination_sessions(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_examination(db, school_id, exam_id) is None:
         raise NotFoundError("Examination not found")
     return repo.list_sessions(db, exam_id)
@@ -632,6 +663,7 @@ def create_examination_session(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     exam = repo.get_examination(db, school_id, exam_id)
     if exam is None:
         raise NotFoundError("Examination not found")
@@ -659,6 +691,7 @@ def update_examination_session(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     session, exam = _session_in_scope(db, school_id, session_id)
     data = payload.model_dump(exclude_unset=True)
     session, warnings = repo.update_session(
@@ -674,6 +707,7 @@ def delete_examination_session(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     session, exam = _session_in_scope(db, school_id, session_id)
     repo.delete_session(db, exam, session)
     return Response(status_code=204)
@@ -686,6 +720,7 @@ def complete_examination_session(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     session, exam = _session_in_scope(db, school_id, session_id)
     session, warnings = repo.complete_session(db, exam, session, current_user.user_id)
     return {"session": session, "warnings": warnings}
@@ -698,6 +733,7 @@ def list_session_versions(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     session, _ = _session_in_scope(db, school_id, session_id)
     return repo.list_session_versions(db, session.session_id)
 

@@ -17,14 +17,14 @@ from common.exceptions import AppError, ConflictError, NotFoundError
 from common.models import (
     Base, AcademicYear, AcademicPeriod, ExaminationType, Examination,
     ExaminationSession, ExaminationSessionVersion, GradeScale,
-    Holiday, SchoolClass, Subject,
+    Holiday, School, SchoolClass, Subject,
 )
 import services.academics_service.repository as repo
 
 TABLES = [
     "academic_years", "academic_periods", "examination_types", "examinations",
     "examination_sessions", "examination_session_versions",
-    "classes", "subjects", "holidays", "academic_events", "grade_scales",
+    "schools", "classes", "subjects", "holidays", "academic_events", "grade_scales",
     "class_subjects", "student_subjects",
 ]
 
@@ -91,6 +91,15 @@ class ExaminationSchedulingTests(unittest.TestCase):
             Subject(subject_id=5, school_id=1, name="Science"),
             Subject(subject_id=7, school_id=2, name="Maths"),
             Holiday(school_id=1, occasion="Diwali", holiday_date=date(2026, 11, 5)),
+        ])
+        self.db.commit()
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
         ])
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)

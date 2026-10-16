@@ -15,10 +15,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
 from common.exceptions import AppError, ConflictError, NotFoundError
-from common.models import AcademicEvent, AcademicPeriod, AcademicYear, Base
+from common.models import AcademicEvent, AcademicPeriod, AcademicYear, Base, School
 import services.academics_service.repository as repo
 
-TABLES = ["academic_years", "academic_periods", "academic_events"]
+TABLES = ["schools", "academic_years", "academic_periods", "academic_events"]
 
 
 def _load_academics_router():
@@ -56,6 +56,15 @@ class AcademicYearTests(unittest.TestCase):
         self.db: Session = self.Session()
         for name in TABLES:
             self.db.execute(Base.metadata.tables[name].delete())
+        self.db.commit()
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+        ])
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
         self.admin2 = CurrentUser(user_id=12, role="admin", school_id=2, linked_person_id=None)
@@ -125,6 +134,15 @@ class AcademicPeriodTests(unittest.TestCase):
         for name in TABLES:
             self.db.execute(Base.metadata.tables[name].delete())
         self.db.commit()
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+        ])
+        self.db.commit()
         self.year = repo.create_year(self.db, 1, dict(YEAR_26))
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
 
@@ -191,6 +209,15 @@ class AcademicEventTests(unittest.TestCase):
         self.db: Session = self.Session()
         for name in TABLES:
             self.db.execute(Base.metadata.tables[name].delete())
+        self.db.commit()
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+        ])
         self.db.commit()
         self.year = repo.create_year(self.db, 1, dict(YEAR_26))
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)

@@ -3,7 +3,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import require_role, CurrentUser
+from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
 import bulk
 import repository as repo
@@ -152,6 +152,7 @@ def create_session_mark(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     session, exam = _session_and_exam(db, current_user.school_id, payload.session_id)
     _require_session_grader(db, current_user, session)
     return repo.create_session_mark(
@@ -167,6 +168,7 @@ def update_mark(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     mark = repo.get_mark_in_school(db, current_user.school_id, mark_id)
     if mark is None:
         raise NotFoundError("Mark not found")
@@ -183,6 +185,7 @@ def submit_session_marks(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     session, _ = _session_and_exam(db, current_user.school_id, session_id)
     _require_session_grader(db, current_user, session)
     return repo.submit_session_marks(db, session)
@@ -196,6 +199,7 @@ def publish_session_marks(
 ):
     # Publishing is admin-only; require_school_scope is folded into the
     # session lookup so cross-school ids are a uniform 404.
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     session, _ = _session_and_exam(db, current_user.school_id, session_id)
@@ -208,6 +212,7 @@ def withhold_marks(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     rows = repo.get_marks_in_school(db, current_user.school_id, payload.mark_ids)
@@ -222,6 +227,7 @@ def unwithhold_marks(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     rows = repo.get_marks_in_school(db, current_user.school_id, payload.mark_ids)
@@ -237,6 +243,7 @@ def correct_mark(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     mark = repo.get_mark_in_school(db, current_user.school_id, mark_id)
@@ -259,6 +266,7 @@ def import_template(
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
     """Starter CSV for a session: one row per active class student."""
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     session, _ = _session_and_exam(db, current_user.school_id, session_id)
@@ -278,6 +286,7 @@ def preview_import(
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
     """Validate a spreadsheet, write a preview batch, commit nothing."""
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     session, exam = _session_and_exam(db, current_user.school_id, session_id)
@@ -315,6 +324,7 @@ def commit_import(
         current_user.school_id is not None and batch.school_id != current_user.school_id
     ):
         raise NotFoundError("Import batch not found")
+    require_examinations_enabled(db, batch.school_id)
     session, _ = _session_and_exam(db, batch.school_id, batch.session_id)
     _require_session_grader(db, current_user, session)
     return bulk.commit_batch(
@@ -329,6 +339,7 @@ def export_marks(
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
     """Authorized CSV export for one session, formula-injection guarded."""
+    require_examinations_enabled(db, current_user.school_id)
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     session, _ = _session_and_exam(db, current_user.school_id, session_id)
@@ -377,6 +388,7 @@ def get_student_results(
         raise NotFoundError("Student not found")
     else:
         scope = current_user.school_id
+    require_examinations_enabled(db, scope)
     return repo.student_results(db, scope, student_id, year_id, exam_id)
 
 
@@ -396,6 +408,7 @@ def get_examination_results(
         scope = _master_scope(current_user, school_id)
     else:
         scope = current_user.school_id
+    require_examinations_enabled(db, scope)
     exam = db.query(ExamModel).filter(
         ExamModel.exam_id == exam_id, ExamModel.school_id == scope).first()
     if exam is None:

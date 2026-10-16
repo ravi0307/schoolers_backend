@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import require_role, CurrentUser
+from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import NotFoundError, ForbiddenError, AppError
 from common.storage import (
     ALLOWED_IMAGE_TYPES,
@@ -169,6 +169,7 @@ def update_marking_system(
     """
     _guard_school_access(current_user, school_id)
     school = _get_or_404(db, school_id)
+    require_examinations_enabled(db, school_id)
     return repo.set_marking_system(db, school, payload.marking_system, payload.confirm)
 
 

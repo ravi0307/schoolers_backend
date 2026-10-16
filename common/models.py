@@ -68,6 +68,10 @@ class School(AuditColumnsMixin, Base):
     marking_system = Column(String(10), nullable=False, default="marks", server_default="marks")
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    # B1 rollout gate (marks_feature): per-school opt-in for the examination
+    # framework. Default off. Checked ONLY by new examination/marks endpoints;
+    # legacy paths never read it, so the flag cannot disable legacy marks.
+    examinations_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
 
     __table_args__ = (CheckConstraint("marking_system IN ('marks', 'grades')"),)
 

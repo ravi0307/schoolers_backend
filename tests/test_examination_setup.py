@@ -59,12 +59,15 @@ class MarkingSystemTests(unittest.TestCase):
         self.db.commit()
         self.db.add_all([
             School(school_id=1, name="Green Valley", address="A", pincode="1",
-                   city="C", state="S", primary_contact="P", primary_email="e@x.io"),
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
             School(school_id=2, name="Blue Horizon", address="A", pincode="1",
-                   city="C", state="S", primary_contact="P", primary_email="e@x.io"),
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
         ])
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
+        self.admin2 = CurrentUser(user_id=12, role="admin", school_id=2, linked_person_id=None)
         self.admin2 = CurrentUser(user_id=12, role="admin", school_id=2, linked_person_id=None)
         self.master = CurrentUser(user_id=1, role="master", school_id=None, linked_person_id=None)
         self.teacher1 = CurrentUser(user_id=31, role="teacher", school_id=1, linked_person_id=7)
@@ -160,6 +163,16 @@ class ExaminationTypeTests(unittest.TestCase):
             self.db.execute(Base.metadata.tables[name].delete())
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+        ])
+        self.db.commit()
+        self.admin2 = CurrentUser(user_id=12, role="admin", school_id=2, linked_person_id=None)
 
     def tearDown(self):
         self.db.rollback()
@@ -189,7 +202,7 @@ class ExaminationTypeTests(unittest.TestCase):
         self.assertFalse(acad_repo.get_examination_type(self.db, 1, t1.type_id).is_active)
         with self.assertRaises(NotFoundError):
             router.update_examination_type(
-                t1.type_id, schemas.ExaminationTypeUpdate(name="X"), self.db, 2, self.admin1
+                t1.type_id, schemas.ExaminationTypeUpdate(name="X"), self.db, 2, self.admin2
             )
 
 
@@ -209,6 +222,16 @@ class GradeScaleTests(unittest.TestCase):
             self.db.execute(Base.metadata.tables[name].delete())
         self.db.commit()
         self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
+        self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+            School(school_id=2, name="Blue Horizon", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
+        ])
+        self.db.commit()
+        self.admin2 = CurrentUser(user_id=12, role="admin", school_id=2, linked_person_id=None)
 
     def tearDown(self):
         self.db.rollback()
@@ -257,10 +280,10 @@ class GradeScaleTests(unittest.TestCase):
         level = acad_repo.list_grade_levels(self.db, scale.scale_id)[0]
         with self.assertRaises(NotFoundError):
             router.update_grade_level(
-                level.level_id, schemas.GradeLevelUpdate(label="Z"), self.db, 2, self.admin1
+                level.level_id, schemas.GradeLevelUpdate(label="Z"), self.db, 2, self.admin2
             )
         with self.assertRaises(NotFoundError):
-            router.delete_grade_level(level.level_id, self.db, 2, self.admin1)
+            router.delete_grade_level(level.level_id, self.db, 2, self.admin2)
         updated = router.update_grade_level(
             level.level_id, schemas.GradeLevelUpdate(description="Top"), self.db, 1, self.admin1
         )

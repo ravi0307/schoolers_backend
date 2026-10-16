@@ -14,13 +14,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from common.dependencies import CurrentUser
 from common.exceptions import AppError, ConflictError, NotFoundError
 from common.models import (
-    Base, AcademicYear, ClassEnrollment, PromotionBatch, SchoolClass,
+    Base, AcademicYear, ClassEnrollment, PromotionBatch, School, SchoolClass,
     Student, Subject,
 )
 import services.people_service.repository as repo
 
 TABLES = [
-    "academic_years", "classes", "students", "subjects", "class_enrollments",
+    "schools", "academic_years", "classes", "students", "subjects", "class_enrollments",
     "promotion_batches", "class_subjects", "student_subjects",
     "examination_types", "examinations", "examination_sessions", "marks",
 ]
@@ -63,6 +63,10 @@ class PromotionTests(unittest.TestCase):
         self.db.commit()
         _year(self.db, 1, 1, "2026-27", date(2026, 6, 1), date(2027, 5, 31))
         _year(self.db, 2, 1, "2027-28", date(2027, 6, 1), date(2028, 5, 31))
+        self.db.add(
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True))
         self.db.add_all([
             SchoolClass(class_id=1, school_id=1, name="8-A"),
             SchoolClass(class_id=2, school_id=1, name="8-B"),

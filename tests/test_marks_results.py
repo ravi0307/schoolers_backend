@@ -17,13 +17,13 @@ from common.dependencies import CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
 from common.models import (
     Base, AcademicYear, Examination, ExaminationSession, ExaminationType,
-    GradeLevel, GradeScale, Mark, Parent, ParentStudent, Student, Subject,
+    GradeLevel, GradeScale, Mark, Parent, ParentStudent, School, Student, Subject,
     TeacherClassSubject,
 )
 import services.marks_service.repository as repo
 
 TABLES = [
-    "academic_years", "examination_types", "examinations", "examination_sessions",
+    "schools", "academic_years", "examination_types", "examinations", "examination_sessions",
     "grade_scales", "grade_levels", "students", "subjects", "parents",
     "parent_student", "teacher_class_subjects", "marks",
     "class_subjects", "student_subjects",
@@ -68,6 +68,9 @@ class MarksResultsTests(unittest.TestCase):
             self.db.execute(Base.metadata.tables[name].delete())
         self.db.commit()
         self.db.add_all([
+            School(school_id=1, name="Green Valley", address="A", pincode="1",
+                   city="C", state="S", primary_contact="P", primary_email="e@x.io",
+                   examinations_enabled=True),
             AcademicYear(year_id=1, school_id=1, name="2026-27",
                          start_date=date(2026, 6, 1), end_date=date(2027, 5, 31)),
             ExaminationType(type_id=1, school_id=1, name="Half-Yearly", default_max_marks=100),

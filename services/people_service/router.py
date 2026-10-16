@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import require_role, require_school_scope, CurrentUser
+from common.dependencies import require_role, require_examinations_enabled, require_school_scope, CurrentUser
 from common.email import send_student_added_email
 from common.exceptions import AppError, NotFoundError, ForbiddenError
 import repository as repo
@@ -299,6 +299,7 @@ def preview_promotion(
     reconciliation roster: every active student proposed into their
     current class as `enrolled` in the target year.
     """
+    require_examinations_enabled(db, school_id)
     class_map = {entry.from_class_id: entry.to_class_id for entry in payload.class_map}
     return repo.preview_promotion(
         db, school_id, payload.source_year_id, payload.target_year_id, class_map
@@ -314,6 +315,7 @@ def commit_promotion(
 ):
     """Apply enrollment rows plus the class-cache update in one transaction.
     Retries with the same idempotency key return the prior receipt."""
+    require_examinations_enabled(db, school_id)
     return repo.commit_promotion(
         db, school_id, current_user.user_id,
         payload.source_year_id, payload.target_year_id,
@@ -328,6 +330,7 @@ def list_promotion_batches(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     batches = repo.list_promotion_batches(db, school_id)
     out = []
     for batch in batches:
@@ -350,6 +353,7 @@ def get_promotion_batch(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     batch = repo.get_promotion_batch(db, school_id, batch_id)
     if batch is None:
         raise NotFoundError("Promotion batch not found")
@@ -362,6 +366,7 @@ def list_student_subjects(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     from services.academics_service import repository as acad_repo
 
     if repo.get_student(db, school_id, student_id) is None:
@@ -389,6 +394,7 @@ def enroll_student_subject(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     from services.academics_service import repository as acad_repo
 
     if repo.get_student(db, school_id, student_id) is None:
@@ -419,6 +425,7 @@ def update_student_subject(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     from services.academics_service import repository as acad_repo
     from common.models import StudentSubject as StudentSubjectModel
 

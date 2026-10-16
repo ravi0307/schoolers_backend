@@ -657,6 +657,39 @@ class BackendContractTests(unittest.TestCase):
             self.assertIn(route, router)
         self.assertIn("published_only=True", router)
 
+    def test_rollout_flag_contract(self):
+        """B1: per-school examinations gate on new endpoints only."""
+        for service in ("academics_service", "marks_service", "people_service",
+                        "schools_service"):
+            router = (ROOT / "services" / service / "router.py").read_text(encoding="utf-8")
+            self.assertIn("require_examinations_enabled", router,
+                          f"{service} never enforces the rollout flag")
+        schools_router = (ROOT / "services" / "schools_service" / "router.py").read_text(
+            encoding="utf-8")
+        self.assertIn('"/{school_id}/marking-system"', schools_router)
+        # Flipping flags and switching marking systems are privileged:
+        # master-only features endpoint, master/admin-only marking switch.
+        features_start = schools_router.rindex("@router.patch(", 0,
+                                                 schools_router.index("def update_features"))
+        self.assertIn('require_role("master")', schools_router[features_start:features_start + 400])
+        # Legacy marks reads/writes carry no flag check by design, so the
+        # flag cannot disable legacy functionality.
+        marks_router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        legacy_section = marks_router.split("# ---- Session marks lifecycle")[0]
+        for func in ("def get_student_marks", "def get_class_marks", "def upsert_mark"):
+            body = legacy_section.split(func, 1)[1].split("\n\n\n", 1)[0]
+            self.assertNotIn("require_examinations_enabled", body, func)
+        schemas_src = (ROOT / "services" / "schools_service" / "schemas.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("examinations_enabled", schemas_src)
+        migration = (ROOT / "db-migration-examinations-flag.sql").read_text(encoding="utf-8")
+        for fragment in ("examinations_enabled", "DEFAULT FALSE", "IF NOT EXISTS"):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
     def test_media_read_schema_exposes_created_at(self):
         """MediaRead must carry created_at so gallery albums display timestamps."""
         schema = (ROOT / "services" / "media_service" / "schemas.py").read_text(encoding="utf-8")

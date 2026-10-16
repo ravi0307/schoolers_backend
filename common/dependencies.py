@@ -66,3 +66,18 @@ def require_school_scope(current_user: CurrentUser = Depends(get_current_user)) 
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")
     return current_user.school_id
+
+
+def require_examinations_enabled(db: Session, school_id: int) -> None:
+    """B1 rollout gate: per-school opt-in for the examination framework.
+
+    Call with the already-resolved school id on every NEW examination/marks
+    endpoint (years through results, settings, promotions, import/export).
+    Legacy paths never call this, so the flag cannot disable legacy marks
+    by construction. Missing rows and False both deny (fail safe).
+    """
+    from common.models import School
+
+    school = db.query(School).filter(School.school_id == school_id).first()
+    if school is None or not school.examinations_enabled:
+        raise ForbiddenError("Examinations are not enabled for this school")

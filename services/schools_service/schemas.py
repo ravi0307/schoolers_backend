@@ -57,6 +57,7 @@ class FeatureFlags(BaseModel):
     library_enabled: bool | None = None
     fees_enabled: bool | None = None
     salary_enabled: bool | None = None
+    examinations_enabled: bool | None = None
 
 
 class SchoolStatusUpdate(BaseModel):
