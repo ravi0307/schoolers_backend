@@ -498,3 +498,281 @@ def get_marks_in_school(db: Session, school_id: int, mark_ids: list[int]) -> lis
         .filter(Mark.mark_id.in_(mark_ids), Student.school_id == school_id)
         .all()
     )
+
+
+# ---- Results aggregation (Phase 6) ----
+# Published, non-withheld rows only. Marks-wise scopes sum each row's own
+# captured maximum (mixed maxima are valid: 42/50 + 78/100 = 120/150, never
+# averaged percentages). Grade-wise scopes count distributions and never
+# invent numbers. Absent/missing/exempt rows are listed, excluded from
+# totals, and raise the incomplete flag. Legacy session-less rows group by
+# verbatim term string under "earlier terms" and never merge with year
+# scopes, so double-counting is impossible by construction.
+
+
+def _subject_names(db: Session, school_id: int) -> dict:
+    from common.models import Subject as SubjectModel
+
+    return {
+        s.subject_id: s.name
+        for s in db.query(SubjectModel)
+        .filter(SubjectModel.school_id == school_id)
+        .all()
+    }
+
+
+def _grade_for_percentage(db: Session, scale_id: int | None, percentage: float):
+    """A grade only when the pinned scale defines numeric bands. No global
+    thresholds are invented here; without bands the answer is None."""
+    if scale_id is None or percentage is None:
+        return None
+    levels = (
+        db.query(GradeLevel)
+        .filter(
+            GradeLevel.scale_id == scale_id,
+            GradeLevel.min_score.is_not(None),
+            GradeLevel.max_score.is_not(None),
+        )
+        .order_by(GradeLevel.rank)
+        .all()
+    )
+    for level in levels:
+        if level.min_score <= percentage <= level.max_score:
+            return {"label": level.label, "description": level.description}
+    return None
+
+
+def _visible_marks_query(db: Session, student_id: int):
+    return db.query(Mark).filter(
+        Mark.student_id == student_id,
+        Mark.workflow_status == "published",
+        Mark.is_withheld.is_(False),
+    )
+
+
+def _exam_context(db: Session, exam, sessions):
+    from common.models import ExaminationType as TypeModel
+
+    type_row = db.query(TypeModel).filter(TypeModel.type_id == exam.type_id).first()
+    dates = sorted(s.date for s in sessions if s.date is not None)
+    return {
+        "exam_id": exam.exam_id,
+        "name": exam.name,
+        "start_date": dates[0].isoformat() if dates else None,
+        "end_date": dates[-1].isoformat() if dates else None,
+        "result_format": exam.result_format_expectation,
+        "type_name": type_row.name if type_row else None,
+        "status": exam.status,
+    }
+
+
+def _row_view(subject_names: dict, mark) -> dict:
+    return {
+        "mark_id": mark.mark_id,
+        "subject_id": mark.subject_id,
+        "subject_name": subject_names.get(mark.subject_id, f"Subject #{mark.subject_id}"),
+        "score": mark.score,
+        "max_marks": mark.max_marks,
+        "grade_level_id": mark.grade_level_id,
+        "grade": None,
+        "assessment_status": mark.assessment_status,
+        "term": mark.term,
+    }
+
+
+def _summarize_marks_rows(rows: list) -> dict:
+    """Totals over present numeric rows; incomplete when anything else lurks."""
+    present = [m for m in rows if m.assessment_status == "present" and m.score is not None]
+    obtained = sum(m.score for m in present)
+    possible = sum(m.max_marks for m in present if m.max_marks)
+    incomplete = any(m.assessment_status != "present" for m in rows)
+    percentage = round(obtained / possible * 100, 2) if possible else None
+    return {
+        "obtained": obtained,
+        "possible": possible,
+        "percentage": percentage,
+        "incomplete": incomplete or not present,
+        "subjects_counted": len(present),
+        "subjects_total": len(rows),
+    }
+
+
+def student_results(db: Session, school_id: int, student_id: int,
+                    year_id: int | None = None, exam_id: int | None = None) -> dict:
+    from common.models import Examination as ExamModel
+
+    names = _subject_names(db, school_id)
+    session_rows = (
+        _visible_marks_query(db, student_id)
+        .filter(Mark.examination_session_id.is_not(None))
+        .all()
+    )
+    legacy_rows = (
+        _visible_marks_query(db, student_id)
+        .filter(Mark.examination_session_id.is_(None))
+        .order_by(Mark.term)
+        .all()
+    )
+    examinations, aggregate_rows = [], []
+    seen_exams: dict[int, dict] = {}
+    sessions_by_exam: dict[int, list] = {}
+    for mark in session_rows:
+        session, exam = get_session_with_exam(db, mark.examination_session_id)
+        if session is None or exam is None:
+            continue
+        if exam.school_id != school_id:
+            continue
+        if year_id is not None and exam.year_id != year_id:
+            continue
+        if exam_id is not None and exam.exam_id != exam_id:
+            continue
+        key = exam.exam_id
+        if key not in seen_exams:
+            seen_exams[key] = {"exam": exam, "sessions": [], "subjects": []}
+            examinations.append(seen_exams[key])
+        seen_exams[key]["sessions"].append(session)
+        view = _row_view(names, mark)
+        seen_exams[key]["subjects"].append(view)
+        aggregate_rows.append(mark)
+    final_examinations = []
+    for holder in examinations:
+        exam = holder["exam"]
+        entry = _exam_context(db, exam, holder["sessions"])
+        entry["subjects"] = holder["subjects"]
+        final_examinations.append(entry)
+    examinations = final_examinations
+    by_exam_marks: dict[int, list] = {}
+    for mark in aggregate_rows:
+        by_exam_marks.setdefault(mark.examination_session_id, []).append(mark)
+    exam_of_session = {}
+    for holder in seen_exams.values():
+        for s in holder["sessions"]:
+            exam_of_session[s.session_id] = holder["exam"].exam_id
+    marks_by_exam: dict[int, list] = {}
+    for mark in aggregate_rows:
+        marks_by_exam.setdefault(exam_of_session[mark.examination_session_id], []).append(mark)
+    for entry in examinations:
+        summary = _summarize_marks_rows(marks_by_exam.get(entry["exam_id"], []))
+        entry.update(summary)
+        if entry["result_format"] == "marks" and summary["percentage"] is not None:
+            exam = db.query(ExamModel).filter(ExamModel.exam_id == entry["exam_id"]).first()
+            grade = _grade_for_percentage(
+                db, exam.grade_scale_id if exam else None, summary["percentage"])
+            if grade:
+                entry["grade"] = grade
+        if entry["result_format"] == "grade":
+            dist: dict[str, int] = {}
+            for v in entry["subjects"]:
+                if v["assessment_status"] == "present":
+                    level = db.query(GradeLevel).filter(
+                        GradeLevel.level_id == v["grade_level_id"]).first()
+                    label = level.label if level else "Ungraded"
+                    dist[label] = dist.get(label, 0) + 1
+            entry["grade_distribution"] = dist
+            # Grade scopes carry no numbers: drop the numeric summary keys
+            # so callers cannot mistake them for computed totals.
+            for numeric_key in ("obtained", "possible", "percentage", "subjects_counted"):
+                entry.pop(numeric_key, None)
+    legacy_terms = []
+    by_term: dict[str, list] = {}
+    for mark in legacy_rows:
+        by_term.setdefault(mark.term, []).append(mark)
+    for term, rows in sorted(by_term.items()):
+        views = [_row_view(names, m) for m in rows]
+        legacy_terms.append({"term": term, "subjects": views, **_summarize_marks_rows(rows)})
+    aggregate = None
+    marks_rows = [m for m in aggregate_rows if m.result_format == "marks"]
+    if marks_rows:
+        aggregate = _summarize_marks_rows(marks_rows)
+        aggregate["scope"] = "year" if year_id is not None else "all examinations"
+    elif aggregate_rows:
+        aggregate = {"scope": "grade-only", "note": "Not applicable for grade-based assessment"}
+    return {
+        "student_id": student_id,
+        "examinations": examinations,
+        "legacy_terms": legacy_terms,
+        "aggregate": aggregate,
+    }
+
+
+def examination_results(db: Session, school_id: int, exam) -> dict:
+    """One examination's published results per student, plus the missing
+    list (class students with no row in any of the exam's sessions)."""
+    sessions = (
+        db.query(ExaminationSession)
+        .filter(ExaminationSession.exam_id == exam.exam_id)
+        .all()
+    )
+    names = _subject_names(db, school_id)
+    students: dict[int, dict] = {}
+    for session in sessions:
+        rows = (
+            db.query(Mark)
+            .filter(
+                Mark.examination_session_id == session.session_id,
+                Mark.workflow_status == "published",
+                Mark.is_withheld.is_(False),
+            )
+            .all()
+        )
+        for mark in rows:
+            entry = students.setdefault(mark.student_id, {"student_id": mark.student_id, "subjects": []})
+            entry["subjects"].append(_row_view(names, mark))
+    class_ids = sorted({s.class_id for s in sessions})
+    session_ids = {s.session_id for s in sessions}
+    missing = []
+    if class_ids:
+        published_here = {
+            m.student_id
+            for m in db.query(Mark.student_id)
+            .filter(
+                Mark.examination_session_id.in_(session_ids),
+                Mark.workflow_status == "published",
+                Mark.is_withheld.is_(False),
+            )
+            .all()
+        }
+        for student in (
+            db.query(Student)
+            .filter(Student.class_id.in_(class_ids), Student.is_active.is_(True))
+            .all()
+        ):
+            if student.student_id not in published_here:
+                missing.append(student.student_id)
+    results = []
+    for student_id, entry in sorted(students.items()):
+        marks_here = [
+            m for m in db.query(Mark).filter(
+                Mark.student_id == student_id,
+                Mark.workflow_status == "published",
+                Mark.is_withheld.is_(False)).all()
+            if m.examination_session_id in session_ids
+        ]
+        entry.update(_summarize_marks_rows(marks_here))
+        results.append(entry)
+    return {
+        "exam_id": exam.exam_id,
+        "name": exam.name,
+        "status": exam.status,
+        "results": results,
+        "missing_student_ids": sorted(missing),
+    }
+
+
+def teacher_in_exam(db: Session, staff_id: int, exam_id: int) -> bool:
+    """True when the teacher is assigned to at least one session slot."""
+    from common.models import ExaminationSession as SessionModel
+
+    triples = (
+        db.query(TeacherClassSubject.class_id, TeacherClassSubject.subject_id)
+        .filter(TeacherClassSubject.staff_id == staff_id)
+        .all()
+    )
+    if not triples:
+        return False
+    slots = (
+        db.query(SessionModel.class_id, SessionModel.subject_id)
+        .filter(SessionModel.exam_id == exam_id)
+        .all()
+    )
+    return any((c, s) in {(t.class_id, t.subject_id) for t in triples} for c, s in slots)

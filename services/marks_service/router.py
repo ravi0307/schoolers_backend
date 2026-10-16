@@ -10,6 +10,7 @@ import repository as repo
 from schemas import (
     MarkUpsert, MarkRead, SessionMarkCreate, SessionMarkUpdate,
     WithholdPayload, UnwithholdPayload, CorrectMarkPayload, MarkReadV2,
+    StudentResultsRead, ExaminationResultsRead,
 )
 
 router = APIRouter(prefix="/marks", tags=["marks"])
@@ -339,3 +340,69 @@ def export_marks(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=marks-session-{session_id}.csv"},
     )
+
+
+# ---- Results aggregation (Phase 6) ----
+
+
+@router.get("/results/student/{student_id}", response_model=StudentResultsRead)
+def get_student_results(
+    student_id: int,
+    year_id: int | None = None,
+    exam_id: int | None = None,
+    school_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "master")),
+):
+    """Published, non-withheld results grouped by examination, plus legacy
+    terms and a year aggregate. Scoping mirrors the marks reads; parents
+    and students never see drafts, withheld rows, or other families."""
+    if current_user.role == "master":
+        scope = _master_scope(current_user, school_id)
+        if not repo.student_in_school(db, student_id, scope):
+            raise NotFoundError("Student not found")
+    elif current_user.role == "parent":
+        if not current_user.linked_person_id or not repo.is_parent_of(
+            db, current_user.linked_person_id, student_id
+        ):
+            raise ForbiddenError("You can only view results for your own children")
+        scope = current_user.school_id
+    elif current_user.role == "teacher":
+        if not current_user.linked_person_id or not repo.teacher_teaches_student(
+            db, current_user.linked_person_id, student_id
+        ):
+            raise ForbiddenError("You can only view results for students you teach")
+        scope = current_user.school_id
+    elif not repo.student_in_school(db, student_id, current_user.school_id):
+        raise NotFoundError("Student not found")
+    else:
+        scope = current_user.school_id
+    return repo.student_results(db, scope, student_id, year_id, exam_id)
+
+
+@router.get("/results/examination/{exam_id}", response_model=ExaminationResultsRead)
+def get_examination_results(
+    exam_id: int,
+    school_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("teacher", "admin", "master")),
+):
+    """One examination's published results per student plus the missing
+    list. Teachers see examinations they teach in; parents use the student
+    view instead."""
+    from common.models import Examination as ExamModel
+
+    if current_user.role == "master":
+        scope = _master_scope(current_user, school_id)
+    else:
+        scope = current_user.school_id
+    exam = db.query(ExamModel).filter(
+        ExamModel.exam_id == exam_id, ExamModel.school_id == scope).first()
+    if exam is None:
+        raise NotFoundError("Examination not found")
+    if current_user.role == "teacher":
+        if not current_user.linked_person_id or not repo.teacher_in_exam(
+            db, current_user.linked_person_id, exam_id
+        ):
+            raise ForbiddenError("You don't teach in this examination")
+    return repo.examination_results(db, scope, exam)

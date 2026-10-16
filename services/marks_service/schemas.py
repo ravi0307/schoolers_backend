@@ -77,3 +77,18 @@ class MarkReadV2(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StudentResultsRead(BaseModel):
+    student_id: int
+    examinations: list[dict] = []
+    legacy_terms: list[dict] = []
+    aggregate: dict | None = None
+
+
+class ExaminationResultsRead(BaseModel):
+    exam_id: int
+    name: str
+    status: str
+    results: list[dict] = []
+    missing_student_ids: list[int] = []

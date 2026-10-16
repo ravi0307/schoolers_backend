@@ -175,6 +175,7 @@ class BackendContractTests(unittest.TestCase):
             "examinations",
             "sessions",
             "promotions",
+            "results",
             "teachers",
             "staff",
             "students",
@@ -643,6 +644,18 @@ class BackendContractTests(unittest.TestCase):
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, migration)
+
+    def test_results_endpoints_contract(self):
+        """Phase 6: published-only aggregated reads with uniform scoping."""
+        router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/results/student/{student_id}"',
+            '"/results/examination/{exam_id}"',
+        ):
+            self.assertIn(route, router)
+        self.assertIn("published_only=True", router)
 
     def test_media_read_schema_exposes_created_at(self):
         """MediaRead must carry created_at so gallery albums display timestamps."""

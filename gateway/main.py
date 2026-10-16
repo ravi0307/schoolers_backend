@@ -50,6 +50,7 @@ ROUTE_MAP = {
     "promotions": "people",
     "attendance": "attendance",
     "marks": "marks",
+    "results": "marks",
     "timetable": "timetable",
     "routes": "transport",
     "trips": "transport",
