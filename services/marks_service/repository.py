@@ -569,6 +569,7 @@ def _exam_context(db: Session, exam, sessions):
 def _row_view(subject_names: dict, mark) -> dict:
     return {
         "mark_id": mark.mark_id,
+        "student_id": mark.student_id,
         "subject_id": mark.subject_id,
         "subject_name": subject_names.get(mark.subject_id, f"Subject #{mark.subject_id}"),
         "score": mark.score,
@@ -576,7 +577,10 @@ def _row_view(subject_names: dict, mark) -> dict:
         "grade_level_id": mark.grade_level_id,
         "grade": None,
         "assessment_status": mark.assessment_status,
+        "workflow_status": mark.workflow_status,
+        "is_withheld": mark.is_withheld,
         "term": mark.term,
+        "examination_session_id": mark.examination_session_id,
     }
 
 
