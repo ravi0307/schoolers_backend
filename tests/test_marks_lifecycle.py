@@ -244,6 +244,18 @@ class SessionMarksLifecycleTests(unittest.TestCase):
                 self.db, stranger,
             )
 
+    def test_legacy_upsert_returns_legacy_row_beside_session_rows(self):
+        """E2E catch: with session and legacy rows sharing one
+        (student, subject, term), the legacy write path must read back the
+        legacy row — returning a session row breaks the legacy contract."""
+        self._mark(score=42)
+        row = repo.upsert_mark(self.db, 1, 3, "Term 1", 70, 7)
+        self.assertIsNone(row.examination_session_id)
+        self.assertEqual(row.score, 70)
+        row = repo.upsert_mark(self.db, 1, 3, "Term 1", 75, 7)
+        self.assertIsNone(row.examination_session_id)
+        self.assertEqual(row.score, 75)
+
     def test_session_max_reduction_blocked_with_entered_scores(self):
         import services.academics_service.repository as acad_repo
         self._mark(score=80)

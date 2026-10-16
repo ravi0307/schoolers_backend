@@ -149,8 +149,12 @@ def upsert_mark(
     )
     db.execute(stmt)
     db.commit()
+    # Scope the read-back to legacy rows: session rows may share the same
+    # (student, subject, term), and returning one would break the legacy
+    # response contract (and show the wrong score).
     return db.query(Mark).filter(
-        Mark.student_id == student_id, Mark.subject_id == subject_id, Mark.term == term
+        Mark.student_id == student_id, Mark.subject_id == subject_id,
+        Mark.term == term, Mark.examination_session_id.is_(None),
     ).first()
 
 
