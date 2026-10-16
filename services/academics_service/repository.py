@@ -520,6 +520,7 @@ def create_period(db: Session, year: AcademicYear, data: dict) -> AcademicPeriod
         raise AppError("The period must fall within its academic year", status_code=400)
     if period_overlaps(db, year.year_id, data["start_date"], data["end_date"]):
         raise ConflictError("The period overlaps another period in this academic year")
+    data = {k: v for k, v in data.items() if k != "year_id"}
     period = AcademicPeriod(year_id=year.year_id, **data)
     db.add(period)
     db.commit()

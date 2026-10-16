@@ -68,6 +68,7 @@ class SchoolRead(SchoolBase):
     school_id: int
     status: str
     marking_system: str = "marks"
+    examinations_enabled: bool = False
     route_enabled: bool
     website_enabled: bool
     library_enabled: bool

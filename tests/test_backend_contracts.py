@@ -685,6 +685,11 @@ class BackendContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("examinations_enabled", schemas_src)
+        # The flag must be visible on reads, not just accepted on writes:
+        # pilot debugging once showed a flip persisting while GET responses
+        # omitted the field.
+        read_block = schemas_src.split("class SchoolRead", 1)[1].split("\n\nclass ", 1)[0]
+        self.assertIn("examinations_enabled", read_block)
         migration = (ROOT / "db-migration-examinations-flag.sql").read_text(encoding="utf-8")
         for fragment in ("examinations_enabled", "DEFAULT FALSE", "IF NOT EXISTS"):
             with self.subTest(fragment=fragment):
