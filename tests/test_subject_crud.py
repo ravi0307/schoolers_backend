@@ -141,7 +141,9 @@ class SubjectCrudTests(unittest.TestCase):
             school_id=1, class_id=1, day_of_week="MON", period_id=1,
             subject_id=subject.subject_id, created_on=datetime.now(),
         ))
-        self.db.add(Mark(student_id=1, subject_id=subject.subject_id, term="Term 1", score=80))
+        self.db.add(Mark(student_id=1, subject_id=subject.subject_id, term="Term 1", score=80, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False))
         self.db.add(TeacherClassSubject(staff_id=1, class_id=1, subject_id=subject.subject_id))
         self.db.commit()
         inactive = academics_repo.deactivate_subject(self.db, subject)

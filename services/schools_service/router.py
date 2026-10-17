@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import require_role, CurrentUser
+from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import NotFoundError, ForbiddenError, AppError
 from common.storage import (
     ALLOWED_IMAGE_TYPES,
@@ -15,6 +15,7 @@ from common.storage import (
 import repository as repo
 from schemas import (
     SchoolCreate, SchoolUpdate, SchoolRead, SchoolWithCredentials, FeatureFlags, SchoolStatusUpdate, SchoolStats,
+    MarkingSystemUpdate,
 )
 
 router = APIRouter(prefix="/schools", tags=["schools"])
@@ -150,6 +151,26 @@ def update_school(
 ):
     school = _get_or_404(db, school_id)
     return repo.update_school(db, school, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/{school_id}/marking-system", response_model=SchoolRead)
+def update_marking_system(
+    school_id: int,
+    payload: MarkingSystemUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("master", "admin")),
+):
+    """Switch the school's marking system (marks/numbers vs grades).
+
+    Master may change any school; an admin only their own (guarded below,
+    so teachers, parents, and other schools' admins get 403). Switching
+    with existing marks requires confirm=true (409 carries the impact
+    counts); published history always keeps its captured format.
+    """
+    _guard_school_access(current_user, school_id)
+    school = _get_or_404(db, school_id)
+    require_examinations_enabled(db, school_id)
+    return repo.set_marking_system(db, school, payload.marking_system, payload.confirm)
 
 
 @router.delete("/{school_id}", status_code=204)

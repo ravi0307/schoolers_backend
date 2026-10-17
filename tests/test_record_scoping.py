@@ -99,6 +99,17 @@ class ParentScopingTests(unittest.TestCase):
         )
         self.assertEqual(people_repo.children_of_parent(self.db, 4242), [])
 
+    def test_children_of_parent_excludes_cross_school_linkage(self):
+        # Phase 0 school guard: a linkage row spanning schools must not leak
+        # the other school's child, even if the link row exists (corrupt data
+        # or a guessed parent id must both stay silent).
+        self.db.add(Student(student_id=9, school_id=2, class_id=9, admission_no="B1", name="Zara"))
+        self.db.add(ParentStudent(parent_id=225, student_id=9))
+        self.db.commit()
+        self.assertEqual(
+            [s.student_id for s in people_repo.children_of_parent(self.db, 225)], [2]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

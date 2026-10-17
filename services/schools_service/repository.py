@@ -8,7 +8,8 @@ from common.email import (
     send_school_removed_email,
     send_school_registered_email,
 )
-from common.models import School, Staff, Student, Parent, User
+from common.models import School, Staff, Student, Parent, User, Mark
+from common.exceptions import ConflictError
 from common.security import generate_temp_password, hash_password
 from services.people_service import repository as people_repo
 
@@ -173,3 +174,41 @@ def compute_stats(db: Session, school_id: int) -> dict:
     students = db.query(func.count(Student.student_id)).filter(Student.school_id == school_id, Student.is_active.is_(True)).scalar()
     parents = db.query(func.count(distinct(Parent.parent_id))).filter(Parent.school_id == school_id, Parent.is_active.is_(True)).scalar()
     return {"teachers": teachers, "staff": staff, "students": students, "parents": parents}
+
+
+# ---- Marking system (Phase 2, marks_feature) ----
+
+
+def marking_impact_counts(db: Session, school_id: int) -> dict:
+    """Published-data counts shown in the switch confirmation.
+
+    Switching only affects NEW examinations and entries; these counts tell
+    the admin how much history keeps its captured format. The examinations
+    count is 0 until the examinations table lands (Phase 3).
+    """
+    marks = (
+        db.query(Student.student_id)
+        .join(Mark, Mark.student_id == Student.student_id)
+        .filter(Student.school_id == school_id)
+        .count()
+    )
+    return {"marks": marks, "examinations": 0}
+
+
+def set_marking_system(
+    db: Session, school: School, value: str, confirm: bool = False
+) -> School:
+    if school.marking_system == value:
+        return school
+    counts = marking_impact_counts(db, school.school_id)
+    if (counts["marks"] > 0 or counts["examinations"] > 0) and not confirm:
+        raise ConflictError(
+            f"Switching marking system affects {counts['marks']} existing marks "
+            f"and {counts['examinations']} examinations. Published history keeps "
+            f"its format; only new examinations use '{value}'. "
+            f"Resubmit with confirm=true to proceed."
+        )
+    school.marking_system = value
+    db.commit()
+    db.refresh(school)
+    return school

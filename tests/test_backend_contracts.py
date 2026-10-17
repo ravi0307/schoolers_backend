@@ -166,6 +166,16 @@ class BackendContractTests(unittest.TestCase):
             "subjects",
             "periods",
             "holidays",
+            "academic-years",
+            "academic-periods",
+            "academic-events",
+            "examination-types",
+            "grade-scales",
+            "grade-levels",
+            "examinations",
+            "sessions",
+            "promotions",
+            "results",
             "teachers",
             "staff",
             "students",
@@ -344,10 +354,15 @@ class BackendContractTests(unittest.TestCase):
         self.assertIn("upsert_mark", repository)
 
         # Shared schema guarantees: term default "Term 1" and score 0..100,
-        # riding on the (student_id, subject_id, term) unique upsert target.
+        # riding on the legacy session-less upsert target. Phase 4 splits
+        # identity into two partial uniques (legacy vs session rows) plus a
+        # payload-coherence check; the old bare unique is gone by design.
         self.assertIn('term: str = "Term 1"', schema)
         self.assertIn("ge=0, le=100", schema)
-        self.assertIn('UniqueConstraint("student_id", "subject_id", "term")', model)
+        self.assertIn('"marks_legacy_unique"', model)
+        self.assertIn('"marks_session_unique"', model)
+        self.assertIn("marks_payload_coherence", model)
+        self.assertIn("examination_session_id IS NULL", model)
 
     def test_parent_reads_are_scoped_to_own_children(self):
         """Parents must not read other families' marks/attendance/children."""
@@ -375,11 +390,26 @@ class BackendContractTests(unittest.TestCase):
         self.assertIn("updated_by_user=current_user.user_id", router)
 
         # Existence + per-role scope helpers used by the read/write guards.
-        for helper in ("student_exists", "subject_exists", "student_in_school", "teacher_teaches_student"):
+        for helper in ("subject_exists", "student_in_school", "teacher_teaches_student"):
             self.assertIn(helper, repository)
             self.assertIn(helper, router)
         self.assertIn("NotFoundError", router)
         self.assertIn('current_user.role == "teacher"', router)
+
+        # Phase 0 existence-oracle fix: the marks router must not run an
+        # unscoped existence probe before the school/role checks, or unknown
+        # ids (404) become distinguishable from out-of-school ids (403).
+        # The helper stays in the repository (other callers use it); the
+        # router reaches it through scoped checks only.
+        self.assertIn("student_exists", repository)
+        self.assertNotIn("repo.student_exists", router)
+
+        # Phase 0 master read-only access: reads name the school explicitly,
+        # writes stay teacher/admin-only.
+        self.assertIn('"master"', router)
+        self.assertIn("Master access requires an explicit school_id", router)
+        put_decorator = router.split("def upsert_mark")[0].rsplit("@router.put(", 1)[1]
+        self.assertNotIn("master", put_decorator)
 
     def test_attendance_status_and_teacher_scope_contract(self):
         schema = (ROOT / "services" / "attendance_service" / "schemas.py").read_text(encoding="utf-8")
@@ -456,6 +486,214 @@ class BackendContractTests(unittest.TestCase):
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, migrations)
+
+    def test_academic_calendar_endpoints_and_migration_contract(self):
+        """Phase 1: years/periods/events are school-scoped with admin writes."""
+        router = (ROOT / "services" / "academics_service" / "router.py").read_text(encoding="utf-8")
+        for route in ("/academic-years", "/academic-periods", "/academic-events"):
+            self.assertIn(f'"{route}"', router)
+        # Writes are admin-only; reads include parent/teacher/admin.
+        self.assertIn('require_role("admin")', router)
+        self.assertIn('require_role("parent", "teacher", "admin")', router)
+        self.assertIn("require_school_scope", router)
+        # Years/periods deactivate instead of deleting; only events delete.
+        deletes = re.findall(r'@router\.delete\("([^"]+)"', router)
+        self.assertIn("/academic-events/{event_id}", deletes)
+        for path in deletes:
+            self.assertFalse(
+                path.startswith("/academic-years/") or path.startswith("/academic-periods/"),
+                f"unexpected delete route {path}: years/periods deactivate, never delete",
+            )
+        # The migration is a separate idempotent file (repo convention).
+        migration = (ROOT / "db-migration-academic-calendar.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "academic_years",
+            "academic_periods",
+            "academic_events",
+            "IF NOT EXISTS",
+            "event_type IN ('exam_period', 'revision', 'result_date', 'other')",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_examination_setup_endpoints_and_migration_contract(self):
+        """Phase 2: marking setting, types, and versioned scales are scoped."""
+        academics_router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        schools_router = (ROOT / "services" / "schools_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            "/examination-types",
+            "/grade-scales",
+            "/grade-scales/{scale_id}/new-version",
+            "/grade-levels/{level_id}",
+        ):
+            self.assertIn(f'"{route}"', academics_router)
+        self.assertIn('"/{school_id}/marking-system"', schools_router)
+        self.assertIn('require_role("master", "admin")', schools_router)
+        # The generic school update cannot smuggle the setting: only the
+        # dedicated marking-system endpoint carries it.
+        schemas_src = (ROOT / "services" / "schools_service" / "schemas.py").read_text(
+            encoding="utf-8"
+        )
+        update_body = schemas_src.split("class SchoolUpdate", 1)[1].split("\n\nclass ", 1)[0]
+        self.assertNotIn("marking_system", update_body)
+        migration = (ROOT / "db-migration-examination-setup.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "marking_system",
+            "examination_types",
+            "grade_scales",
+            "grade_levels",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_examination_scheduling_endpoints_and_migration_contract(self):
+        """Phase 3: sessions are the scheduling source of truth with versions."""
+        router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/examinations"',
+            '"/examinations/timetable"',
+            '"/examinations/{exam_id}/publish"',
+            '"/examinations/{exam_id}/cancel"',
+            '"/examinations/{exam_id}/sessions"',
+            '"/sessions/{session_id}"',
+            '"/sessions/{session_id}/complete"',
+            '"/sessions/{session_id}/versions"',
+        ):
+            self.assertIn(route, router)
+        # Timetable is defined before the {exam_id} capture route.
+        self.assertLess(
+            router.index('"/examinations/timetable"'),
+            router.index('"/examinations/{exam_id}"'),
+        )
+        # Published-schedule writes are admin-only; reads include all roles.
+        self.assertIn('require_role("parent", "teacher", "admin")', router)
+        migration = (ROOT / "db-migration-examinations.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "examinations",
+            "examination_sessions",
+            "examination_session_versions",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_marks_lifecycle_endpoints_and_migration_contract(self):
+        """Phase 4: session lifecycle, corrections, and bulk pipeline exist."""
+        router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/session-marks"',
+            '"/sessions/{session_id}/submit"',
+            '"/sessions/{session_id}/publish"',
+            '"/withhold"',
+            '"/unwithhold"',
+            '"/{mark_id}/correct"',
+            '"/import/template"',
+            '"/import"',
+            '"/import/{batch_id}/commit"',
+            '"/export"',
+        ):
+            self.assertIn(route, router)
+        migration = (ROOT / "db-migration-marks-lifecycle.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "marks_legacy_unique",
+            "marks_session_unique",
+            "marks_payload_coherence",
+            "mark_corrections",
+            "mark_import_batches",
+            "mark_import_rows",
+            "WHERE examination_session_id IS NULL",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_promotion_enrollment_endpoints_and_migration_contract(self):
+        """Phase 5: preview/commit promotion, offerings, enrollment reads."""
+        people_router = (ROOT / "services" / "people_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        academics_router = (ROOT / "services" / "academics_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/promotions/preview"',
+            '"/promotions/commit"',
+            '"/promotions/batches"',
+            '"/students/{student_id}/subjects"',
+        ):
+            self.assertIn(route, people_router)
+        for route in ('"/classes/{class_id}/subjects"',):
+            self.assertIn(route, academics_router)
+        migration = (ROOT / "db-migration-enrollment-promotion.sql").read_text(encoding="utf-8")
+        for fragment in (
+            "promotion_batches",
+            "class_enrollments",
+            "class_enrollments_active_unique",
+            "class_subjects",
+            "student_subjects",
+            "IF NOT EXISTS",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
+
+    def test_results_endpoints_contract(self):
+        """Phase 6: published-only aggregated reads with uniform scoping."""
+        router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        for route in (
+            '"/results/student/{student_id}"',
+            '"/results/examination/{exam_id}"',
+        ):
+            self.assertIn(route, router)
+        self.assertIn("published_only=True", router)
+
+    def test_rollout_flag_contract(self):
+        """B1: per-school examinations gate on new endpoints only."""
+        for service in ("academics_service", "marks_service", "people_service",
+                        "schools_service"):
+            router = (ROOT / "services" / service / "router.py").read_text(encoding="utf-8")
+            self.assertIn("require_examinations_enabled", router,
+                          f"{service} never enforces the rollout flag")
+        schools_router = (ROOT / "services" / "schools_service" / "router.py").read_text(
+            encoding="utf-8")
+        self.assertIn('"/{school_id}/marking-system"', schools_router)
+        # Flipping flags and switching marking systems are privileged:
+        # master-only features endpoint, master/admin-only marking switch.
+        features_start = schools_router.rindex("@router.patch(", 0,
+                                                 schools_router.index("def update_features"))
+        self.assertIn('require_role("master")', schools_router[features_start:features_start + 400])
+        # Legacy marks reads/writes carry no flag check by design, so the
+        # flag cannot disable legacy functionality.
+        marks_router = (ROOT / "services" / "marks_service" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        legacy_section = marks_router.split("# ---- Session marks lifecycle")[0]
+        for func in ("def get_student_marks", "def get_class_marks", "def upsert_mark"):
+            body = legacy_section.split(func, 1)[1].split("\n\n\n", 1)[0]
+            self.assertNotIn("require_examinations_enabled", body, func)
+        schemas_src = (ROOT / "services" / "schools_service" / "schemas.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("examinations_enabled", schemas_src)
+        # The flag must be visible on reads, not just accepted on writes:
+        # pilot debugging once showed a flip persisting while GET responses
+        # omitted the field.
+        read_block = schemas_src.split("class SchoolRead", 1)[1].split("\n\nclass ", 1)[0]
+        self.assertIn("examinations_enabled", read_block)
+        migration = (ROOT / "db-migration-examinations-flag.sql").read_text(encoding="utf-8")
+        for fragment in ("examinations_enabled", "DEFAULT FALSE", "IF NOT EXISTS"):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, migration)
 
     def test_media_read_schema_exposes_created_at(self):
         """MediaRead must carry created_at so gallery albums display timestamps."""

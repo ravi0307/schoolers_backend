@@ -20,8 +20,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
-from common.exceptions import ForbiddenError, UnauthorizedError
-from common.models import Base, Broadcast, Parent, Pilot, School, SchoolClass, Staff, User
+from common.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
+from common.models import (
+    Base,
+    Broadcast,
+    Mark,
+    Parent,
+    ParentStudent,
+    Pilot,
+    School,
+    SchoolClass,
+    Staff,
+    Student,
+    Subject,
+    TeacherClassSubject,
+    User,
+)
 from common.security import hash_password, validate_password_byte_length, verify_password
 from services.auth_service.schemas import ForgotPasswordResetRequest
 from services.transport_service.schemas import PilotCreate, PilotUpdate
@@ -449,6 +463,139 @@ class ResetResponseUniformityTests(unittest.TestCase):
         validated = self.router.ForgotPasswordResponse(**response)
         self.assertIsNone(validated.reset_token)
         self.assertIsNone(validated.reset_expires_at)
+
+
+class MarksOracleAndMasterTests(unittest.TestCase):
+    """Phase 0: uniform unknown-vs-out-of-school responses + master read-only.
+
+    Regression: the marks router used to probe `student_exists` before the
+    school/role checks, so unknown ids (404) were distinguishable from
+    another school's ids (403). Unknown and out-of-school must now share one
+    response per role, and master reads must name their school explicitly.
+    """
+
+    TABLES = [
+        "classes", "subjects", "students", "parents", "parent_student",
+        "teacher_class_subjects", "marks",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.Session = make_session(cls.TABLES)
+        # Isolated router import: `import repository` inside the router
+        # resolves via sys.path, which other service-router tests also use,
+        # so evict the shared top-level names around the import and again
+        # afterwards to avoid cross-test module poisoning.
+        sys.path.insert(0, "services/marks_service")
+        try:
+            for mod in ("repository", "schemas"):
+                sys.modules.pop(mod, None)
+            from services.marks_service import router as marks_router
+            cls.router = marks_router
+        finally:
+            sys.path.pop(0)
+            for mod in ("repository", "schemas"):
+                sys.modules.pop(mod, None)
+
+    def setUp(self):
+        self.db: Session = self.Session()
+        for name in self.TABLES:
+            self.db.execute(Base.metadata.tables[name].delete())
+        self.db.commit()
+        self.db.add_all([
+            SchoolClass(class_id=1, school_id=1, name="8-A"),
+            SchoolClass(class_id=9, school_id=2, name="8-A"),
+            Subject(subject_id=3, school_id=1, name="Maths"),
+            Student(student_id=1, school_id=1, class_id=1, admission_no="A1", name="Riya"),
+            Student(student_id=3, school_id=1, class_id=2, admission_no="A3", name="Dev"),
+            Student(student_id=9, school_id=2, class_id=9, admission_no="B1", name="Zara"),
+            Parent(parent_id=225, school_id=1, name="Mrs Sinha", phone="9000000001"),
+            ParentStudent(parent_id=225, student_id=1),
+            TeacherClassSubject(staff_id=7, class_id=1, subject_id=3),
+            Mark(student_id=1, subject_id=3, term="Term 1", score=80, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
+            Mark(student_id=1, subject_id=3, term="Term 2", score=85, max_marks=100, result_format="marks",
+                             workflow_status="published", assessment_status="present",
+                             is_withheld=False),
+        ])
+        self.db.commit()
+        self.admin1 = CurrentUser(user_id=11, role="admin", school_id=1, linked_person_id=None)
+        self.master = CurrentUser(user_id=1, role="master", school_id=None, linked_person_id=None)
+        self.parent225 = CurrentUser(user_id=21, role="parent", school_id=1, linked_person_id=225)
+        self.teacher7 = CurrentUser(user_id=31, role="teacher", school_id=1, linked_person_id=7)
+
+    def tearDown(self):
+        self.db.rollback()
+        self.db.close()
+
+    def test_admin_cannot_distinguish_unknown_from_out_of_school_student(self):
+        # Unknown id and another school's id share one response: no oracle.
+        for probe in (4242, 9):
+            with self.assertRaises(NotFoundError) as ctx:
+                self.router.get_student_marks(probe, None, self.db, self.admin1)
+            self.assertEqual(str(ctx.exception), "Student not found")
+
+    def test_parent_cannot_distinguish_unknown_from_other_family(self):
+        for probe in (4242, 3):
+            with self.assertRaises(ForbiddenError) as ctx:
+                self.router.get_student_marks(probe, None, self.db, self.parent225)
+            self.assertEqual(str(ctx.exception), "You can only view marks for your own children")
+
+    def test_teacher_cannot_distinguish_unknown_from_untaught(self):
+        # Student 3 is real and in-school but taught by nobody in this seed.
+        for probe in (4242, 3):
+            with self.assertRaises(ForbiddenError) as ctx:
+                self.router.get_student_marks(probe, None, self.db, self.teacher7)
+            self.assertEqual(str(ctx.exception), "You can only view marks for students you teach")
+
+    def test_teacher_upsert_unknown_student_is_forbidden_not_notfound(self):
+        from types import SimpleNamespace
+        payload = SimpleNamespace(term="Term 1", score=50)
+        with self.assertRaises(ForbiddenError):
+            self.router.upsert_mark(4242, 3, payload, self.db, self.teacher7)
+
+    def test_admin_upsert_unknown_vs_out_of_school_uniform_notfound(self):
+        from types import SimpleNamespace
+        payload = SimpleNamespace(term="Term 1", score=50)
+        for probe in (4242, 9):
+            with self.assertRaises(NotFoundError) as ctx:
+                self.router.upsert_mark(probe, 3, payload, self.db, self.admin1)
+            self.assertEqual(str(ctx.exception), "Student not found")
+
+    def test_admin_upsert_success_unaffected(self):
+        from types import SimpleNamespace
+        row = self.router.upsert_mark(
+            1, 3, SimpleNamespace(term="Term 1", score=90), self.db, self.admin1
+        )
+        self.assertEqual(row.score, 90)
+
+    def test_master_student_read_requires_explicit_school(self):
+        with self.assertRaises(ForbiddenError) as ctx:
+            self.router.get_student_marks(1, None, self.db, self.master)
+        self.assertEqual(str(ctx.exception), "Master access requires an explicit school_id")
+        rows = self.router.get_student_marks(1, 1, self.db, self.master)
+        self.assertEqual(len(rows), 2)
+        # Other-school and unknown ids share the uniform 404.
+        for probe in (9, 4242):
+            with self.assertRaises(NotFoundError):
+                self.router.get_student_marks(probe, 1, self.db, self.master)
+
+    def test_master_class_read_requires_explicit_school(self):
+        with self.assertRaises(ForbiddenError):
+            self.router.get_class_marks(1, None, None, self.db, self.master)
+        rows = self.router.get_class_marks(1, None, 1, self.db, self.master)
+        self.assertEqual(len(rows), 2)
+        with self.assertRaises(NotFoundError):
+            self.router.get_class_marks(9, None, 1, self.db, self.master)
+
+    def test_class_term_filter_applies(self):
+        t1 = self.router.get_class_marks(1, "Term 1", None, self.db, self.admin1)
+        self.assertEqual([m.term for m in t1], ["Term 1"])
+        t2 = self.router.get_class_marks(1, "Term 2", None, self.db, self.admin1)
+        self.assertEqual([m.term for m in t2], ["Term 2"])
+        both = self.router.get_class_marks(1, None, None, self.db, self.admin1)
+        self.assertEqual(len(both), 2)
 
 
 if __name__ == "__main__":

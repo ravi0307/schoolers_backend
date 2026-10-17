@@ -55,12 +55,20 @@ class MarksEditingTests(unittest.TestCase):
         self.db.rollback()
         self.db.close()
 
-    def test_schema_declares_unique_constraint_for_upsert_target(self):
-        """The upsert target (student_id, subject_id, term) must be unique."""
+    def test_schema_declares_partial_uniques_for_legacy_and_session_marks(self):
+        """Phase 4: legacy (student, subject, term) uniqueness applies only
+        to session-less rows; session rows are unique per (session, student).
+        Two examinations can now hold marks for one student+subject+term."""
         inspector = inspect(self.engine)
-        uniques = inspector.get_unique_constraints("marks")
-        names = {tuple(sorted(u["column_names"])) for u in uniques}
-        self.assertIn(("student_id", "subject_id", "term"), names)
+        indexes = {ix["name"]: ix for ix in inspector.get_indexes("marks")}
+        legacy = indexes["marks_legacy_unique"]
+        self.assertTrue(legacy["unique"])
+        self.assertEqual(sorted(legacy["column_names"]), ["student_id", "subject_id", "term"])
+        session_ix = indexes["marks_session_unique"]
+        self.assertTrue(session_ix["unique"])
+        self.assertEqual(
+            sorted(session_ix["column_names"]), ["examination_session_id", "student_id"]
+        )
 
     def test_upsert_creates_mark(self):
         mark = repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=88, updated_by=7)
@@ -124,6 +132,17 @@ class MarksEditingTests(unittest.TestCase):
         rows = repo.get_for_class(self.db, class_id=1)
         got = {(r.student_id, r.subject_id) for r in rows}
         self.assertEqual(got, {(1, 3), (1, 5)})
+
+    def test_get_for_class_term_filter_applies_in_query(self):
+        # Phase 0: the term filter moved from Python post-filtering into the
+        # query so scoped reads never over-fetch before filtering.
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 1", score=70, updated_by=7)
+        repo.upsert_mark(self.db, student_id=1, subject_id=3, term="Term 2", score=75, updated_by=7)
+        t1 = repo.get_for_class(self.db, class_id=1, term="Term 1")
+        self.assertEqual([(r.term, r.score) for r in t1], [("Term 1", 70)])
+        t2 = repo.get_for_class(self.db, class_id=1, term="Term 2")
+        self.assertEqual([(r.term, r.score) for r in t2], [("Term 2", 75)])
+        self.assertEqual(len(repo.get_for_class(self.db, class_id=1)), 2)
 
     def test_upsert_records_admin_audit_as_user_id_only(self):
         # Admins have no teacher row, so updated_by stays None while the

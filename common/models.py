@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, Date, DateTime, Time, ForeignKey,
-    Numeric, UniqueConstraint, CheckConstraint, func, text, JSON
+    Numeric, UniqueConstraint, CheckConstraint, Index, func, text, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -61,8 +61,19 @@ class School(AuditColumnsMixin, Base):
     library_enabled = Column(Boolean, nullable=False, default=False)
     fees_enabled = Column(Boolean, nullable=False, default=False)
     salary_enabled = Column(Boolean, nullable=False, default=False)
+    # Phase 2 (marks_feature): per-school marking system. 'marks' is the
+    # legacy behavior (numeric entry, global grade display); 'grades' uses
+    # the school's own grade scale. Published history keeps its own format
+    # per mark row, so switching never reinterprets the past.
+    marking_system = Column(String(10), nullable=False, default="marks", server_default="marks")
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    # B1 rollout gate (marks_feature): per-school opt-in for the examination
+    # framework. Default off. Checked ONLY by new examination/marks endpoints;
+    # legacy paths never read it, so the flag cannot disable legacy marks.
+    examinations_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    __table_args__ = (CheckConstraint("marking_system IN ('marks', 'grades')"),)
 
 
 class SchoolNotification(AuditColumnsMixin, Base):
@@ -137,6 +148,188 @@ class Holiday(AuditColumnsMixin, Base):
     # A school cannot have two holidays on the same date; the timetable would
     # otherwise have to pick one arbitrarily when highlighting that column.
     __table_args__ = (UniqueConstraint("school_id", "holiday_date"),)
+
+
+# ============================================================================
+# 2b. ACADEMIC CALENDAR (Phase 1, marks_feature)
+# ============================================================================
+# Years and periods give examinations their temporal context. Nothing here
+# existed before: terms were free-text on marks rows and `Period` is the
+# daily bell schedule, not an academic term. Events cover dated non-closure
+# periods (exam windows, revision weeks, result dates); the holidays table
+# stays exactly as it is (closures only).
+
+
+class AcademicYear(AuditColumnsMixin, Base):
+    __tablename__ = "academic_years"
+
+    year_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(20), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    is_founding = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "name"),
+        CheckConstraint("end_date > start_date"),
+    )
+
+
+class AcademicPeriod(AuditColumnsMixin, Base):
+    __tablename__ = "academic_periods"
+
+    period_id = Column(Integer, primary_key=True)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(40), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        UniqueConstraint("year_id", "name"),
+        CheckConstraint("end_date > start_date"),
+    )
+
+
+class AcademicEvent(AuditColumnsMixin, Base):
+    __tablename__ = "academic_events"
+
+    event_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="SET NULL"), nullable=True)
+    event_type = Column(String(20), nullable=False)
+    title = Column(String(150), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        CheckConstraint("end_date >= start_date"),
+        CheckConstraint("event_type IN ('exam_period', 'revision', 'result_date', 'other')"),
+    )
+
+
+# ============================================================================
+# 2c. EXAMINATION CONFIG (Phase 2, marks_feature)
+# ============================================================================
+# School-owned examination types and grade scales. Grade scales are
+# versioned by copy-on-write: a scale row referenced (via its levels) by
+# published marks is frozen, and further edits require a new version.
+# Nothing here existed before; numeric entry assumed global 0-100 maxima
+# and ParentMarks hardcoded its grade bands.
+
+
+class ExaminationType(AuditColumnsMixin, Base):
+    __tablename__ = "examination_types"
+
+    type_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(60), nullable=False)
+    description = Column(String(255))
+    default_max_marks = Column(Integer, nullable=False, default=100, server_default="100")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "name"),
+        CheckConstraint("default_max_marks > 0"),
+    )
+
+
+class GradeScale(AuditColumnsMixin, Base):
+    __tablename__ = "grade_scales"
+
+    scale_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(60), nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    supersedes_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="SET NULL"))
+    effective_from = Column(Date)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (UniqueConstraint("school_id", "name", "version"),)
+
+
+class GradeLevel(AuditColumnsMixin, Base):
+    __tablename__ = "grade_levels"
+
+    level_id = Column(Integer, primary_key=True)
+    scale_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="CASCADE"), nullable=False)
+    label = Column(String(10), nullable=False)
+    rank = Column(Integer, nullable=False, default=0, server_default="0")
+    min_score = Column(Integer, nullable=True)
+    max_score = Column(Integer, nullable=True)
+    description = Column(String(255))
+
+    __table_args__ = (UniqueConstraint("scale_id", "label"),)
+
+
+# ============================================================================
+# 2d. EXAMINATIONS AND SESSIONS (Phase 3, marks_feature)
+# ============================================================================
+# An examination is academic context (year, period, type, format); its
+# sessions are the schedulable units (class × subject × date/time/venue).
+# Sessions are the source of truth for timetables and conflict checks.
+# Amendments to published sessions append version rows; the live row is
+# always current. Marks link to sessions in Phase 4 (nothing references
+# sessions yet, so all Phase-3 sessions are freely editable within the
+# conflict rules).
+
+
+class Examination(AuditColumnsMixin, Base):
+    __tablename__ = "examinations"
+
+    exam_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    type_id = Column(Integer, ForeignKey("examination_types.type_id", ondelete="RESTRICT"), nullable=False)
+    year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="RESTRICT"), nullable=False)
+    period_id = Column(Integer, ForeignKey("academic_periods.period_id", ondelete="SET NULL"), nullable=True)
+    name = Column(String(120), nullable=False)
+    description = Column(String(255))
+    result_format_expectation = Column(String(10), nullable=False, default="marks", server_default="marks")
+    grade_scale_id = Column(Integer, ForeignKey("grade_scales.scale_id", ondelete="RESTRICT"), nullable=True)
+    status = Column(String(20), nullable=False, default="draft", server_default="draft")
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "year_id", "name"),
+        CheckConstraint("result_format_expectation IN ('marks', 'grade')"),
+        CheckConstraint("status IN ('draft', 'published', 'cancelled')"),
+    )
+
+
+class ExaminationSession(AuditColumnsMixin, Base):
+    __tablename__ = "examination_sessions"
+
+    session_id = Column(Integer, primary_key=True)
+    exam_id = Column(Integer, ForeignKey("examinations.exam_id", ondelete="CASCADE"), nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="RESTRICT"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="RESTRICT"), nullable=False)
+    date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    venue = Column(String(120))
+    max_marks = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, default="scheduled", server_default="scheduled")
+
+    __table_args__ = (
+        CheckConstraint("end_time > start_time"),
+        CheckConstraint("max_marks > 0"),
+        CheckConstraint("status IN ('scheduled', 'rescheduled', 'cancelled', 'completed')"),
+    )
+
+
+class ExaminationSessionVersion(AuditColumnsMixin, Base):
+    __tablename__ = "examination_session_versions"
+
+    version_id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("examination_sessions.session_id", ondelete="CASCADE"), nullable=False)
+    changed_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    changed_at = Column(DateTime, server_default=func.now())
+    reason = Column(String(255))
+    old_row = Column(JSON)
+    new_row = Column(JSON)
 
 
 # ============================================================================
@@ -231,6 +424,94 @@ class Student(AuditColumnsMixin, Base):
     present_today = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+
+# ============================================================================
+# 3b. ENROLLMENT AND PROMOTION (Phase 5, marks_feature)
+# ============================================================================
+# students.class_id is the CURRENT class cache. class_enrollments is the
+# history: one active row per (student, year); promotion writes enrollment
+# rows plus the cache update in a single transaction. Published marks,
+# sessions, and report inputs keep pointing at student_id (and sessions
+# embed class-at-time), so promotion never rewrites history.
+
+
+class PromotionBatch(AuditColumnsMixin, Base):
+    __tablename__ = "promotion_batches"
+
+    batch_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    source_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="SET NULL"))
+    target_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    created_at = Column(DateTime, server_default=func.now())
+    status = Column(String(20), nullable=False, default="committed", server_default="committed")
+    idempotency_key = Column(String(64), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "idempotency_key"),
+        CheckConstraint("status IN ('committed', 'failed')"),
+    )
+
+
+class ClassEnrollment(AuditColumnsMixin, Base):
+    __tablename__ = "class_enrollments"
+
+    enroll_id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="RESTRICT"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False)
+    batch_id = Column(Integer, ForeignKey("promotion_batches.batch_id", ondelete="SET NULL"))
+    decided_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    decided_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        # One active enrollment per student-year; transferred/withdrawn are
+        # terminal history rows outside this index (re-admission allowed).
+        Index(
+            "class_enrollments_active_unique", "student_id", "academic_year_id",
+            unique=True,
+            postgresql_where=text("status IN ('enrolled', 'promoted', 'retained', 'new')"),
+            sqlite_where=text("status IN ('enrolled', 'promoted', 'retained', 'new')"),
+        ),
+        CheckConstraint(
+            "status IN ('enrolled', 'promoted', 'retained', 'transferred', 'withdrawn', 'new')"
+        ),
+    )
+
+
+class ClassSubject(AuditColumnsMixin, Base):
+    """What each class actually offers (Phase 5). The subjects catalog stays
+    school-scoped; this table says which of them a class teaches, and which
+    are required. Sessions and enrollments validate against it once a class
+    has any offering rows (opt-in: classes without rows keep legacy behavior)."""
+
+    __tablename__ = "class_subjects"
+
+    class_id = Column(Integer, ForeignKey("classes.class_id", ondelete="CASCADE"), primary_key=True)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), primary_key=True)
+    is_required = Column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class StudentSubject(AuditColumnsMixin, Base):
+    """Per-student subject enrollment for a year (Phase 5). Non-enrolled
+    subjects are excluded from entry grids and aggregates — never zero,
+    never missing."""
+
+    __tablename__ = "student_subjects"
+
+    id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.year_id", ondelete="CASCADE"), nullable=False)
+    state = Column(String(20), nullable=False, default="enrolled", server_default="enrolled")
+    is_optional = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "subject_id", "academic_year_id"),
+        CheckConstraint("state IN ('enrolled', 'dropped')"),
+    )
 
 
 class ParentStudent(AuditColumnsMixin, Base):
@@ -496,21 +777,143 @@ class Attendance(AuditColumnsMixin, Base):
 
 
 class Mark(AuditColumnsMixin, Base):
+    """One student's assessment in one subject.
+
+    Two disjoint identity scopes (Phase 4, marks_feature):
+    - legacy rows (examination_session_id IS NULL) keep the original
+      (student_id, subject_id, term) uniqueness and 0-100 behavior;
+    - session rows belong to exactly one examination session and are
+      unique per (session, student); the subject is the session's own.
+    Workflow (draft/submitted/published) is independent from assessment
+    (present/absent/missing/exempt); is_withheld suppresses a published
+    row without touching either status. result_format/max_marks are
+    captured at publish so later edits cannot rewrite history.
+    """
+
     __tablename__ = "marks"
 
     mark_id = Column(Integer, primary_key=True)
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
     subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
     term = Column(String(20), nullable=False, default="Term 1")
-    score = Column(Integer, nullable=False)
+    score = Column(Integer, nullable=True)
+    max_marks = Column(Integer, nullable=True)
+    grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"), nullable=True)
+    result_format = Column(String(10), nullable=False, default="marks", server_default="marks")
+    workflow_status = Column(String(20), nullable=False, default="draft", server_default="draft")
+    assessment_status = Column(String(20), nullable=False, default="present", server_default="present")
+    is_withheld = Column(Boolean, nullable=False, default=False, server_default="false")
+    withheld_reason = Column(String(255))
+    withheld_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    withheld_at = Column(DateTime)
+    examination_session_id = Column(
+        Integer, ForeignKey("examination_sessions.session_id", ondelete="RESTRICT"), nullable=True
+    )
     updated_by = Column(Integer, ForeignKey("staff.staff_id", ondelete="SET NULL"))
     updated_by_user = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
-        UniqueConstraint("student_id", "subject_id", "term"),
-        CheckConstraint("score BETWEEN 0 AND 100"),
+        # Legacy identity survives only for session-less rows.
+        Index(
+            "marks_legacy_unique", "student_id", "subject_id", "term",
+            unique=True,
+            postgresql_where=text("examination_session_id IS NULL"),
+            sqlite_where=text("examination_session_id IS NULL"),
+        ),
+        # Session identity: one mark per student per session.
+        Index(
+            "marks_session_unique", "examination_session_id", "student_id",
+            unique=True,
+            postgresql_where=text("examination_session_id IS NOT NULL"),
+            sqlite_where=text("examination_session_id IS NOT NULL"),
+        ),
+        CheckConstraint("score IS NULL OR score >= 0", name="marks_score_nonnegative"),
+        CheckConstraint("max_marks IS NULL OR max_marks > 0", name="marks_max_positive"),
+        CheckConstraint("result_format IN ('marks', 'grade')", name="marks_format_check"),
+        CheckConstraint(
+            "workflow_status IN ('draft', 'submitted', 'published')",
+            name="marks_workflow_check",
+        ),
+        CheckConstraint(
+            "assessment_status IN ('present', 'absent', 'missing', 'exempt')",
+            name="marks_assessment_check",
+        ),
+        # Payload coherence per format: exactly one payload kind, and
+        # non-present assessments carry neither score nor grade.
+        CheckConstraint(
+            "(assessment_status = 'present' AND result_format = 'marks'"
+            " AND score IS NOT NULL AND max_marks IS NOT NULL AND grade_level_id IS NULL)"
+            " OR (assessment_status = 'present' AND result_format = 'grade'"
+            " AND grade_level_id IS NOT NULL AND score IS NULL)"
+            " OR (assessment_status IN ('absent', 'missing', 'exempt')"
+            " AND score IS NULL AND grade_level_id IS NULL)",
+            name="marks_payload_coherence",
+        ),
     )
+
+
+class MarkCorrection(AuditColumnsMixin, Base):
+    """Append-only record of every post-publish mark change (Phase 4).
+
+    Published rows change ONLY through this flow: the correction stores
+    both sides, who reasoned it, and who approved it. The original value
+    stays auditable here even after the mark row moves on.
+    """
+
+    __tablename__ = "mark_corrections"
+
+    correction_id = Column(Integer, primary_key=True)
+    mark_id = Column(Integer, ForeignKey("marks.mark_id", ondelete="CASCADE"), nullable=False)
+    old_score = Column(Integer, nullable=True)
+    old_grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"))
+    new_score = Column(Integer, nullable=True)
+    new_grade_level_id = Column(Integer, ForeignKey("grade_levels.level_id", ondelete="RESTRICT"))
+    reason = Column(String(255), nullable=False)
+    corrected_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    corrected_at = Column(DateTime, server_default=func.now())
+    approved_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    approved_at = Column(DateTime)
+
+
+class MarkImportBatch(AuditColumnsMixin, Base):
+    """One spreadsheet upload: previewed, then committed atomically (Phase 4).
+
+    Idempotent retry: (school_id, file_hash, scope-hash) is unique, so a
+    repeated upload returns the prior receipt instead of duplicating rows.
+    """
+
+    __tablename__ = "mark_import_batches"
+
+    batch_id = Column(Integer, primary_key=True)
+    school_id = Column(Integer, ForeignKey("schools.school_id", ondelete="CASCADE"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
+    source_filename = Column(String(255), nullable=False)
+    file_hash = Column(String(64), nullable=False)
+    scope_hash = Column(String(64), nullable=False)
+    session_id = Column(Integer, ForeignKey("examination_sessions.session_id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False, default="preview", server_default="preview")
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "file_hash", "scope_hash"),
+        CheckConstraint("status IN ('preview', 'committed', 'failed')"),
+    )
+
+
+class MarkImportRow(AuditColumnsMixin, Base):
+    __tablename__ = "mark_import_rows"
+
+    row_id = Column(Integer, primary_key=True)
+    batch_id = Column(Integer, ForeignKey("mark_import_batches.batch_id", ondelete="CASCADE"), nullable=False)
+    row_no = Column(Integer, nullable=False)
+    student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"))
+    subject_id = Column(Integer, ForeignKey("subjects.subject_id", ondelete="CASCADE"))
+    payload = Column(JSON)
+    verdict = Column(String(20), nullable=False)
+    errors = Column(JSON)
+
+    __table_args__ = (CheckConstraint("verdict IN ('valid', 'invalid', 'warning')"),)
 
 
 # ============================================================================
