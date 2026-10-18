@@ -4,13 +4,13 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.dependencies import require_role, require_examinations_enabled, CurrentUser
-from common.exceptions import ForbiddenError, NotFoundError
+from common.exceptions import AppError, ForbiddenError, NotFoundError
 import bulk
 import repository as repo
 from schemas import (
     MarkUpsert, MarkRead, SessionMarkCreate, SessionMarkUpdate,
     WithholdPayload, UnwithholdPayload, CorrectMarkPayload, MarkReadV2,
-    StudentResultsRead, ExaminationResultsRead,
+    StudentResultsRead, ExaminationResultsRead, CorrectionRead,
 )
 
 router = APIRouter(prefix="/marks", tags=["marks"])
@@ -256,6 +256,24 @@ def correct_mark(
     return mark
 
 
+@router.get("/{mark_id}/corrections", response_model=list[CorrectionRead])
+def list_mark_corrections(
+    mark_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Audit trail for one mark: old/new values, reason, correcting admin,
+    approval timestamp. Admin-only and school-scoped — same audience as
+    the correction action itself (self-approval model, unchanged)."""
+    require_examinations_enabled(db, current_user.school_id)
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    mark = repo.get_mark_in_school(db, current_user.school_id, mark_id)
+    if mark is None:
+        raise NotFoundError("Mark not found")
+    return repo.list_corrections(db, mark.mark_id)
+
+
 # ---- Bulk CSV import/export (Phase 4) ----
 
 
@@ -398,12 +416,16 @@ def get_examination_results(
     school_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin", "master")),
+    view: str = "published",
 ):
-    """One examination's published results per student plus the missing
-    list. Teachers see examinations they teach in; parents use the student
-    view instead."""
+    """One examination's results per student plus the missing list.
+    view=published (default): published, non-withheld rows. view=entry:
+    every workflow state incl. withheld — staff entry grids only. Teachers
+    see examinations they teach in; parents use the student view instead."""
     from common.models import Examination as ExamModel
 
+    if view not in ("published", "entry"):
+        raise AppError("view must be 'published' or 'entry'", status_code=400)
     if current_user.role == "master":
         scope = _master_scope(current_user, school_id)
     else:
@@ -418,4 +440,13 @@ def get_examination_results(
             db, current_user.linked_person_id, exam_id
         ):
             raise ForbiddenError("You don't teach in this examination")
-    return repo.examination_results(db, scope, exam)
+    # Teachers only ever receive entry-view rows for sessions they teach;
+    # admins and masters see the whole examination.
+    entry_session_ids = None
+    if view == "entry" and current_user.role == "teacher":
+        entry_session_ids = repo.teacher_session_ids_for_exam(
+            db, current_user.linked_person_id, exam_id
+        )
+    return repo.examination_results(
+        db, scope, exam, view=view, entry_session_ids=entry_session_ids
+    )

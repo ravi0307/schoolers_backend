@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.dependencies import CurrentUser
-from common.exceptions import ForbiddenError, NotFoundError
+from common.exceptions import AppError, ForbiddenError, NotFoundError
 from common.models import (
     Base, AcademicYear, Examination, ExaminationSession, ExaminationType,
     GradeLevel, GradeScale, Mark, Parent, ParentStudent, School, Student, Subject,
@@ -210,6 +210,108 @@ class MarksResultsTests(unittest.TestCase):
             router.get_student_results(9, None, None, 1, self.db, self.master)
         self.assertEqual(
             len(router.get_student_results(1, None, None, 1, self.db, self.master)["examinations"]), 1)
+
+    # ---- incomplete-flag semantics (B1) ----
+    def test_grade_exam_complete_when_all_rows_present(self):
+        self._publish(3, 1, grade_label="A")
+        out = repo.student_results(self.db, 1, 1, year_id=1)
+        entry = out["examinations"][0]
+        self.assertFalse(entry["incomplete"])
+        self.assertEqual(entry["grade_distribution"], {"A": 1})
+
+    def test_grade_exam_incomplete_when_any_row_not_sat(self):
+        self._publish(3, 1, grade_label="A")
+        self._publish(3, 2, assessment_status="absent")
+        out = repo.student_results(self.db, 1, 2, year_id=1)
+        entry = out["examinations"][0]
+        self.assertTrue(entry["incomplete"])
+        self.assertEqual(entry["subjects_total"], 1)
+
+    def test_empty_rows_are_incomplete(self):
+        self.assertTrue(repo._summarize_marks_rows([])["incomplete"])
+
+    # ---- entry view for staff grids (B2) ----
+    def test_entry_view_shows_draft_and_submitted_states(self):
+        s1 = self.db.get(ExaminationSession, 1)
+        repo.create_session_mark(self.db, s1, self.exam1, 1, 3,
+                                 {"assessment_status": "present", "score": 42}, 31)
+        repo.submit_session_marks(self.db, s1)  # student 1 -> submitted
+        repo.create_session_mark(self.db, s1, self.exam1, 2, 3,
+                                 {"assessment_status": "present", "score": 50}, 31)  # draft
+        entry = repo.examination_results(self.db, 1, self.exam1, view="entry")
+        self.assertEqual([r["student_id"] for r in entry["results"]], [1, 2])
+        self.assertEqual(entry["missing_student_ids"], [])
+        states = {r["student_id"]: r["subjects"][0]["workflow_status"]
+                  for r in entry["results"]}
+        self.assertEqual(states, {1: "submitted", 2: "draft"})
+        pub = repo.examination_results(self.db, 1, self.exam1)
+        self.assertEqual(pub["results"], [])
+        self.assertEqual(pub["missing_student_ids"], [1, 2])
+
+    def test_entry_view_includes_withheld_published_rows(self):
+        mark = self._publish(1, 1, score=42)
+        repo.withhold_marks(self.db, [mark.mark_id], "Review", 11)
+        pub = repo.examination_results(self.db, 1, self.exam1)
+        self.assertEqual(pub["results"], [])
+        self.assertEqual(pub["missing_student_ids"], [1, 2])
+        entry = repo.examination_results(self.db, 1, self.exam1, view="entry")
+        row = entry["results"][0]["subjects"][0]
+        self.assertTrue(row["is_withheld"])
+        # Student 2 never entered → entry view still reports them missing.
+        self.assertEqual(entry["missing_student_ids"], [2])
+
+    def test_unknown_view_rejected(self):
+        with self.assertRaises(AppError):
+            repo.examination_results(self.db, 1, self.exam1, view="bogus")
+
+    def test_entry_view_reachable_at_router(self):
+        router = _load_marks_router()
+        self._publish(1, 1, score=42)
+        out = router.get_examination_results(1, None, self.db, self.admin1, view="entry")
+        self.assertEqual(len(out["results"]), 1)
+        with self.assertRaises(AppError):
+            router.get_examination_results(1, None, self.db, self.admin1, view="bogus")
+
+    def test_entry_view_for_teacher_scoped_to_own_sessions(self):
+        # Exam 1 gains a second slot (class 2 / subject 4) taught by staff 8
+        # only; staff 7 teaches the class-1 slots. Drafts exist on both.
+        router = _load_marks_router()
+        self.db.add_all([
+            Subject(subject_id=4, school_id=1, name="Science"),
+            Student(student_id=4, school_id=1, class_id=2, name="Two Four", admission_no="A4"),
+            Student(student_id=5, school_id=1, class_id=2, name="Five Five", admission_no="A5"),
+            ExaminationSession(session_id=4, exam_id=1, class_id=2, subject_id=4,
+                               date=date(2026, 12, 18), start_time=time(9, 0),
+                               end_time=time(12, 0), max_marks=100, status="scheduled"),
+            TeacherClassSubject(staff_id=8, class_id=2, subject_id=4),
+        ])
+        self.db.commit()
+        repo.create_session_mark(
+            self.db, self.db.get(ExaminationSession, 1), self.exam1, 1, 3,
+            {"assessment_status": "present", "score": 42}, 31)  # staff 7's slot
+        repo.create_session_mark(
+            self.db, self.db.get(ExaminationSession, 4), self.exam1, 4, 4,
+            {"assessment_status": "present", "score": 55}, 31)  # staff 8's slot
+        teacher8 = CurrentUser(user_id=32, role="teacher", school_id=1, linked_person_id=8)
+
+        # Staff 8: only their own slot's rows; class-2 classmate still missing.
+        entry8 = router.get_examination_results(1, None, self.db, teacher8, view="entry")
+        self.assertEqual([r["student_id"] for r in entry8["results"]], [4])
+        self.assertEqual(
+            {s["examination_session_id"] for r in entry8["results"] for s in r["subjects"]},
+            {4},
+        )
+        self.assertEqual(entry8["missing_student_ids"], [5])
+        # Staff 7 never sees class 2's draft either.
+        entry7 = router.get_examination_results(1, None, self.db, self.teacher7, view="entry")
+        self.assertEqual([r["student_id"] for r in entry7["results"]], [1])
+        self.assertEqual(entry7["missing_student_ids"], [2])
+        # Admins keep the whole-examination picture.
+        admin = router.get_examination_results(1, None, self.db, self.admin1, view="entry")
+        self.assertEqual([r["student_id"] for r in admin["results"]], [1, 4])
+        # The published view's exam-wide contract for teachers is unchanged.
+        pub7 = router.get_examination_results(1, None, self.db, self.teacher7)
+        self.assertEqual(pub7["results"], [])  # nothing published yet
 
 
 if __name__ == "__main__":

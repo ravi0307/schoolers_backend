@@ -42,7 +42,7 @@ from common.exceptions import AppError
 from common.models import (
     Base, AcademicYear, Examination, ExaminationSession, ExaminationType,
     GradeLevel, GradeScale, Mark, MarkCorrection, School, Student, Subject,
-    TeacherClassSubject,
+    TeacherClassSubject, User,
 )
 import services.marks_service.repository as repo
 
@@ -52,6 +52,7 @@ TABLES = [
     "students", "subjects", "teacher_class_subjects", "marks",
     "holidays", "academic_events", "class_subjects", "student_subjects",
     "mark_corrections", "mark_import_batches", "mark_import_rows",
+    "users",
 ]
 
 
@@ -127,6 +128,14 @@ class CorrectionAuditTests(unittest.TestCase):
             Student(student_id=2, school_id=1, class_id=1, admission_no="A2", name="Dev"),
             Subject(subject_id=3, school_id=1, name="Maths"),
             TeacherClassSubject(staff_id=7, class_id=1, subject_id=3),
+            User(user_id=11, school_id=1, role="admin", username="admin1",
+                 password_hash="x", is_active=True),
+            User(user_id=12, school_id=2, role="admin", username="admin2",
+                 password_hash="x", is_active=True),
+            User(user_id=31, school_id=1, role="teacher", username="teach7",
+                 password_hash="x", is_active=True),
+            User(user_id=21, school_id=1, role="parent", username="parent225",
+                 password_hash="x", is_active=True),
         ])
         self.db.commit()
         self.session1 = self.db.get(ExaminationSession, 1)
@@ -406,8 +415,24 @@ class CorrectionAuditTests(unittest.TestCase):
             json={"score": 88, "assessment_status": "present"},
         )
         self.assertEqual(resp.status_code, 422)
+        # Empty and whitespace-only reasons are rejected too — an audit
+        # row without a meaningful reason must never be written.
+        for blank in ("", "   "):
+            resp = self._client(self.admin1).post(
+                f"/marks/{mark.mark_id}/correct",
+                json={"score": 88, "assessment_status": "present", "reason": blank},
+            )
+            self.assertEqual(resp.status_code, 422, f"reason={blank!r} accepted")
         self._assert_mark_unchanged(mark.mark_id)
         self.assertEqual(self._correction_count(), 0)
+        # A padded-but-real reason is stored trimmed, not rejected.
+        resp = self._client(self.admin1).post(
+            f"/marks/{mark.mark_id}/correct",
+            json={"score": 88, "assessment_status": "present", "reason": "  Totalling error  "},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.db.rollback()
+        self.assertEqual(self.db.query(MarkCorrection).one().reason, "Totalling error")
 
     def test_successful_correction_via_endpoint(self):
         mark = self._published_mark()
@@ -424,6 +449,66 @@ class CorrectionAuditTests(unittest.TestCase):
         self.assertIsNotNone(corr.corrected_at)
         self.assertIsNotNone(corr.approved_at)
         self.assertEqual(corr.reason, "Totalling error")
+
+    # ---- read-only correction history endpoint (audit visibility) ----
+
+    def test_audit_endpoint_returns_history_with_actor_names(self):
+        mark = self._published_mark()
+        repo.correct_mark(
+            self.db, mark,
+            {"assessment_status": "present", "score": 88},
+            "Totalling error", 11,
+        )
+        # Historical pre-fix row: NULL approved_at stays visible as-is.
+        self.db.add(MarkCorrection(
+            mark_id=mark.mark_id, old_score=70, new_score=75,
+            reason="Pre-fix correction", corrected_by=11, approved_by=11,
+        ))
+        self.db.commit()
+        resp = self._client(self.admin1).get(f"/marks/{mark.mark_id}/corrections")
+        self.assertEqual(resp.status_code, 200)
+        rows = resp.json()
+        self.assertEqual(len(rows), 2)
+        newest, legacy = rows[0], rows[1]
+        self.assertEqual((newest["old_score"], newest["new_score"]), (80, 88))
+        self.assertEqual(newest["reason"], "Totalling error")
+        self.assertEqual(newest["corrected_by_name"], "admin1")
+        self.assertEqual(newest["approved_by_name"], "admin1")
+        self.assertEqual(newest["corrected_by"], 11)
+        self.assertIsNotNone(newest["corrected_at"])
+        self.assertIsNotNone(newest["approved_at"])
+        self.assertIsNone(legacy["approved_at"])
+        self.assertEqual(legacy["reason"], "Pre-fix correction")
+
+    def test_audit_endpoint_empty_for_uncorrected_mark(self):
+        mark = self._published_mark()
+        resp = self._client(self.admin1).get(f"/marks/{mark.mark_id}/corrections")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), [])
+
+    def test_audit_endpoint_cross_school_is_uniform_404(self):
+        mark = self._published_mark()
+        client = self._client(self.admin2)
+        known = client.get(f"/marks/{mark.mark_id}/corrections")
+        unknown = client.get(f"/marks/{mark.mark_id + 999}/corrections")
+        self.assertEqual(known.status_code, 404)
+        self.assertEqual(unknown.status_code, 404)
+        self.assertEqual(known.json(), unknown.json())
+
+    def test_audit_endpoint_flag_off_is_403(self):
+        mark = self._published_mark()
+        school = self.db.get(School, 1)
+        school.examinations_enabled = False
+        self.db.commit()
+        resp = self._client(self.admin1).get(f"/marks/{mark.mark_id}/corrections")
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json()["detail"], "Examinations are not enabled for this school")
+
+    def test_audit_endpoint_role_blocked(self):
+        mark = self._published_mark()
+        for user in (self.teacher7, self.parent225):
+            resp = self._client(user).get(f"/marks/{mark.mark_id}/corrections")
+            self.assertEqual(resp.status_code, 403)
 
 
 if __name__ == "__main__":

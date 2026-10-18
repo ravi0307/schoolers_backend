@@ -457,6 +457,53 @@ def correct_mark(
     return mark, correction
 
 
+def list_corrections(db: Session, mark_id: int) -> list[dict]:
+    """Full audit trail for one mark: old/new score and grade, reason, who
+    corrected it, who approved it (admin self-approval), and both server
+    timestamps. Historical rows with NULL approved_at are returned as-is."""
+    from common.models import User
+
+    rows = (
+        db.query(MarkCorrection)
+        .filter(MarkCorrection.mark_id == mark_id)
+        .order_by(MarkCorrection.correction_id)
+        .all()
+    )
+    user_ids = sorted(
+        {r for row in rows for r in (row.corrected_by, row.approved_by) if r is not None}
+    )
+    usernames = (
+        {u.user_id: u.username for u in db.query(User).filter(User.user_id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
+    grade_ids = sorted(
+        {g for row in rows for g in (row.old_grade_level_id, row.new_grade_level_id) if g is not None}
+    )
+    grade_labels = (
+        {g.level_id: g.label for g in db.query(GradeLevel).filter(GradeLevel.level_id.in_(grade_ids)).all()}
+        if grade_ids
+        else {}
+    )
+    return [
+        {
+            "correction_id": row.correction_id,
+            "old_score": row.old_score,
+            "new_score": row.new_score,
+            "old_grade": grade_labels.get(row.old_grade_level_id),
+            "new_grade": grade_labels.get(row.new_grade_level_id),
+            "reason": row.reason,
+            "corrected_by": row.corrected_by,
+            "corrected_by_name": usernames.get(row.corrected_by),
+            "corrected_at": row.corrected_at,
+            "approved_by": row.approved_by,
+            "approved_by_name": usernames.get(row.approved_by),
+            "approved_at": row.approved_at,
+        }
+        for row in rows
+    ]
+
+
 def session_max_entered_score(db: Session, session_id: int):
     """Highest present numeric score on a session, or None. Guards session
     maximum-mark reductions (academics service)."""
@@ -590,17 +637,23 @@ def _row_view(subject_names: dict, mark) -> dict:
 
 
 def _summarize_marks_rows(rows: list) -> dict:
-    """Totals over present numeric rows; incomplete when anything else lurks."""
+    """Totals over present numeric rows; incomplete when anything else lurks.
+
+    Incomplete means an assessment was not sat (absent/missing/exempt) or
+    there is nothing to count at all — it is not a property of the format:
+    a fully-graded grade-format exam is complete, while a marks exam with
+    one absent row is not. Percentages are always over papers sat.
+    """
     present = [m for m in rows if m.assessment_status == "present" and m.score is not None]
     obtained = sum(m.score for m in present)
     possible = sum(m.max_marks for m in present if m.max_marks)
-    incomplete = any(m.assessment_status != "present" for m in rows)
+    incomplete = (not rows) or any(m.assessment_status != "present" for m in rows)
     percentage = round(obtained / possible * 100, 2) if possible else None
     return {
         "obtained": obtained,
         "possible": possible,
         "percentage": percentage,
-        "incomplete": incomplete or not present,
+        "incomplete": incomplete,
         "subjects_counted": len(present),
         "subjects_total": len(rows),
     }
@@ -704,60 +757,79 @@ def student_results(db: Session, school_id: int, student_id: int,
     }
 
 
-def examination_results(db: Session, school_id: int, exam) -> dict:
-    """One examination's published results per student, plus the missing
-    list (class students with no row in any of the exam's sessions)."""
-    sessions = (
-        db.query(ExaminationSession)
-        .filter(ExaminationSession.exam_id == exam.exam_id)
-        .all()
+def examination_results(db: Session, school_id: int, exam, view: str = "published",
+                        entry_session_ids: set[int] | None = None) -> dict:
+    """One examination's results per student, plus the missing list.
+
+    view="published" (default): published, non-withheld rows only — what
+    parents and result consumers see. view="entry": every workflow state
+    (draft/submitted/published), including withheld rows, so staff entry
+    grids show work in progress instead of hiding it; "missing" then means
+    no row of any kind for a class student. Both views are staff-gated at
+    the router; parents never reach this endpoint.
+
+    entry_session_ids restricts an entry view to specific sessions (the
+    teacher case): only those sessions contribute rows and the missing
+    list, so a teacher never receives other classes' drafts. None (admins,
+    masters) keeps the whole examination.
+    """
+    if view not in ("published", "entry"):
+        raise AppError("view must be 'published' or 'entry'", status_code=400)
+    entry_view = view == "entry"
+    session_q = db.query(ExaminationSession).filter(
+        ExaminationSession.exam_id == exam.exam_id
     )
+    if entry_session_ids is not None:
+        session_q = session_q.filter(
+            ExaminationSession.session_id.in_(entry_session_ids)
+        )
+    sessions = session_q.all()
     names = _subject_names(db, school_id)
     students: dict[int, dict] = {}
     for session in sessions:
-        rows = (
-            db.query(Mark)
-            .filter(
-                Mark.examination_session_id == session.session_id,
+        row_q = db.query(Mark).filter(
+            Mark.examination_session_id == session.session_id,
+        )
+        if not entry_view:
+            row_q = row_q.filter(
                 Mark.workflow_status == "published",
                 Mark.is_withheld.is_(False),
             )
-            .all()
-        )
-        for mark in rows:
+        for mark in row_q.all():
             entry = students.setdefault(mark.student_id, {"student_id": mark.student_id, "subjects": []})
             entry["subjects"].append(_row_view(names, mark))
     class_ids = sorted({s.class_id for s in sessions})
     session_ids = {s.session_id for s in sessions}
     missing = []
     if class_ids:
-        published_here = {
-            m.student_id
-            for m in db.query(Mark.student_id)
-            .filter(
-                Mark.examination_session_id.in_(session_ids),
+        seen_q = db.query(Mark.student_id).filter(
+            Mark.examination_session_id.in_(session_ids),
+        )
+        if not entry_view:
+            seen_q = seen_q.filter(
                 Mark.workflow_status == "published",
                 Mark.is_withheld.is_(False),
             )
-            .all()
-        }
+        seen_here = {m.student_id for m in seen_q.all()}
         for student in (
             db.query(Student)
             .filter(Student.class_id.in_(class_ids), Student.is_active.is_(True))
             .all()
         ):
-            if student.student_id not in published_here:
+            if student.student_id not in seen_here:
                 missing.append(student.student_id)
     results = []
     for student_id, entry in sorted(students.items()):
-        marks_here = [
-            m for m in db.query(Mark).filter(
-                Mark.student_id == student_id,
+        marks_q = db.query(Mark).filter(
+            Mark.student_id == student_id,
+            Mark.examination_session_id.in_(session_ids),
+        )
+        if not entry_view:
+            marks_q = marks_q.filter(
                 Mark.workflow_status == "published",
-                Mark.is_withheld.is_(False)).all()
-            if m.examination_session_id in session_ids
-        ]
-        entry.update(_summarize_marks_rows(marks_here))
+                Mark.is_withheld.is_(False),
+            )
+        entry.update(_summarize_marks_rows(marks_q.all()))
         results.append(entry)
     return {
         "exam_id": exam.exam_id,
@@ -768,20 +840,27 @@ def examination_results(db: Session, school_id: int, exam) -> dict:
     }
 
 
-def teacher_in_exam(db: Session, staff_id: int, exam_id: int) -> bool:
-    """True when the teacher is assigned to at least one session slot."""
+def teacher_session_ids_for_exam(db: Session, staff_id: int, exam_id: int) -> set[int]:
+    """Session slots within an exam that this teacher teaches — usually a
+    subset of the exam's sessions. Scopes the teacher entry view so another
+    class's in-flight drafts never leave the server for a co-teacher."""
     from common.models import ExaminationSession as SessionModel
 
-    triples = (
-        db.query(TeacherClassSubject.class_id, TeacherClassSubject.subject_id)
-        .filter(TeacherClassSubject.staff_id == staff_id)
-        .all()
-    )
+    triples = {
+        (c, s)
+        for c, s in db.query(
+            TeacherClassSubject.class_id, TeacherClassSubject.subject_id
+        ).filter(TeacherClassSubject.staff_id == staff_id).all()
+    }
     if not triples:
-        return False
-    slots = (
-        db.query(SessionModel.class_id, SessionModel.subject_id)
-        .filter(SessionModel.exam_id == exam_id)
-        .all()
-    )
-    return any((c, s) in {(t.class_id, t.subject_id) for t in triples} for c, s in slots)
+        return set()
+    return {
+        sl.session_id
+        for sl in db.query(SessionModel).filter(SessionModel.exam_id == exam_id).all()
+        if (sl.class_id, sl.subject_id) in triples
+    }
+
+
+def teacher_in_exam(db: Session, staff_id: int, exam_id: int) -> bool:
+    """True when the teacher is assigned to at least one session slot."""
+    return bool(teacher_session_ids_for_exam(db, staff_id, exam_id))
