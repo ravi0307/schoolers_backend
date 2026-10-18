@@ -211,6 +211,54 @@ class ExaminationSchedulingTests(unittest.TestCase):
         repo.update_session(self.db, draft, dsess, 11, {"venue": "Hall C"}, None)
         self.assertEqual(repo.list_session_versions(self.db, dsess.session_id), [])
 
+    def test_add_to_published_schedule_requires_and_records_reason(self):
+        exam, _ = self._publish_with_session()
+        router, schemas = _load_academics()
+
+        def payload(**over):
+            return schemas.SessionCreate(**_session_data(**over))
+
+        # No reason → refused at the HTTP boundary, nothing persists.
+        before = len(repo.list_sessions(self.db, exam.exam_id))
+        with self.assertRaises(AppError):
+            router.create_examination_session(
+                exam.exam_id, payload(date=date(2026, 12, 17)), self.db, 1, self.admin1)
+        self.assertEqual(len(repo.list_sessions(self.db, exam.exam_id)), before)
+        # With a reason → created and versioned (old_row NULL marks an add).
+        out = router.create_examination_session(
+            exam.exam_id, payload(date=date(2026, 12, 17), reason="Extra sitting"),
+            self.db, 1, self.admin1)
+        versions = repo.list_session_versions(self.db, out["session"].session_id)
+        self.assertEqual(len(versions), 1)
+        self.assertIsNone(versions[0].old_row)
+        self.assertEqual(versions[0].reason, "Extra sitting")
+        self.assertEqual(versions[0].new_row["date"], "2026-12-17")
+        self.assertEqual(versions[0].new_row["status"], "scheduled")
+        # Draft examinations still add silently with no history.
+        draft = self._exam(name="Unit 2")
+        out = router.create_examination_session(
+            draft.exam_id, payload(date=date(2026, 12, 18)), self.db, 1, self.admin1)
+        self.assertEqual(repo.list_session_versions(self.db, out["session"].session_id), [])
+
+    def test_republish_counts_rescheduled_and_live_sessions_only(self):
+        exam, session = self._publish_with_session()
+        session, _ = repo.update_session(
+            self.db, exam, session, 11, {"venue": "Hall B"}, "Hall A flooded")
+        self.assertEqual(session.status, "rescheduled")
+        # Unpublish → republish must still work when every session has been
+        # amended (status "rescheduled") — the journey cannot dead-end here.
+        repo.unpublish_examination(self.db, exam)
+        exam = repo.publish_examination(self.db, exam)
+        self.assertEqual(exam.status, "published")
+        # Cancelled rows alone never satisfy the publish gate.
+        exam2 = self._exam(name="All cancelled")
+        s2, _ = repo.create_session(
+            self.db, exam2, 11, _session_data(date=date(2026, 12, 19)))
+        s2.status = "cancelled"
+        self.db.commit()
+        with self.assertRaises(ConflictError):
+            repo.publish_examination(self.db, exam2)
+
     def test_cancel_preserves_rows_with_status(self):
         exam, session = self._publish_with_session()
         repo.cancel_examination(self.db, exam, 11, "Floods")

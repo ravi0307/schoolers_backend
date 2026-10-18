@@ -891,11 +891,13 @@ def publish_examination(db: Session, exam):
         return exam
     if exam.status != "draft":
         raise ConflictError("Only draft examinations can be published")
+    # Any live session counts: scheduled, rescheduled (published-schedule
+    # edits flip status), or completed. Only cancelled rows are dead weight.
     live = (
         db.query(ExaminationSession)
         .filter(
             ExaminationSession.exam_id == exam.exam_id,
-            ExaminationSession.status == "scheduled",
+            ExaminationSession.status != "cancelled",
         )
         .count()
     )
@@ -1065,6 +1067,10 @@ def _apply_session_change(db: Session, session, changes: dict, user_id, reason: 
 
 
 def create_session(db: Session, exam, user_id: int | None, data: dict):
+    data = dict(data)
+    reason = data.pop("reason", None)
+    if exam.status != "draft" and not reason:
+        raise AppError("Adding a session to a published schedule requires a reason", status_code=400)
     if get_class(db, exam.school_id, data["class_id"]) is None:
         raise NotFoundError("Class not found")
     if get_subject(db, exam.school_id, data["subject_id"]) is None:
@@ -1086,6 +1092,17 @@ def create_session(db: Session, exam, user_id: int | None, data: dict):
         raise ConflictError("; ".join(blocking))
     session = ExaminationSession(exam_id=exam.exam_id, status="scheduled", **data)
     db.add(session)
+    db.flush()
+    if exam.status != "draft":
+        # Adds to a published schedule are amendments too: version them with
+        # a NULL old_row so History can tell an add from an edit.
+        db.add(ExaminationSessionVersion(
+            session_id=session.session_id,
+            changed_by=user_id,
+            reason=reason,
+            old_row=None,
+            new_row=_snapshot_session(session),
+        ))
     db.commit()
     db.refresh(session)
     return session, warnings
