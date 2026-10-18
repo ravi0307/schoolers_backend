@@ -132,6 +132,29 @@ class SessionMarksLifecycleTests(unittest.TestCase):
         mark = self._mark(assessment_status="absent", score=None)
         self.assertIsNone(mark.score)
 
+    def test_mark_read_serializes_absent_and_grade_rows(self):
+        # Parent report cards serialize published rows through MarkRead;
+        # score=None rows (absent or grade-format) must not fail validation,
+        # or the whole parent marks endpoint 500s.
+        _, schemas = _load_marks_router()
+        absent = self._mark(assessment_status="absent", score=None)
+        graded = self._mark(session=self.session2, exam=self.exam2,
+                            grade_label="A", score=None)
+        repo.submit_session_marks(self.db, self.session1)
+        repo.publish_session_marks(self.db, self.session1)
+        repo.submit_session_marks(self.db, self.session2)
+        repo.publish_session_marks(self.db, self.session2)
+        a = schemas.MarkRead.model_validate(absent)
+        self.assertIsNone(a.score)
+        self.assertEqual(a.assessment_status, "absent")
+        self.assertIsNone(a.max_marks)  # absent rows carry no maximum by design
+        g = schemas.MarkRead.model_validate(graded)
+        self.assertIsNone(g.score)
+        self.assertEqual(g.grade_level_id, 1)
+        # A plain present row keeps the legacy shape (int score + max).
+        p = schemas.MarkRead.model_validate(self._mark(student_id=2))
+        self.assertEqual((p.score, p.max_marks, p.assessment_status), (80, 100, "present"))
+
     def test_grade_entry_uses_pinned_scale(self):
         mark = self._mark(session=self.session2, exam=self.exam2,
                           grade_label="A", score=None)
