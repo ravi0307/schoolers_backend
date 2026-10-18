@@ -594,6 +594,49 @@ def _grade_for_percentage(db: Session, scale_id: int | None, percentage: float):
     return None
 
 
+def _resolve_row_grade(db: Session, exam, mark) -> dict | None:
+    """One mark's grade straight from the school's configured scale: the
+    pinned level for grade-format rows, numeric bands for marks-format rows
+    when the examination names a scale. None when nothing is configured —
+    no thresholds are invented here."""
+    if mark.grade_level_id is not None:
+        level = (
+            db.query(GradeLevel)
+            .filter(GradeLevel.level_id == mark.grade_level_id)
+            .first()
+        )
+        if level is None:
+            return None
+        return {"label": level.label, "description": level.description}
+    if (
+        mark.assessment_status == "present"
+        and mark.score is not None
+        and mark.max_marks
+        and exam is not None
+    ):
+        return _grade_for_percentage(
+            db, exam.grade_scale_id, mark.score / mark.max_marks * 100
+        )
+    return None
+
+
+def mark_read_views(db: Session, school_id: int | None, marks: list) -> list[dict]:
+    """Flat mark list (student route) as dicts: subject names from the
+    school catalog plus scale-resolved grades on every row."""
+    names = _subject_names(db, school_id) if school_id is not None else {}
+    views = []
+    for mark in marks:
+        view = _row_view(names, mark)
+        view["updated_by"] = mark.updated_by
+        view["updated_by_user"] = mark.updated_by_user
+        exam = None
+        if mark.examination_session_id is not None:
+            _, exam = get_session_with_exam(db, mark.examination_session_id)
+        view["grade"] = _resolve_row_grade(db, exam, mark)
+        views.append(view)
+    return views
+
+
 def _visible_marks_query(db: Session, student_id: int):
     return db.query(Mark).filter(
         Mark.student_id == student_id,
@@ -660,7 +703,8 @@ def _summarize_marks_rows(rows: list) -> dict:
 
 
 def student_results(db: Session, school_id: int, student_id: int,
-                    year_id: int | None = None, exam_id: int | None = None) -> dict:
+                    year_id: int | None = None, exam_id: int | None = None,
+                    period_id: int | None = None) -> dict:
     from common.models import Examination as ExamModel
 
     names = _subject_names(db, school_id)
@@ -688,12 +732,15 @@ def student_results(db: Session, school_id: int, student_id: int,
             continue
         if exam_id is not None and exam.exam_id != exam_id:
             continue
+        if period_id is not None and exam.period_id != period_id:
+            continue
         key = exam.exam_id
         if key not in seen_exams:
             seen_exams[key] = {"exam": exam, "sessions": [], "subjects": []}
             examinations.append(seen_exams[key])
         seen_exams[key]["sessions"].append(session)
         view = _row_view(names, mark)
+        view["grade"] = _resolve_row_grade(db, exam, mark)
         seen_exams[key]["subjects"].append(view)
         aggregate_rows.append(mark)
     final_examinations = []
@@ -741,12 +788,18 @@ def student_results(db: Session, school_id: int, student_id: int,
         by_term.setdefault(mark.term, []).append(mark)
     for term, rows in sorted(by_term.items()):
         views = [_row_view(names, m) for m in rows]
+        for view, m in zip(views, rows):
+            view["grade"] = _resolve_row_grade(db, None, m)
         legacy_terms.append({"term": term, "subjects": views, **_summarize_marks_rows(rows)})
     aggregate = None
     marks_rows = [m for m in aggregate_rows if m.result_format == "marks"]
     if marks_rows:
         aggregate = _summarize_marks_rows(marks_rows)
-        aggregate["scope"] = "year" if year_id is not None else "all examinations"
+        aggregate["scope"] = (
+            "term" if period_id is not None
+            else "year" if year_id is not None
+            else "all examinations"
+        )
     elif aggregate_rows:
         aggregate = {"scope": "grade-only", "note": "Not applicable for grade-based assessment"}
     return {

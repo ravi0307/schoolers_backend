@@ -16,14 +16,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from common.dependencies import CurrentUser
 from common.exceptions import AppError, ForbiddenError, NotFoundError
 from common.models import (
-    Base, AcademicYear, Examination, ExaminationSession, ExaminationType,
+    Base, AcademicPeriod, AcademicYear, Examination, ExaminationSession, ExaminationType,
     GradeLevel, GradeScale, Mark, Parent, ParentStudent, School, Student, Subject,
     TeacherClassSubject,
 )
 import services.marks_service.repository as repo
 
 TABLES = [
-    "schools", "academic_years", "examination_types", "examinations", "examination_sessions",
+    "schools", "academic_years", "academic_periods", "examination_types", "examinations",
+    "examination_sessions",
     "grade_scales", "grade_levels", "students", "subjects", "parents",
     "parent_student", "teacher_class_subjects", "marks",
     "class_subjects", "student_subjects",
@@ -160,6 +161,68 @@ class MarksResultsTests(unittest.TestCase):
         self.assertEqual(entry["grade_distribution"], {"A": 1})
         self.assertNotIn("percentage", entry)
         self.assertEqual(out["aggregate"]["scope"], "grade-only")
+
+    def test_parent_list_carries_subject_name_and_configured_grade(self):
+        """The flat student route returns subject names from the catalog and
+        the school's own scale label — never an invented threshold."""
+        router = _load_marks_router()
+        self._publish(1, 1, score=42)          # marks exam, scale_id NULL
+        self._publish(3, 1, grade_label="A")   # grade exam, pinned scale
+        out = router.get_student_marks(1, None, self.db, self.parent225)
+        self.assertEqual(len(out), 2)
+        self.assertTrue(all(r["subject_name"] == "Maths" for r in out))
+        grade_rows = [r for r in out if r["grade_level_id"] is not None]
+        self.assertEqual(len(grade_rows), 1)
+        self.assertEqual(grade_rows[0]["grade"], {"label": "A", "description": None})
+        mark_rows = [r for r in out if r["grade_level_id"] is None]
+        self.assertEqual(len(mark_rows), 1)
+        self.assertIsNone(mark_rows[0]["grade"])  # no scale → no invented band
+        self.assertEqual(mark_rows[0]["score"], 42)
+        self.assertEqual(mark_rows[0]["updated_by_user"], 31)  # session marks carry user, not staff slot
+
+    def test_student_results_filters_by_period(self):
+        """period_id narrows results to examinations scheduled in one term."""
+        self.db.add_all([
+            AcademicPeriod(period_id=1, year_id=1, name="Term 1",
+                           start_date=date(2026, 6, 1), end_date=date(2026, 10, 15),
+                           is_active=False),
+            AcademicPeriod(period_id=2, year_id=1, name="Term 2",
+                           start_date=date(2026, 10, 16), end_date=date(2027, 3, 31),
+                           is_active=True),
+            Examination(exam_id=3, school_id=1, type_id=1, year_id=1, period_id=2,
+                        name="Term 2 Weekly", result_format_expectation="marks",
+                        status="published"),
+        ])
+        self.db.commit()
+        self.exam1.period_id = 1
+        self.db.commit()
+        self._publish(1, 1, score=42)
+        _session(self.db, 7, 3, date(2027, 3, 10))
+        self._publish(7, 1, score=90)
+
+        term1 = repo.student_results(self.db, 1, 1, year_id=1, period_id=1)
+        self.assertEqual([e["exam_id"] for e in term1["examinations"]], [1])
+        self.assertEqual(term1["aggregate"]["scope"], "term")
+        term2 = repo.student_results(self.db, 1, 1, year_id=1, period_id=2)
+        self.assertEqual([e["exam_id"] for e in term2["examinations"]], [3])
+        everything = repo.student_results(self.db, 1, 1, year_id=1)
+        self.assertEqual(
+            [e["exam_id"] for e in everything["examinations"]], [1, 3]
+        )
+        self.assertEqual(everything["aggregate"]["scope"], "year")
+        # Router-level: the new kwarg sits after current_user, so the
+        # established positional call shape keeps working untouched.
+        router = _load_marks_router()
+        via_router = router.get_student_results(
+            1, None, None, None, self.db, self.parent225, period_id=2
+        )
+        self.assertEqual(
+            [e["exam_id"] for e in via_router["examinations"]], [3]
+        )
+        positional = router.get_student_results(1, None, None, None, self.db, self.parent225)
+        self.assertEqual(
+            [e["exam_id"] for e in positional["examinations"]], [1, 3]
+        )
 
     def test_legacy_terms_grouped_without_double_count(self):
         repo.upsert_mark(self.db, 1, 3, "Term 1", 70, 7)

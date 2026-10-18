@@ -22,6 +22,11 @@ class MarkRead(BaseModel):
     grade_level_id: int | None = None
     updated_by: int | None = None
     updated_by_user: int | None = None
+    # Read-side display metadata: subject name from the school catalog and
+    # the resolved grade from the school's configured scale (None when the
+    # scale defines nothing — thresholds are never invented here).
+    subject_name: str | None = None
+    grade: dict | None = None
 
     class Config:
         from_attributes = True
