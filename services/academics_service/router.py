@@ -274,7 +274,7 @@ def list_academic_periods(
     require_examinations_enabled(db, school_id)
     if repo.get_year(db, school_id, year_id) is None:
         raise NotFoundError("Academic year not found")
-    return repo.list_periods(db, year_id)
+    return repo.list_academic_periods(db, year_id)
 
 
 @router.post("/academic-periods", response_model=AcademicPeriodRead, status_code=201)

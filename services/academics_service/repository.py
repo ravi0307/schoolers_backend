@@ -465,7 +465,7 @@ def update_year(db: Session, year: AcademicYear, data: dict) -> AcademicYear:
     return year
 
 
-def list_periods(db: Session, year_id: int) -> list[AcademicPeriod]:
+def list_academic_periods(db: Session, year_id: int) -> list[AcademicPeriod]:
     return (
         db.query(AcademicPeriod)
         .filter(AcademicPeriod.year_id == year_id)
