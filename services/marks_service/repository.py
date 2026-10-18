@@ -444,6 +444,7 @@ def correct_mark(
         new_grade_level_id=cols["grade_level_id"],
         reason=reason,
         corrected_by=user_id,
+        approved_at=func.now(),
         approved_by=user_id,
     )
     db.add(correction)
