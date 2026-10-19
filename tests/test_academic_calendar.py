@@ -170,7 +170,7 @@ class AcademicPeriodTests(unittest.TestCase):
         p2 = repo.create_period(self.db, self.year, {
             "name": "Term 2", "start_date": date(2026, 11, 1), "end_date": date(2027, 2, 28),
         })
-        self.assertEqual(len(repo.list_periods(self.db, self.year.year_id)), 2)
+        self.assertEqual(len(repo.list_academic_periods(self.db, self.year.year_id)), 2)
         # Moving the second back onto the first is rejected too.
         with self.assertRaises(ConflictError):
             repo.update_period_entry(self.db, p2, {"start_date": date(2026, 9, 1)})

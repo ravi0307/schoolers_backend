@@ -42,6 +42,7 @@ def get_student_marks(
     # callers cannot distinguish "missing" from "another school's".
     # Non-master callers' school_id argument, if supplied, is ignored: the
     # token's school always wins.
+    scope = current_user.school_id
     if current_user.role == "master":
         scope = _master_scope(current_user, school_id)
         if not repo.student_in_school(db, student_id, scope):
@@ -62,8 +63,12 @@ def get_student_marks(
     # Parents see published results only, never drafts and never withheld
     # rows; staff views keep everything so drafts carry visible badges.
     if current_user.role == "parent":
-        return repo.get_for_student(db, student_id, published_only=True, include_withheld=False)
-    return repo.get_for_student(db, student_id)
+        rows = repo.get_for_student(db, student_id, published_only=True, include_withheld=False)
+    else:
+        rows = repo.get_for_student(db, student_id)
+    # Read-side metadata (subject names, scale-resolved grades) rides the
+    # same rows; authorization above is untouched.
+    return repo.mark_read_views(db, scope, rows)
 
 
 @router.get("/class/{class_id}", response_model=list[MarkRead])
@@ -338,9 +343,9 @@ def commit_import(
         .filter(bulk.MarkImportBatch.batch_id == batch_id)
         .first()
     )
-    if batch is None or (
-        current_user.school_id is not None and batch.school_id != current_user.school_id
-    ):
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    if batch is None or batch.school_id != current_user.school_id:
         raise NotFoundError("Import batch not found")
     require_examinations_enabled(db, batch.school_id)
     session, _ = _session_and_exam(db, batch.school_id, batch.session_id)
@@ -382,6 +387,7 @@ def get_student_results(
     school_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin", "master")),
+    period_id: int | None = None,
 ):
     """Published, non-withheld results grouped by examination, plus legacy
     terms and a year aggregate. Scoping mirrors the marks reads; parents
@@ -407,7 +413,9 @@ def get_student_results(
     else:
         scope = current_user.school_id
     require_examinations_enabled(db, scope)
-    return repo.student_results(db, scope, student_id, year_id, exam_id)
+    # period_id sits after current_user so existing direct-call sites keep
+    # their positional order; FastAPI reads it as an ordinary query param.
+    return repo.student_results(db, scope, student_id, year_id, exam_id, period_id=period_id)
 
 
 @router.get("/results/examination/{exam_id}", response_model=ExaminationResultsRead)

@@ -116,6 +116,14 @@ def cmd_seed(args) -> None:
     seed_mod.run(dry_run=args.dry_run)
 
 
+def cmd_exam_fixtures(args) -> None:
+    from seed import exams as exams_mod
+
+    url_str = database_url()
+    guard_local(url_str)
+    exams_mod.run(dry_run=args.dry_run, database_url=url_str)
+
+
 def cmd_verify(args) -> None:
     from seed import verify as verify_mod
     verify_mod.run()
@@ -141,6 +149,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_seed = sub.add_parser("seed", help="create the two schools via the real API")
     p_seed.add_argument("--dry-run", action="store_true")
     p_seed.set_defaults(func=cmd_seed)
+
+    p_exams = sub.add_parser(
+        "exam-fixtures",
+        help="idempotent Blue Horizon examination fixtures (dev only)",
+    )
+    p_exams.add_argument("--dry-run", action="store_true")
+    p_exams.set_defaults(func=cmd_exam_fixtures)
 
     p_verify = sub.add_parser("verify", help="assert the seeded state")
     p_verify.set_defaults(func=cmd_verify)

@@ -26,6 +26,7 @@ TABLES = [
     "examination_sessions", "classes", "students", "subjects",
     "teacher_class_subjects", "marks", "holidays", "academic_events",
     "class_subjects", "student_subjects", "mark_import_batches", "mark_import_rows",
+    "grade_scales",
 ]
 
 
@@ -255,6 +256,42 @@ class RolloutFlagTests(unittest.TestCase):
         out = marks_router.commit_import(batch2.batch_id, False, self.db, self.admin2)
         self.assertEqual((out["applied"], out["skipped"]), (1, 0))
         self.assertEqual(self.db.query(Mark).count(), 1)
+
+    def test_schoolless_admin_cannot_commit_import(self):
+        # A token with school_id=None must not slip past the batch school
+        # check (the guard used to skip the comparison for None callers).
+        from common.models import Mark
+        self._pilot_school()
+        acad_router, acad_schemas = _load("services/academics_service", "services.academics_service")
+        etype = acad_router.create_examination_type(
+            acad_schemas.ExaminationTypeCreate(name="Half-Yearly"), self.db, 1, self.admin1)
+        exam = acad_router.create_examination(
+            acad_schemas.ExaminationCreate(type_id=etype.type_id, year_id=1, name="HY"),
+            self.db, 1, self.admin1)
+        write = acad_router.create_examination_session(
+            exam.exam_id,
+            acad_schemas.SessionCreate(class_id=1, subject_id=3, date=date(2026, 12, 15),
+                                       start_time=time(9, 0), end_time=time(12, 0), max_marks=100),
+            self.db, 1, self.admin1)
+        sys.path.insert(0, "services/marks_service")
+        try:
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+            from services.marks_service import router as marks_router
+            from services.marks_service import bulk as bulk_mod
+        finally:
+            sys.path.pop(0)
+            for mod in ("repository", "schemas", "bulk"):
+                sys.modules.pop(mod, None)
+        csv_text = ("student_id,admission_no,student_name,score_or_grade,assessment_status\n"
+                    "1,A1,Riya,75,present\n")
+        batch, receipt = bulk_mod.preview_upload(
+            self.db, 1, write["session"], exam, "s1.csv", csv_text.encode(), 11)
+        self.assertEqual([r["verdict"] for r in receipt], ["valid"])
+        schoolless = CurrentUser(user_id=14, role="admin", school_id=None, linked_person_id=None)
+        with self.assertRaises(ForbiddenError):
+            marks_router.commit_import(batch.batch_id, False, self.db, schoolless)
+        self.assertEqual(self.db.query(Mark).count(), 0)
 
     def test_disable_between_preview_and_commit_denies(self):
         from common.models import Mark

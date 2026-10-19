@@ -90,6 +90,13 @@ def teaching_load(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
+    # Teachers may only read their own load; admins only inside their own
+    # school (same tenancy rule as children_of_parent below).
+    if current_user.role == "teacher":
+        if not current_user.linked_person_id or current_user.linked_person_id != teacher_id:
+            raise ForbiddenError("Teachers can only view their own teaching load")
+    elif current_user.school_id is None or not repo.get_teacher(db, current_user.school_id, teacher_id):
+        raise NotFoundError("Teacher not found")
     return [
         {
             "id": tcs.id,
