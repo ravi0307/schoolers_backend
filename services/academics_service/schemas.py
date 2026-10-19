@@ -492,8 +492,6 @@ class ExaminationCreate(BaseModel):
     def _scale_matches_format(self):
         if self.result_format_expectation == "grade" and self.grade_scale_id is None:
             raise ValueError("Grade-wise examinations require a grade scale")
-        if self.result_format_expectation == "marks" and self.grade_scale_id is not None:
-            raise ValueError("Marks-wise examinations must not set a grade scale")
         return self
 
 

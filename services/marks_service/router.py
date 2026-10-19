@@ -343,9 +343,9 @@ def commit_import(
         .filter(bulk.MarkImportBatch.batch_id == batch_id)
         .first()
     )
-    if batch is None or (
-        current_user.school_id is not None and batch.school_id != current_user.school_id
-    ):
+    if current_user.school_id is None:
+        raise ForbiddenError("User is not associated with a school")
+    if batch is None or batch.school_id != current_user.school_id:
         raise NotFoundError("Import batch not found")
     require_examinations_enabled(db, batch.school_id)
     session, _ = _session_and_exam(db, batch.school_id, batch.session_id)

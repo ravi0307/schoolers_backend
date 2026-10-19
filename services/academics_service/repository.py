@@ -855,6 +855,15 @@ def create_examination(db: Session, school_id: int, user_id: int, data: dict):
         get_grade_scale(db, school_id, data["grade_scale_id"]) is None
     ):
         raise NotFoundError("Grade scale not found")
+    if data.get("grade_scale_id") is None:
+        active_scale = (
+            db.query(GradeScale)
+            .filter(GradeScale.school_id == school_id, GradeScale.is_active.is_(True))
+            .order_by(GradeScale.version.desc())
+            .first()
+        )
+        if active_scale is not None:
+            data["grade_scale_id"] = active_scale.scale_id
     if exam_name_taken(db, school_id, data["year_id"], data["name"]):
         raise ConflictError("An examination with this name already exists for this year")
     exam = Examination(
