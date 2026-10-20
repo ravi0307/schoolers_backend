@@ -15,7 +15,7 @@ from common.storage import (
 import repository as repo
 from schemas import (
     SchoolCreate, SchoolUpdate, SchoolRead, SchoolWithCredentials, FeatureFlags, SchoolStatusUpdate, SchoolStats,
-    MarkingSystemUpdate,
+    MarkingSystemUpdate, SchoolFeatures,
 )
 
 router = APIRouter(prefix="/schools", tags=["schools"])
@@ -181,6 +181,32 @@ def delete_school(
 ):
     school = _get_or_404(db, school_id)
     repo.delete_school(db, school)
+
+
+@router.get("/{school_id}/features", response_model=SchoolFeatures)
+def get_features(
+    school_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("master", "admin")),
+):
+    """Effective feature configuration for one school.
+
+    Master Admin may read any school; a School Admin only their own
+    (guard below, so another school's admin gets 403 and reads cannot
+    cross schools). This is the config the School Admin UI loads to
+    drive sidebar visibility and route guards.
+    """
+    _guard_school_access(current_user, school_id)
+    school = _get_or_404(db, school_id)
+    return SchoolFeatures(
+        school_id=school.school_id,
+        route_enabled=school.route_enabled,
+        website_enabled=school.website_enabled,
+        library_enabled=school.library_enabled,
+        fees_enabled=school.fees_enabled,
+        salary_enabled=school.salary_enabled,
+        examinations_enabled=school.examinations_enabled,
+    )
 
 
 @router.patch("/{school_id}/features", response_model=SchoolRead)
