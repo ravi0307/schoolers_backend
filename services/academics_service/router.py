@@ -748,6 +748,7 @@ def list_class_offerings(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("parent", "teacher", "admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_class(db, school_id, class_id) is None:
         raise NotFoundError("Class not found")
     return repo.list_offerings(db, class_id)
@@ -761,6 +762,7 @@ def set_class_offering(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_class(db, school_id, class_id) is None:
         raise NotFoundError("Class not found")
     if repo.get_subject(db, school_id, payload.subject_id) is None:
@@ -782,6 +784,7 @@ def delete_class_offering(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    require_examinations_enabled(db, school_id)
     if repo.get_class(db, school_id, class_id) is None:
         raise NotFoundError("Class not found")
     repo.delete_offering(db, class_id, subject_id)

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class SchoolBase(BaseModel):
@@ -52,12 +52,37 @@ class SchoolUpdate(BaseModel):
 
 
 class FeatureFlags(BaseModel):
+    """Write model for PATCH /schools/{id}/features (master only).
+
+    extra="forbid": an unsupported feature key is a 422 instead of being
+    silently ignored, so a client can never believe it flipped a feature
+    the backend does not have.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     route_enabled: bool | None = None
     website_enabled: bool | None = None
     library_enabled: bool | None = None
     fees_enabled: bool | None = None
     salary_enabled: bool | None = None
     examinations_enabled: bool | None = None
+
+
+class SchoolFeatures(BaseModel):
+    """Effective feature configuration for one school (read model).
+
+    Served by GET /schools/{id}/features to the Master Admin (any school)
+    and a School Admin (own school only).
+    """
+
+    school_id: int
+    route_enabled: bool
+    website_enabled: bool
+    library_enabled: bool
+    fees_enabled: bool
+    salary_enabled: bool
+    examinations_enabled: bool
 
 
 class SchoolStatusUpdate(BaseModel):
