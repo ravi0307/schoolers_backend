@@ -40,10 +40,11 @@ def create(db: Session, school_id: int, data: dict) -> SchoolNotification:
     try:
         send_school_notification_email(school.name, data["type"], data["message"], recipients)
     except Exception as exc:
+        # The row is already committed and shows in the school's notification
+        # history. Do NOT rewrite status here: the column is varchar(10)
+        # CHECK (Sent, Read), so any failure marker crashes on the way out
+        # and masks this error with a 500.
         logger.exception("Failed to email school notification %s", n.notification_id)
-        n.status = "Email failed"
-        db.commit()
-        db.refresh(n)
         raise AppError(f"Notification saved but email could not be sent: {exc}") from exc
 
     n._email_recipients = recipients

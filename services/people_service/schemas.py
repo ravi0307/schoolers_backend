@@ -81,9 +81,11 @@ class StaffCreate(BaseModel):
         min_length=1,
         validation_alias=AliasChoices("role", "role_title"),
     )
-    # Employment category used by teaching assignments and reporting. A staff
-    # member who drives is identified by a pilots row, not by person_type.
-    person_type: Literal["teacher", "pilot", "admin", "staff"] = "staff"
+    # Employment category used by teaching assignments and reporting. When the
+    # client omits it, repository.create_staff infers it from the role label
+    # (so a staff-form "Teacher"/"Pilot" becomes person_type teacher/pilot and
+    # reaches the teachers list and the driver sync respectively).
+    person_type: Literal["teacher", "pilot", "admin", "staff"] | None = None
     phone: str
     email: str = Field(
         min_length=1,

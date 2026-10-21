@@ -248,7 +248,10 @@ def infer_person_type(role: str | None) -> str:
 
 def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     values = dict(data)
-    values.setdefault("person_type", infer_person_type(values.get("role")))
+    # A payload that does not choose a person_type must still be classified by
+    # its role label; only an explicitly sent value is trusted as-is.
+    if values.get("person_type") is None:
+        values["person_type"] = infer_person_type(values.get("role"))
     staff = Staff(school_id=school_id, **values)
     db.add(staff)
     db.flush()
