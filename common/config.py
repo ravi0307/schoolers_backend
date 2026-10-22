@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
+    # Display name on the From header; SMTP_FROM may stay a bare address.
+    SMTP_FROM_NAME: str = "Schoolers"
     SMTP_USE_TLS: bool = True
 
     # File uploads — local disk in dev; swap UPLOAD_BACKEND to "s3" later.
