@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import common.email
+from common.authz import PRIVILEGED_ROLES, SUBMASTER_ROLE, assert_can_manage_privileged
 from common.email_templates import platform_signature, platform_subject, render_email
-from common.exceptions import UnauthorizedError
+from common.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from common.security import (
     verify_password, create_access_token, create_refresh_token, decode_token,
-    hash_password,
+    generate_temp_password, hash_password,
 )
 from common.models import User, Staff, Parent, School
 
@@ -177,8 +178,11 @@ def user_email_address(db: Session, user: User) -> str | None:
     """Resolve a deliverable email address for an account, or None.
 
     Students have no account/email of their own; master accounts are global and
-    have none either.
+    have none either. Sub-Master accounts are standalone (no linked person) but
+    may carry an address on their own row, so password recovery can reach them.
     """
+    if user.role == "submaster":
+        return user.email or None
     if user.role == "admin":
         school = db.query(School).filter(School.school_id == user.school_id).first()
         return school.primary_email if school else None
@@ -291,3 +295,103 @@ def forgot_password_reset(db: Session, identifier: str, reset_token: str, new_pa
     db.commit()
     db.refresh(user)
     return user
+
+
+# ---- Sub-Master accounts: the Master-managed lifecycle ----
+
+
+def _account_dict(user: User) -> dict:
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "role": user.role,
+        "email": user.email,
+        "is_active": user.is_active,
+        "created_at": user.created_at,
+    }
+
+
+def list_privileged_accounts(db: Session) -> list[dict]:
+    """Every Master and Sub-Master account, for the Master-facing roster."""
+    rows = (
+        db.query(User)
+        .filter(User.role.in_(PRIVILEGED_ROLES))
+        .order_by(User.role, User.username)
+        .all()
+    )
+    return [_account_dict(user) for user in rows]
+
+
+def create_submaster(db: Session, payload) -> dict:
+    """Create a Sub-Master (router already restricted to Master callers).
+
+    The role is assigned here and never read from the payload, so the
+    endpoint cannot mint a Master or any other role no matter what a client
+    sends. The password — supplied or generated — is returned exactly once
+    with the creation response; only its bcrypt hash is persisted.
+    """
+    if (
+        db.query(User.user_id)
+        .filter(func.lower(User.username) == payload.username.lower())
+        .first()
+    ):
+        raise ConflictError("Username is already taken")
+    password = payload.password or generate_temp_password()
+    user = User(
+        school_id=None,
+        role=SUBMASTER_ROLE,
+        username=payload.username,
+        email=payload.email or None,
+        password_hash=hash_password(password),
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {**_account_dict(user), "password": password}
+
+
+def _target_submaster(db: Session, current_user, user_id: int, action: str) -> User:
+    """Fetch the target account and enforce the management rule.
+
+    Unknown ids are 404. A Master target, an account of any other role, or a
+    non-Master actor are all the same generic 403 from
+    assert_can_manage_privileged — the response never describes what the id
+    points at. Master accounts have no mutation API at all: even a Master
+    actor may only mutate Sub-Master rows here.
+    """
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user is None:
+        raise NotFoundError("Account not found")
+    assert_can_manage_privileged(current_user, user.role, action)
+    return user
+
+
+def update_submaster(db: Session, current_user, user_id: int, payload) -> dict:
+    """Apply a partial update to a Sub-Master: email, activation, password."""
+    user = _target_submaster(db, current_user, user_id, "update")
+    if payload.email is not None:
+        user.email = payload.email.strip() or None
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.password is not None:
+        user.password_hash = hash_password(payload.password)
+        user.password_reset_token = None
+        user.password_reset_token_expires_at = None
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _account_dict(user)
+
+
+def deactivate_submaster(db: Session, current_user, user_id: int) -> None:
+    """Deactivate a Sub-Master — the system's soft-delete for users.
+
+    Rows are never destroyed (a deactivated account keeps its audit trail and
+    can be reactivated with PATCH is_active=true); deactivation immediately
+    blocks new logins because identifier lookup only matches active rows.
+    """
+    user = _target_submaster(db, current_user, user_id, "delete")
+    user.is_active = False
+    db.add(user)
+    db.commit()

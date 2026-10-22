@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from common.database import get_db
+from common.authz import is_master_like
 from common.dependencies import CurrentUser, require_role
 from common.exceptions import ForbiddenError, NotFoundError
 import repository as repo
@@ -45,8 +46,8 @@ def list_tickets(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin", "master")),
 ):
-    """The caller's queue: an admin's own school, or every school for master."""
-    if current_user.role == "master":
+    """The caller's queue: an admin's own school, or every school for master-like."""
+    if is_master_like(current_user.role):
         return repo.list_tickets(db, status=status, school_id=school_id)
     if current_user.school_id is None:
         return []

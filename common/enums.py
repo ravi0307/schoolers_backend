@@ -7,6 +7,7 @@ class Role(str, Enum):
     admin = "admin"
     pilot = "pilot"
     master = "master"
+    submaster = "submaster"
 
 
 class SchoolStatus(str, Enum):

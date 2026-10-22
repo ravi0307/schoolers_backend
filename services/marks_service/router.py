@@ -3,6 +3,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from common.database import get_db
+from common.authz import is_master_like
 from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import AppError, ForbiddenError, NotFoundError
 import bulk
@@ -43,7 +44,7 @@ def get_student_marks(
     # Non-master callers' school_id argument, if supplied, is ignored: the
     # token's school always wins.
     scope = current_user.school_id
-    if current_user.role == "master":
+    if is_master_like(current_user.role):
         scope = _master_scope(current_user, school_id)
         if not repo.student_in_school(db, student_id, scope):
             raise NotFoundError("Student not found")
@@ -81,7 +82,7 @@ def get_class_marks(
 ):
     # The class must belong to the caller's school before any marks are read.
     # Master names the school explicitly; everyone else is bound to the token.
-    if current_user.role == "master":
+    if is_master_like(current_user.role):
         scope = _master_scope(current_user, school_id)
         if not repo.class_in_school(db, class_id, scope):
             raise NotFoundError("Class not found")
@@ -392,7 +393,7 @@ def get_student_results(
     """Published, non-withheld results grouped by examination, plus legacy
     terms and a year aggregate. Scoping mirrors the marks reads; parents
     and students never see drafts, withheld rows, or other families."""
-    if current_user.role == "master":
+    if is_master_like(current_user.role):
         scope = _master_scope(current_user, school_id)
         if not repo.student_in_school(db, student_id, scope):
             raise NotFoundError("Student not found")
@@ -434,7 +435,7 @@ def get_examination_results(
 
     if view not in ("published", "entry"):
         raise AppError("view must be 'published' or 'entry'", status_code=400)
-    if current_user.role == "master":
+    if is_master_like(current_user.role):
         scope = _master_scope(current_user, school_id)
     else:
         scope = current_user.school_id

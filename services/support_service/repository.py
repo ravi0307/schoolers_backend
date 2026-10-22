@@ -1,6 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from common.authz import is_master_like
 from common.models import (
     Parent,
     School,
@@ -36,8 +37,8 @@ def author_name(db: Session, user) -> str:
 
 
 def can_view(current_user, ticket: SupportTicket) -> bool:
-    """The master sees every ticket; an admin sees only their own school's."""
-    return current_user.role == "master" or ticket.school_id == current_user.school_id
+    """Master and Sub-Master see every ticket; an admin only their school's."""
+    return is_master_like(current_user.role) or ticket.school_id == current_user.school_id
 
 
 def _message_dict(message: SupportTicketMessage) -> dict:

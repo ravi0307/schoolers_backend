@@ -11,6 +11,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from common.audit import set_current_actor
+from common.authz import MASTER_ROLE, is_master_like, role_allowed
 from common.database import get_db
 from common.security import decode_token
 from common.exceptions import UnauthorizedError, ForbiddenError
@@ -51,17 +52,35 @@ async def get_current_user(
 
 
 def require_role(*allowed_roles: str):
-    """Dependency factory: require_role("admin", "master") etc."""
+    """Dependency factory: require_role("admin", "master") etc.
+
+    Admission uses common.authz.role_allowed: a Sub-Master is admitted
+    wherever a Master is (operational inheritance), so master-guarded
+    endpoints do not each need editing, while roles never granted to Master
+    (parent/teacher/admin/...) still deny Sub-Master exactly as before.
+    """
     def _checker(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        if current_user.role not in allowed_roles:
+        if not role_allowed(current_user.role, allowed_roles):
             raise ForbiddenError(f"Role '{current_user.role}' cannot access this endpoint")
         return current_user
     return _checker
 
 
+def require_master_only(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Dependency: exactly the Master role — the strictest guard.
+
+    Use for endpoints a Sub-Master must never reach (privileged-account
+    management and anything else reserved to Master). Ordinary operational
+    endpoints keep require_role("master"), which now admits Sub-Master too.
+    """
+    if current_user.role != MASTER_ROLE:
+        raise ForbiddenError(f"Role '{current_user.role}' cannot access this endpoint")
+    return current_user
+
+
 def require_school_scope(current_user: CurrentUser = Depends(get_current_user)) -> int:
-    """For endpoints scoped to the caller's own school (everyone except master)."""
-    if current_user.role == "master":
+    """For endpoints scoped to the caller's own school (everyone except master-like)."""
+    if is_master_like(current_user.role):
         raise ForbiddenError("Master Admin must specify a school_id explicitly")
     if current_user.school_id is None:
         raise ForbiddenError("User is not associated with a school")

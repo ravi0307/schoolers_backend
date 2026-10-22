@@ -52,8 +52,8 @@ TENANT_TABLES: list[str] = [
     "schools",
 ]
 
-# Tables whose rows are NOT all removed (master rows survive).
-KEEP_MASTER_USERS = "role = 'master'"
+# Tables whose rows are NOT all removed (master and sub-master rows survive).
+KEEP_MASTER_USERS = "role IN ('master', 'submaster')"
 
 
 def make_engine(database_url: str | None = None):

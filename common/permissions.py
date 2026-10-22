@@ -8,7 +8,9 @@ This mirrors the table in FASTAPI_MODULES.md. Routers can use this via
 from common.exceptions import ForbiddenError
 
 PERMISSIONS: dict[str, dict[str, set[str]]] = {
-    "schools":        {"read": {"admin", "master"}, "write": {"master"}},
+    # Master and Sub-Master share one operational surface; privileged-account
+    # management is enforced by common.authz, not by this matrix.
+    "schools":        {"read": {"admin", "master", "submaster"}, "write": {"master", "submaster"}},
     "academics":      {"read": {"parent", "teacher", "admin"}, "write": {"admin"}},
     "people":         {"read": {"parent", "teacher", "admin"}, "write": {"admin"}},
     "attendance":     {"read": {"parent", "teacher", "admin"}, "write": {"teacher", "admin"}},
@@ -20,8 +22,8 @@ PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "barter":         {"read": {"parent"}, "write": {"parent"}},
     "activities":     {"read": {"parent"}, "write": {"admin"}},
     "website":        {"read": {"admin"}, "write": {"admin"}},
-    "notifications":  {"read": {"admin"}, "write": {"master"}},
-    "reports":        {"read": {"admin", "master"}, "write": set()},
+    "notifications":  {"read": {"admin"}, "write": {"master", "submaster"}},
+    "reports":        {"read": {"admin", "master", "submaster"}, "write": set()},
 }
 
 

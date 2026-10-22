@@ -1202,9 +1202,10 @@ class SupportTicket(AuditColumnsMixin, Base):
 class SupportTicketMessage(AuditColumnsMixin, Base):
     """One turn in a ticket's conversation, including the opening message.
 
-    `author_role` is the account role that wrote it ('admin' or 'master'), so
-    the thread reads as two parties rather than as a pile of bodies. The name
-    is denormalised for the same reason as the ticket's `created_by_name`.
+    `author_role` is the account role that wrote it ('admin', 'master' or
+    'submaster'), so the thread reads as two parties rather than as a pile of
+    bodies. The name is denormalised for the same reason as the ticket's
+    `created_by_name`.
 
     `attachments` is a JSON list of URL strings minted by the existing upload
     endpoints; support stores references only and never owns the files.
@@ -1225,7 +1226,7 @@ class SupportTicketMessage(AuditColumnsMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "author_role IN ('admin','master')",
+            "author_role IN ('admin','master','submaster')",
             name="support_ticket_messages_role_check",
         ),
     )
