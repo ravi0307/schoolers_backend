@@ -37,15 +37,31 @@ def create(db: Session, school_id: int, data: dict) -> SchoolNotification:
     db.commit()
     db.refresh(n)
 
-    try:
-        send_school_notification_email(school.name, data["type"], data["message"], recipients)
-    except Exception as exc:
+    delivered = send_school_notification_email(
+        school.name,
+        data["type"],
+        data["message"],
+        recipients,
+        db=db,
+        school_email=school.primary_email,
+        school_phone=school.primary_contact,
+    )
+    if not delivered:
         # The row is already committed and shows in the school's notification
         # history. Do NOT rewrite status here: the column is varchar(10)
         # CHECK (Sent, Read), so any failure marker crashes on the way out
-        # and masks this error with a 500.
-        logger.exception("Failed to email school notification %s", n.notification_id)
-        raise AppError(f"Notification saved but email could not be sent: {exc}") from exc
+        # and masks this error with a 500. The outbox keeps an explicit
+        # Failed delivery row for audit and bounded retry; the client only
+        # sees a safe message — SMTP details stay in the server logs.
+        logger.warning(
+            "Notification %s saved but email delivery failed for school %s",
+            n.notification_id, school_id,
+        )
+        raise AppError(
+            "Notification saved to the school's notification history, but the "
+            "email could not be sent. The delivery will be retried "
+            "automatically; no need to resend it."
+        )
 
     n._email_recipients = recipients
     return n

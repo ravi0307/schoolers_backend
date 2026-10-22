@@ -246,9 +246,18 @@ def create_student(
         repo.link_parent_student(db, parent_id, student.student_id)
     elif parent_data:
         repo.create_student_parent(db, school_id, student.student_id, parent_data)
-    parent_email = repo.parent_email_for_student(db, student.student_id)
+    parent_name, parent_email = repo.parent_contact_for_student(db, student.student_id)
     if parent_email:
-        send_student_added_email(repo.school_name(db, school_id), student.name, [parent_email])
+        school_email, school_phone = repo.school_contact(db, school_id)
+        send_student_added_email(
+            repo.school_name(db, school_id),
+            student.name,
+            [parent_email],
+            db=db,
+            school_email=school_email,
+            school_phone=school_phone,
+            recipient_name=parent_name,
+        )
     return repo.student_response(db, student)
 
 

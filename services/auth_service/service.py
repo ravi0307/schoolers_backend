@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import common.email
+from common.email_templates import platform_signature, platform_subject, render_email
 from common.exceptions import UnauthorizedError
 from common.security import (
     verify_password, create_access_token, create_refresh_token, decode_token,
@@ -193,20 +194,27 @@ def user_email_address(db: Session, user: User) -> str | None:
 def _deliver_reset_token(email: str, raw_token: str, expires_minutes: int = RESET_TOKEN_TTL_MINUTES) -> None:
     """Email the one-time 6-digit reset OTP out of band. Best-effort: a
     delivery failure is logged and swallowed so it can never reveal whether
-    the identifier is registered."""
-    subject = "Schoolers — Password reset"
-    body = (
-        "Hello,\n\n"
-        "A password reset was requested for your Schoolers account.\n\n"
-        f"Your one-time 6-digit code is: {raw_token}\n"
-        f"It expires in {expires_minutes} minutes and can only be used once.\n\n"
-        "If you did not request this, you can ignore this email.\n\n"
-        "— Schoolers Platform"
+    the identifier is registered. Sent directly (not via the outbox) so the
+    raw OTP is never persisted to the database at rest."""
+    subject = platform_subject("Password Reset Request")
+    text, html = render_email(
+        greeting="Hello,",
+        paragraphs=[
+            "A password reset was requested for your Schoolers account.",
+        ],
+        details=[
+            f"Your one-time 6-digit code is: {raw_token}",
+            f"The code expires in {expires_minutes} minutes and can only be used once.",
+        ],
+        steps=[
+            'Open the Schoolers sign-in page and click "Forgot password?".',
+            "Enter your username or the email on file.",
+            "Enter this code and set a new password.",
+        ],
+        closing="If you did not request this, you can safely ignore this email.",
+        signature=platform_signature(),
     )
-    try:
-        common.email.send_email([email], subject, body)
-    except Exception as exc:  # noqa: BLE001 — delivery must never leak account state
-        logger.warning("Could not email password reset OTP to %s: %s", email, exc)
+    common.email.try_send_email([email], subject, text, html=html)
 
 
 def _reset_token_digest(raw_token: str) -> str:
