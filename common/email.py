@@ -298,7 +298,6 @@ def send_school_registered_email(
     details: list[str] = []
     steps: list[str] = []
     if username and password:
-        paragraphs.append("Sign-in details:")
         details = [
             f"Username: {collapse(username)}",
             f"Temporary password: {collapse(password)}",
@@ -314,6 +313,7 @@ def send_school_registered_email(
         paragraphs=paragraphs,
         details=details,
         steps=steps,
+        details_heading="Sign-in details",
         closing="If you did not create this school, please contact support.",
         signature=platform_signature(),
     )
@@ -342,18 +342,37 @@ def send_staff_added_email(
     db=None,
     school_email: str | None = None,
     school_phone: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
 ) -> bool:
+    details: list[str] = []
+    steps: list[str] = []
+    if username and password:
+        details = [
+            f"Username: {collapse(username)}",
+            f"Temporary password: {collapse(password)}",
+        ]
+        steps = [
+            "Go to the Schoolers sign-in page.",
+            "Sign in with the username and temporary password above.",
+            'Use "Forgot password?" anytime to reset it by email.',
+        ]
     text, html = render_email(
         greeting=f"Hello {collapse(staff_name)},",
         paragraphs=[
             f"You have been added as a staff member at {collapse(school_name)} "
             "on the Schoolers platform.",
         ],
+        details=details,
+        steps=steps,
+        details_heading="Sign-in details",
         closing="If this was not expected, please contact your school administrator.",
         signature=school_signature(school_name, school_email, school_phone),
     )
+    # Temporary credentials live in the body: direct send, never persisted.
+    delivery_db = None if details else db
     return _deliver(
-        db, recipients,
+        delivery_db, recipients,
         school_subject(school_name, f"Staff Account Created: {staff_name}"),
         text, html,
     )
@@ -393,8 +412,22 @@ def send_student_added_email(
     school_email: str | None = None,
     school_phone: str | None = None,
     recipient_name: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
 ) -> bool:
     greeting = f"Hello {collapse(recipient_name)}," if recipient_name else "Hello,"
+    details: list[str] = []
+    steps: list[str] = []
+    if username and password:
+        details = [
+            f"Username: {collapse(username)}",
+            f"Temporary password: {collapse(password)}",
+        ]
+        steps = [
+            "Go to the Schoolers sign-in page.",
+            "Sign in with the username and temporary password above.",
+            'Use "Forgot password?" anytime to reset it by email.',
+        ]
     text, html = render_email(
         greeting=greeting,
         paragraphs=[
@@ -403,11 +436,16 @@ def send_student_added_email(
             "You can follow their attendance, marks, and timetable from your "
             "Schoolers account.",
         ],
+        details=details,
+        steps=steps,
+        details_heading="Sign-in details",
         closing="There is nothing you need to do for this enrolment.",
         signature=school_signature(school_name, school_email, school_phone),
     )
+    # Temporary credentials live in the body: direct send, never persisted.
+    delivery_db = None if details else db
     return _deliver(
-        db, recipients,
+        delivery_db, recipients,
         school_subject(school_name, f"Student Enrolled: {student_name}"),
         text, html,
     )

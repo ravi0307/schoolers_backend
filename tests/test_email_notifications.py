@@ -235,8 +235,10 @@ class SchoolsNotificationTests(unittest.TestCase):
             }),
         ]
         self.db.commit()
+        # Staff created through the API now come with their own login account,
+        # so every member of the school (manual and provisioned alike) is here.
         self.assertEqual(
-            self.db.query(User).filter(User.school_id == school.school_id).count(), 5,
+            self.db.query(User).filter(User.school_id == school.school_id).count(), 6,
         )
         mock_send.reset_mock()
 

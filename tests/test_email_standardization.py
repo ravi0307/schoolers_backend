@@ -16,6 +16,7 @@ Covers the delivery checklist:
 11. in-app notification workflows keep working alongside email.
 """
 import re
+import sys
 import unittest
 from datetime import datetime, timedelta
 from unittest import mock
@@ -25,11 +26,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 import common.email as email_helpers
 from common.database import Base
+from common.dependencies import CurrentUser
 from common.email import EmailDelivery, _payload_key, dispatch_email
 from common.exceptions import AppError
-from common.models import School, SchoolNotification, Staff
+from common.logins import provision_login
+from common.models import Parent, School, SchoolNotification, Staff, User
+from common.security import verify_password
 import services.auth_service.service as auth_service
 import services.notifications_service.repository as notifications_repo
+import services.people_service.repository as people_repo
 
 VALID_SUBJECT = re.compile(r"^[^\n|]{1,120} \| [^\n|]{3,120}$")
 VAGUE_PURPOSES = {"Notification", "Update", "Message", "Alert", "Email"}
@@ -564,6 +569,146 @@ class InAppWorkflowTests(unittest.TestCase):
         finally:
             db.close()
             engine.dispose()
+
+
+class OnboardingCredentialTests(unittest.TestCase):
+    """Staff/teacher and student-onboarding emails carry working sign-in
+    details: the login exists at send time, the emailed username/password
+    match the stored hash, and the secret never reaches the outbox."""
+
+    def setUp(self):
+        self.engine, Session = make_session()
+        self.db: Session = Session()
+        add_school(self.db, 1, "Blue Horizon Academy", "office@bh.edu")
+
+    def tearDown(self):
+        self.db.close()
+        self.engine.dispose()
+
+    @staticmethod
+    def _credential(body: str, label: str) -> str:
+        marker = f"{label}:"
+        for line in body.splitlines():
+            if marker in line:
+                return line.split(marker, 1)[1].strip()
+        raise AssertionError(f"{label} not found in body")
+
+    @mock.patch("common.email.send_email")
+    def test_staff_onboarding_login_and_credentials_match(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Priya Menon", "role": "Admin", "phone": "111",
+            "email": "priya@bh.edu",
+        })
+        user = self.db.query(User).filter(
+            User.role == "staff", User.linked_person_id == staff.staff_id
+        ).one()
+        self.assertEqual(user.username, "priya.menon")
+
+        mock_send.assert_called_once()
+        _, subject, body = mock_send.call_args[0]
+        self.assertEqual(subject, "Blue Horizon Academy | Staff Account Created: Priya Menon")
+        username = self._credential(body, "Username")
+        password = self._credential(body, "Temporary password")
+        self.assertEqual(username, user.username)
+        self.assertTrue(verify_password(password, user.password_hash))
+        # The plaintext secret is delivered once and never stored at rest.
+        self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+
+    @mock.patch("common.email.send_email")
+    def test_teacher_created_as_staff_gets_teacher_role_login(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "Asha Rao", "role": "Teacher", "phone": "112",
+            "email": "asha@bh.edu",
+        })
+        user = self.db.query(User).filter(
+            User.role == "teacher", User.linked_person_id == staff.staff_id
+        ).one()
+        body = mock_send.call_args[0][2]
+        self.assertEqual(self._credential(body, "Username"), user.username)
+        self.assertTrue(verify_password(self._credential(body, "Temporary password"),
+                                        user.password_hash))
+
+    @mock.patch("common.email.send_email")
+    def test_staff_without_email_still_gets_a_login(self, mock_send):
+        staff = people_repo.create_staff(self.db, 1, {
+            "name": "No Mail", "role": "Admin", "phone": "113",
+        })
+        mock_send.assert_not_called()
+        user = self.db.query(User).filter(
+            User.role == "staff", User.linked_person_id == staff.staff_id
+        ).one()
+        self.assertTrue(user.is_active)
+
+    def test_duplicate_onboarding_never_mints_a_second_account(self):
+        first = provision_login(self.db, school_id=1, role="staff",
+                                name="Dup Person", email="dup@bh.edu",
+                                linked_person_id=42)
+        second = provision_login(self.db, school_id=1, role="staff",
+                                 name="Dup Person", email="dup@bh.edu",
+                                 linked_person_id=42)
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(self.db.query(User).filter(User.linked_person_id == 42).count(), 1)
+
+    def test_school_created_credentials_heading_appears_exactly_once(self):
+        with mock.patch("common.email.send_email") as mock_send:
+            email_helpers.send_school_registered_email(
+                "Blue Horizon Academy", ["office@bh.edu"],
+                username="bh.admin", password="Cedar!abc123",
+            )
+        body = mock_send.call_args[0][2]
+        self.assertEqual(body.count("Sign-in details"), 1)
+        self.assertNotIn("\n\nDetails:", body)
+
+    @mock.patch("common.email.send_email")
+    def test_student_onboarding_router_email_carries_parent_credentials(self, mock_send):
+        # The router lives in a service directory wired via sys.path; import it
+        # exactly the way the other router-level tests do.
+        sys.path.insert(0, "services/people_service")
+        try:
+            for module in ("repository", "schemas", "bulk"):
+                sys.modules.pop(module, None)
+            router = __import__("services.people_service.router", fromlist=["x"])
+            schemas = __import__("schemas", fromlist=["x"])
+            payload = schemas.StudentCreate(
+                name="Aarav Sharma", class_id=1, admission_no="A700",
+                parent_name="Rita Sharma", parent_phone="9000000001",
+                parent_email="rita@bh.edu",
+            )
+            router.create_student(
+                payload=payload, db=self.db, school_id=1,
+                current_user=CurrentUser(user_id=1, role="admin", school_id=1),
+            )
+        finally:
+            sys.path.pop(0)
+            for module in ("repository", "schemas", "bulk"):
+                sys.modules.pop(module, None)
+
+        parent = self.db.query(Parent).filter(Parent.email == "rita@bh.edu").one()
+        user = self.db.query(User).filter(
+            User.role == "parent", User.linked_person_id == parent.parent_id
+        ).one()
+        mock_send.assert_called_once()
+        _, subject, body = mock_send.call_args[0]
+        self.assertEqual(subject, "Blue Horizon Academy | Student Enrolled: Aarav Sharma")
+        self.assertEqual(self._credential(body, "Username"), user.username)
+        self.assertTrue(verify_password(self._credential(body, "Temporary password"),
+                                        user.password_hash))
+        self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+
+    def test_staff_added_without_credentials_has_no_password_block(self):
+        text, _ = self._body(
+            email_helpers.send_staff_added_email,
+            "Blue Horizon Academy", "Ann Lee", ["a@bh.edu"],
+        )
+        self.assertNotIn("Temporary password", text)
+        self.assertNotIn("Username:", text)
+
+    def _body(self, fn, *args, **kwargs):
+        with mock.patch("common.email.send_email") as mock_send:
+            result = fn(*args, **kwargs)
+        self.assertTrue(result)
+        return mock_send.call_args[0][2], (mock_send.call_args.kwargs.get("html") or "")
 
 
 if __name__ == "__main__":

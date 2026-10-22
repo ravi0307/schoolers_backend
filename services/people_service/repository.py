@@ -29,7 +29,8 @@ from common.email import (
     send_staff_removed_email,
     send_student_removed_email,
 )
-from common.security import hash_password
+from common.logins import provision_login
+from common.security import generate_temp_password, hash_password
 
 
 # ---- Teachers (staff rows with person_type='teacher') ----
@@ -140,8 +141,27 @@ def create_teacher(db: Session, school_id: int, data: dict) -> dict:
     values.setdefault("role", data.get("role_title") or "Teacher")
     staff = Staff(school_id=school_id, person_type=TEACHER_PERSON_TYPE, **values)
     db.add(staff)
+    db.flush()
+    # Same onboarding contract as staff: a login exists so the email can carry
+    # working sign-in details.
+    credentials = provision_login(
+        db,
+        school_id=school_id,
+        role="teacher",
+        name=staff.name or "",
+        email=staff.email,
+        linked_person_id=staff.staff_id,
+    )
     db.commit()
     db.refresh(staff)
+    if staff.email:
+        school_email, school_phone = school_contact(db, school_id)
+        username, password = credentials or (None, None)
+        send_staff_added_email(
+            school_name(db, school_id), staff.name, [staff.email],
+            db=db, school_email=school_email, school_phone=school_phone,
+            username=username, password=password,
+        )
     return teacher_response(staff)
 
 
@@ -266,26 +286,45 @@ def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     staff = Staff(school_id=school_id, **values)
     db.add(staff)
     db.flush()
-    # A staff member who drives gets a pilots row plus a driver login; the
-    # generic staff row stays the single record for their personal details.
+    # Every new staff member gets a login so their onboarding email can carry
+    # working sign-in details; a driver's login is provisioned with the rest
+    # of the pilot wiring below.
     if staff.person_type == "pilot":
-        _sync_pilot_from_staff(db, staff)
+        credentials = _sync_pilot_from_staff(
+            db, staff, initial_password=generate_temp_password()
+        )
+    else:
+        role = "teacher" if staff.person_type == TEACHER_PERSON_TYPE else "staff"
+        credentials = provision_login(
+            db,
+            school_id=school_id,
+            role=role,
+            name=staff.name or "",
+            email=staff.email,
+            linked_person_id=staff.staff_id,
+        )
     db.commit()
     db.refresh(staff)
     if staff.email:
         school_email, school_phone = school_contact(db, school_id)
+        username, password = credentials or (None, None)
         send_staff_added_email(
             school_name(db, school_id), staff.name, [staff.email],
             db=db, school_email=school_email, school_phone=school_phone,
+            username=username, password=password,
         )
     return staff
 
 
-def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
+def _sync_pilot_from_staff(
+    db: Session, staff: Staff, initial_password: str | None = None
+) -> tuple[str, str] | None:
     """Keep the driver row and driver login in step with the staff record.
 
     A driver needs a pilots row to exist at all, and every driver gets a login
     so the transport portal keeps working. The login id is the staff id.
+    Returns (username, temp_password) only when this call creates the login —
+    the one moment the plaintext password is knowable — else None.
     """
     pilot = db.query(Pilot).filter(Pilot.staff_id == staff.staff_id).first()
     user = (
@@ -302,7 +341,7 @@ def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
             pilot.is_active = False
         if user:
             user.is_active = False
-        return
+        return None
 
     if pilot is None:
         pilot = Pilot(staff_id=staff.staff_id, is_active=True)
@@ -311,20 +350,26 @@ def _sync_pilot_from_staff(db: Session, staff: Staff) -> None:
     else:
         pilot.is_active = True
 
+    credentials: tuple[str, str] | None = None
     if user is None:
+        username = f"pilot_{staff.school_id}_{staff.staff_id}"
+        password = initial_password or secrets.token_urlsafe(32)
         user = User(
             school_id=staff.school_id,
             role="pilot",
-            username=f"pilot_{staff.school_id}_{staff.staff_id}",
-            password_hash=hash_password(secrets.token_urlsafe(32)),
+            username=username,
+            email=staff.email or None,
+            password_hash=hash_password(password),
             is_active=True,
         )
         db.add(user)
         db.flush()
+        credentials = (username, password)
     else:
         user.school_id = staff.school_id
         user.is_active = True
     user.linked_person_id = staff.staff_id
+    return credentials
 
 
 def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
@@ -483,6 +528,17 @@ def list_parents(db: Session, school_id: int) -> list[Parent]:
 def create_parent(db: Session, school_id: int, data: dict) -> Parent:
     parent = Parent(school_id=school_id, **data)
     db.add(parent)
+    db.flush()
+    # The login exists from the moment the parent does, so any later
+    # onboarding email (or forgot-password) finds a real account.
+    provision_login(
+        db,
+        school_id=school_id,
+        role="parent",
+        name=parent.name or "",
+        email=parent.email,
+        linked_person_id=parent.parent_id,
+    )
     db.commit()
     db.refresh(parent)
     return parent
@@ -542,14 +598,28 @@ def create_student_parent(
     school_id: int,
     student_id: int,
     parent_data: dict,
-) -> Parent:
+) -> tuple[Parent, tuple[str, str] | None]:
+    """Attach a brand-new parent to a student.
+
+    Returns (parent, credentials): the parent gets a login at creation time so
+    the enrolment email can carry working sign-in details, and the credentials
+    are returned only at this creation moment.
+    """
     parent = Parent(school_id=school_id, **parent_data)
     db.add(parent)
     db.flush()
     db.add(ParentStudent(parent_id=parent.parent_id, student_id=student_id, relationship_="Parent"))
+    credentials = provision_login(
+        db,
+        school_id=school_id,
+        role="parent",
+        name=parent.name or "",
+        email=parent.email,
+        linked_person_id=parent.parent_id,
+    )
     db.commit()
     db.refresh(parent)
-    return parent
+    return parent, credentials
 
 
 def update_student_parent(
@@ -575,7 +645,8 @@ def update_student_parent(
         if not _parent_for_student(db, student_id):
             db.add(ParentStudent(parent_id=parent_id, student_id=student_id, relationship_="Parent"))
     elif parent is None and parent_data:
-        return create_student_parent(db, school_id, student_id, parent_data)
+        parent, _credentials = create_student_parent(db, school_id, student_id, parent_data)
+        return parent
 
     if parent is not None:
         for key, value in parent_data.items():
