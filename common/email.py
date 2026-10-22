@@ -214,9 +214,11 @@ def dispatch_email(db, to_addrs: list[str], subject: str, body: str, html: str |
     if not to_addrs:
         logger.warning("Skipping email %r: no recipients", subject)
         return False
-    if not is_email_configured():
-        logger.warning("Skipping email %r: SMTP is not configured", subject)
-        return False
+    # Deliberately no configured-SMTP gate here: send_email performs that
+    # check and raises, so an unconfigured server becomes a visible Failed
+    # delivery row instead of a silent skip. (The notification flow
+    # pre-checks configuration before creating its row, so it never reaches
+    # this path unconfigured.)
 
     key = _payload_key(to_addrs, subject, body)
     row = db.query(EmailDelivery).filter(EmailDelivery.idempotency_key == key).first()
