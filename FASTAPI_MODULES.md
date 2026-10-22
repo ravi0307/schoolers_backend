@@ -86,6 +86,10 @@ modules/attendance/
 - `POST /auth/refresh`
 - `POST /auth/logout` (token blacklist, optional)
 - `POST /auth/password-reset/request`, `POST /auth/password-reset/confirm`
+- `GET/POST /auth/privileged-accounts`, `PATCH/DELETE /auth/privileged-accounts/{user_id}` —
+  Master-only Sub-Master account lifecycle (strict `require_master_only`, plus a
+  service-level guard so even a Master can only mutate Sub-Master rows; the create
+  payload has no role field, so it can only ever mint a Sub-Master)
 - Maps to: `users` table
 
 ---

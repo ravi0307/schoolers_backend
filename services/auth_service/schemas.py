@@ -106,3 +106,82 @@ class ForgotPasswordResponse(BaseModel):
     user_id: int | None = None
     identifier: str | None = None
     email: str | None = None
+
+
+# ---- Privileged accounts: the Master-managed Sub-Master lifecycle ----
+
+
+class PrivilegedAccountCreate(BaseModel):
+    """Master's payload to create a Sub-Master account.
+
+    Deliberately has no `role` field: every account minted through this
+    endpoint is a Sub-Master by construction, so no payload can make it mint
+    a Master (or any other role). The password is optional — omit it and one
+    is generated — and is returned exactly once, with the creation response,
+    for the Master to hand over.
+    """
+    username: str = Field(min_length=3, max_length=100)
+    email: str | None = Field(default=None, max_length=255)
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+
+    @field_validator("username")
+    @classmethod
+    def username_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Username is required")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def email_trimmed(cls, value: str | None) -> str | None:
+        return value.strip() if value else value
+
+    @field_validator("password")
+    @classmethod
+    def password_within_bcrypt_limit(cls, value: str | None) -> str | None:
+        if value:
+            validate_password_byte_length(value)
+        return value
+
+
+class PrivilegedAccountUpdate(BaseModel):
+    """Partial update of a Sub-Master; a field left None means unchanged.
+
+    An empty `email` clears the address; `is_active` flips activate /
+    deactivate; `password` rotates the credential (and clears any outstanding
+    reset OTP so a code issued before the change cannot be redeemed).
+    """
+    email: str | None = Field(default=None, max_length=255)
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+
+    @field_validator("email")
+    @classmethod
+    def email_trimmed(cls, value: str | None) -> str | None:
+        return value.strip() if value else value
+
+    @field_validator("password")
+    @classmethod
+    def password_within_bcrypt_limit(cls, value: str | None) -> str | None:
+        if value:
+            validate_password_byte_length(value)
+        return value
+
+
+class PrivilegedAccountRead(BaseModel):
+    user_id: int
+    username: str
+    role: str
+    email: str | None = None
+    is_active: bool
+    created_at: datetime | None = None
+
+
+class PrivilegedAccountCreateResponse(PrivilegedAccountRead):
+    """Creation view: includes the plaintext password shown once, at creation.
+
+    Only its bcrypt hash is stored; the value is never retrievable again from
+    the API (a Master who loses it rotates the credential via PATCH).
+    """
+    password: str

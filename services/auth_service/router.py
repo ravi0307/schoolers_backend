@@ -1,11 +1,11 @@
 from collections import defaultdict
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from common.database import get_db
-from common.dependencies import get_current_user, CurrentUser
+from common.dependencies import get_current_user, require_master_only, CurrentUser
 from common.models import School, User
 from common.exceptions import AppError, UnauthorizedError
 import service
@@ -14,6 +14,8 @@ from schemas import (
     ForgotPasswordRequest, ForgotPasswordVerifyRequest,
     ForgotPasswordResetRequest, ForgotPasswordResponse,
     ChangePasswordRequest, ChangePasswordResponse,
+    PrivilegedAccountCreate, PrivilegedAccountCreateResponse,
+    PrivilegedAccountRead, PrivilegedAccountUpdate,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -195,3 +197,64 @@ def change_password(
         raise UnauthorizedError("User no longer exists")
     service.change_password(db, user, payload.current_password, payload.new_password)
     return {"message": "Your password has been changed."}
+
+
+# ---- Sub-Master accounts: Master-only lifecycle ----
+#
+# Every endpoint below uses the strict require_master_only dependency rather
+# than the operational require_role("master"): Sub-Masters inherit the whole
+# master operational surface, but privileged-account management — the roster,
+# creation, updates, password rotation and deactivation — must never be
+# reachable by a Sub-Master. The guards double up on purpose: the dependency
+# keeps non-Masters out entirely, and service-level
+# assert_can_manage_privileged confines Master actors to Sub-Master targets,
+# so there is no path by which even a Master row gets mutated here.
+
+
+@router.get("/privileged-accounts", response_model=list[PrivilegedAccountRead])
+def list_privileged_accounts(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_master_only),
+):
+    """Master-only: every Master and Sub-Master account, for the roster."""
+    return service.list_privileged_accounts(db)
+
+
+@router.post("/privileged-accounts", response_model=PrivilegedAccountCreateResponse, status_code=201)
+def create_privileged_account(
+    payload: PrivilegedAccountCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_master_only),
+):
+    """Create a Sub-Master account; the role is fixed server-side.
+
+    The payload has no role field, so this can never mint a Master. The
+    plaintext password in the response is the only time it is ever returned.
+    """
+    return service.create_submaster(db, payload)
+
+
+@router.patch("/privileged-accounts/{user_id}", response_model=PrivilegedAccountRead)
+def update_privileged_account(
+    user_id: int,
+    payload: PrivilegedAccountUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_master_only),
+):
+    """Update a Sub-Master: email, activation state, or password rotation.
+
+    Master targets are refused with the same generic 403 as any
+    non-privileged target — Master rows have no mutation API at all.
+    """
+    return service.update_submaster(db, current_user, user_id, payload)
+
+
+@router.delete("/privileged-accounts/{user_id}", status_code=204)
+def delete_privileged_account(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_master_only),
+):
+    """Deactivate a Sub-Master (soft-delete; reversible via PATCH is_active)."""
+    service.deactivate_submaster(db, current_user, user_id)
+    return Response(status_code=204)
