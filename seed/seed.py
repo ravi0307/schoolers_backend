@@ -154,7 +154,8 @@ class SchoolSeed:
             f"{len(self.parents)} parents, {len(self.students)} students")
 
     def create_logins(self) -> None:
-        """The API creates no login for teachers/staff/parents — insert them here."""
+        """Seed rows bypass the API (which now provisions logins for records
+        it creates itself), so insert the teacher/staff/parent logins here."""
         cfg = self.cfg
         with self.engine.begin() as c:
             for i, t in enumerate(self.teachers, start=1):

@@ -74,12 +74,16 @@ def render_text(
     steps: list[str] | tuple[str, ...] = (),
     closing: str = "",
     signature: list[str] | tuple[str, ...] = (),
+    details_heading: str = "Details",
 ) -> str:
     """Plain-text body from the shared structure."""
     blocks: list[str] = [collapse(greeting)]
     blocks.extend(collapse(p) for p in paragraphs if collapse(p))
     if details:
-        blocks.append("Details:\n" + "\n".join(f"  \u2022 {collapse(d)}" for d in details))
+        blocks.append(
+            f"{collapse(details_heading)}:\n"
+            + "\n".join(f"  \u2022 {collapse(d)}" for d in details)
+        )
     if steps:
         blocks.append("Next steps:\n" + "\n".join(f"  {i}. {collapse(s)}" for i, s in enumerate(steps, 1)))
     if closing:
@@ -95,6 +99,7 @@ def render_html(
     steps: list[str] | tuple[str, ...] = (),
     closing: str = "",
     signature: list[str] | tuple[str, ...] = (),
+    details_heading: str = "Details",
 ) -> str:
     """HTML alternative of the same structure — every value escaped."""
     body: list[str] = [f'<p style="margin:0 0 14px;">{html_escape(collapse(greeting))}</p>']
@@ -107,7 +112,8 @@ def render_html(
             f'<li style="margin:0 0 6px;">{html_escape(collapse(d))}</li>' for d in details
         )
         body.append(
-            '<p style="margin:14px 0 6px;font-weight:bold;">Details:</p>'
+            f'<p style="margin:14px 0 6px;font-weight:bold;">'
+            f"{html_escape(collapse(details_heading))}:</p>"
             f'<ul style="margin:0 0 14px;padding-left:20px;">{items}</ul>'
         )
     if steps:
@@ -157,6 +163,7 @@ def render_email(
     steps: list[str] | tuple[str, ...] = (),
     closing: str = "",
     signature: list[str] | tuple[str, ...] = (),
+    details_heading: str = "Details",
 ) -> tuple[str, str]:
     """Return the (plain text, HTML) pair for one email."""
     kwargs = dict(
@@ -166,5 +173,6 @@ def render_email(
         steps=steps,
         closing=closing,
         signature=signature,
+        details_heading=details_heading,
     )
     return render_text(**kwargs), render_html(**kwargs)
