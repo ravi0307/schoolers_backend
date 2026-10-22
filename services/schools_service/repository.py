@@ -138,6 +138,9 @@ def update_school(db: Session, school: School, data: dict) -> School:
                 school.name,
                 labeled,
                 recipients,
+                db=db,
+                school_email=school.primary_email,
+                school_phone=school.primary_contact,
             )
     return school
 
@@ -155,7 +158,7 @@ def delete_school(db: Session, school: School) -> None:
     people_repo.deactivate_school_parents(db, school.school_id)
     people_repo.deactivate_school_users(db, school.school_id)
     db.commit()
-    send_school_removed_email(school.name, school_recipients(school))
+    send_school_removed_email(school.name, school_recipients(school), db=db)
 
 
 def compute_stats(db: Session, school_id: int) -> dict:

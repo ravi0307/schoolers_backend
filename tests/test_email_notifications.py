@@ -111,7 +111,7 @@ class SchoolsNotificationTests(unittest.TestCase):
         })
         mock_send.assert_called_once()
         _, subject, body = mock_send.call_args[0]
-        self.assertIn("Welcome, Northstar High!", subject)
+        self.assertEqual(subject, "Schoolers | School Account Created: Northstar High")
         self.assertIn("Sign-in details", body)
         self.assertIn("Username: ravi.kumar", body)
         self.assertIn("Temporary password: ", body)

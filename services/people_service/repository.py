@@ -81,8 +81,19 @@ def _notify_record_update(
         (FIELD_LABELS.get(k, k.replace("_", " ").title()), _fmt_value(db, k, old), _fmt_value(db, k, new))
         for k, old, new in changes
     ]
-    school = school_name(db, school_id)
-    send_record_updated_email(record_type, record_name, school, labeled, to_addrs)
+    school_row = (
+        db.query(School.name, School.primary_email, School.primary_contact)
+        .filter(School.school_id == school_id)
+        .first()
+    )
+    if school_row:
+        school, school_email, school_phone = school_row[0], school_row[1], school_row[2]
+    else:
+        school, school_email, school_phone = school_name(db, school_id), None, None
+    send_record_updated_email(
+        record_type, record_name, school, labeled, to_addrs,
+        db=db, school_email=school_email, school_phone=school_phone,
+    )
 
 
 def teacher_response(staff: Staff) -> dict:
@@ -262,7 +273,11 @@ def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     db.commit()
     db.refresh(staff)
     if staff.email:
-        send_staff_added_email(school_name(db, school_id), staff.name, [staff.email])
+        school_email, school_phone = school_contact(db, school_id)
+        send_staff_added_email(
+            school_name(db, school_id), staff.name, [staff.email],
+            db=db, school_email=school_email, school_phone=school_phone,
+        )
     return staff
 
 
@@ -340,12 +355,35 @@ def delete_staff(db: Session, staff: Staff) -> None:
         pilot.is_active = False
     db.commit()
     if email:
-        send_staff_removed_email(school, name, [email])
+        school_email, school_phone = school_contact(db, staff.school_id)
+        send_staff_removed_email(
+            school, name, [email],
+            db=db, school_email=school_email, school_phone=school_phone,
+        )
 
 
 def school_name(db: Session, school_id: int) -> str:
     row = db.query(School.name).filter(School.school_id == school_id).first()
     return row[0] if row else "your school"
+
+
+def school_contact(db: Session, school_id: int) -> tuple[str | None, str | None]:
+    """Verified signature details for a school — (primary email, phone)."""
+    row = (
+        db.query(School.primary_email, School.primary_contact)
+        .filter(School.school_id == school_id)
+        .first()
+    )
+    return (row[0], row[1]) if row else (None, None)
+
+
+def parent_contact_for_student(db: Session, student_id: int) -> tuple[str | None, str | None]:
+    """(name, email) of the first linked, active parent — used to address
+    student lifecycle mail to the right person."""
+    parent = _parent_for_student(db, student_id)
+    if not parent:
+        return None, None
+    return parent.name, parent.email
 
 
 def parent_email_for_student(db: Session, student_id: int) -> str | None:
@@ -648,12 +686,17 @@ def update_student_with_changes(
 
 
 def delete_student(db: Session, student: Student) -> None:
-    parent_email = parent_email_for_student(db, student.student_id)
+    parent_name, parent_email = parent_contact_for_student(db, student.student_id)
     school = school_name(db, student.school_id)
+    school_email, school_phone = school_contact(db, student.school_id)
     student.is_active = False
     db.commit()
     if parent_email:
-        send_student_removed_email(school, student.name, [parent_email])
+        send_student_removed_email(
+            school, student.name, [parent_email],
+            db=db, school_email=school_email, school_phone=school_phone,
+            recipient_name=parent_name,
+        )
 
 
 # ---- Promotion and carry-forward (Phase 5) ----

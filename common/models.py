@@ -1231,6 +1231,46 @@ class SupportTicketMessage(AuditColumnsMixin, Base):
     )
 
 
+class EmailDelivery(AuditColumnsMixin, Base):
+    """Durable record of one logical outbound email.
+
+    One row per logical message (keyed by payload hash within the
+    idempotency window), so a retry after an ambiguous failure reuses the row
+    instead of creating a duplicate, and every send ends in an explicit state
+    the platform is allowed to report:
+
+    - ``Pending``: recorded, not yet known to have reached the SMTP server.
+    - ``Sent``: accepted by the SMTP server; never re-sent automatically.
+    - ``Failed``: rejected; kept for bounded opportunistic retry and audit.
+
+    The body is stored so retries resend the exact same message; flows whose
+    bodies carry live secrets (password-reset OTPs, temporary credentials)
+    deliberately bypass the outbox and send directly.
+    """
+
+    __tablename__ = "email_deliveries"
+
+    delivery_id = Column(Integer, primary_key=True)
+    idempotency_key = Column(String(64), nullable=False, unique=True)
+    recipients = Column(String(512), nullable=False)
+    subject = Column(String(512), nullable=False)
+    body_text = Column(Text, nullable=False)
+    body_html = Column(Text)
+    state = Column(String(16), nullable=False, default="Pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(String(256))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
+    sent_at = Column(DateTime)
+
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('Pending', 'Sent', 'Failed')",
+            name="email_deliveries_state_check",
+        ),
+    )
+
+
 # Register the audit stamper so every process importing the models configures
 # the modified_by/modified_at listener before the first flush.
 import common.audit  # noqa: E402,F401
