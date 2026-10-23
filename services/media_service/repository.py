@@ -4,6 +4,7 @@ inside the communication service alongside broadcasts."""
 from sqlalchemy.orm import Session
 
 from common.dependencies import CurrentUser
+from common.authz import is_school_admin
 from common.exceptions import ForbiddenError, NotFoundError
 from common.models import Media, Staff
 
@@ -80,7 +81,7 @@ def get_media_for_write(db: Session, school_id: int, media_id: int, current_user
     # another school's id must not learn that the row exists.
     if not media:
         raise NotFoundError("Media not found")
-    if current_user.role != "admin" and media.uploader_user_id != current_user.user_id:
+    if not is_school_admin(current_user.role) and media.uploader_user_id != current_user.user_id:
         raise ForbiddenError("You can only edit or remove media you uploaded")
     return media
 

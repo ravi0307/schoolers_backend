@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from common.authz import (
+    assert_can_assign_subadmin,
+    assert_can_manage_school_account,
+)
 from common.database import get_db
 from common.dependencies import require_role, require_examinations_enabled, require_school_scope, CurrentUser
 from common.email import send_student_added_email
@@ -111,6 +115,20 @@ def teaching_load(
 
 
 # ---- Staff ----
+#
+# The Add Staff workflow carries the Sub-Admin role. require_role("admin")
+# now admits Sub-Admin too (operational parity), so the two guards below are
+# what keep the privileged edges Admin-only:
+#
+#   * assignment — the Sub-Admin *label* in a create/edit payload may only be
+#     sent by an Admin actor (common.authz.assert_can_assign_subadmin);
+#   * target — a staff record whose linked login resolves to an Admin or
+#     Sub-Admin (the caller's own row included) may not be updated or removed
+#     by a Sub-Admin actor (common.authz.assert_can_manage_school_account),
+#     with the target roles read from the users rows, never the request.
+#
+# Ordinary staff management stays Admin-equivalent for Sub-Admin, and Master
+# keeps never reaching these endpoints (require_role("admin") only).
 @router.get("/staff", response_model=list[StaffRead])
 def list_staff(
     search: str | None = Query(default=None),
@@ -128,6 +146,8 @@ def create_staff(
     school_id: int = Depends(require_school_scope),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    if repo.is_subadmin_label(payload.role):
+        assert_can_assign_subadmin(current_user, "assignment")
     return repo.create_staff(db, school_id, payload.model_dump())
 
 
@@ -142,6 +162,10 @@ def update_staff(
     staff = repo.get_staff(db, school_id, staff_id)
     if not staff:
         raise NotFoundError("Staff member not found")
+    assert_can_manage_school_account(
+        current_user, repo.linked_login_roles(db, staff.staff_id), "update")
+    if repo.is_subadmin_label(payload.role):
+        assert_can_assign_subadmin(current_user, "assignment")
     return repo.update_staff(db, staff, payload.model_dump(exclude_unset=True))
 
 
@@ -155,6 +179,8 @@ def delete_staff(
     staff = repo.get_staff(db, school_id, staff_id)
     if not staff:
         raise NotFoundError("Staff member not found")
+    assert_can_manage_school_account(
+        current_user, repo.linked_login_roles(db, staff.staff_id), "removal")
     repo.delete_staff(db, staff)
 
 

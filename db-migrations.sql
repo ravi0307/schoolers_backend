@@ -798,7 +798,7 @@ CREATE TABLE IF NOT EXISTS schoolers.support_ticket_messages (
     modified_by INTEGER REFERENCES schoolers.users(user_id) ON DELETE SET NULL,
     modified_at TIMESTAMP NOT NULL DEFAULT now(),
     CONSTRAINT support_ticket_messages_role_check
-        CHECK (author_role IN ('admin','master','submaster'))
+        CHECK (author_role IN ('admin','master','submaster','subadmin'))
 );
 
 -- The admin queue filters school + status and orders newest-first; the master

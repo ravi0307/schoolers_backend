@@ -1,4 +1,5 @@
 import random
+import re
 import secrets
 
 from sqlalchemy.orm import Session
@@ -277,28 +278,65 @@ def infer_person_type(role: str | None) -> str:
     return "staff"
 
 
+def is_subadmin_label(role: str | None) -> bool:
+    """True when a staff role label names the Sub-Admin role.
+
+    The Add Staff form submits the role as a free-text label; "Sub-Admin" is
+    the one label that decides the login role the new account gets. Matching
+    ignores case, spaces, hyphens and punctuation so a crafted variant
+    ("subadmin", "SUB ADMIN") cannot slip past the assignment guard — and the
+    guard keys on exactly this helper, so detection and enforcement can never
+    disagree.
+    """
+    return re.sub(r"[^a-z]", "", str(role or "").lower()) == "subadmin"
+
+
+def linked_login_roles(db: Session, staff_id: int) -> set[str]:
+    """Roles of every users row linked to this staff record (any state).
+
+    Read fresh from the database on each guard — the persisted role is the
+    only thing the authorization decision may trust, never anything in the
+    request. Inactive rows count too, so a deactivated Sub-Admin login is
+    still a protected target.
+    """
+    return {
+        row
+        for (row,) in db.query(User.role).filter(User.linked_person_id == staff_id).all()
+    }
+
+
 def create_staff(db: Session, school_id: int, data: dict) -> Staff:
     values = dict(data)
     # A payload that does not choose a person_type must still be classified by
-    # its role label; only an explicitly sent value is trusted as-is.
-    if values.get("person_type") is None:
+    # its role label; only an explicitly sent value is trusted as-is. The one
+    # exception is the Sub-Admin label: it decides the login role below, so its
+    # person_type is pinned to "admin" and a crafted person_type cannot
+    # disagree with the privileged role the account actually receives.
+    if is_subadmin_label(values.get("role")):
+        values["person_type"] = "admin"
+    elif values.get("person_type") is None:
         values["person_type"] = infer_person_type(values.get("role"))
     staff = Staff(school_id=school_id, **values)
     db.add(staff)
     db.flush()
     # Every new staff member gets a login so their onboarding email can carry
     # working sign-in details; a driver's login is provisioned with the rest
-    # of the pilot wiring below.
-    if staff.person_type == "pilot":
+    # of the pilot wiring below. The Sub-Admin label is the only way the staff
+    # form produces a privileged login: everything else stays teacher/staff,
+    # exactly as before the role existed.
+    if staff.person_type == "pilot" and not is_subadmin_label(staff.role):
         credentials = _sync_pilot_from_staff(
             db, staff, initial_password=generate_temp_password()
         )
     else:
-        role = "teacher" if staff.person_type == TEACHER_PERSON_TYPE else "staff"
+        if is_subadmin_label(staff.role):
+            login_role = "subadmin"
+        else:
+            login_role = "teacher" if staff.person_type == TEACHER_PERSON_TYPE else "staff"
         credentials = provision_login(
             db,
             school_id=school_id,
-            role=role,
+            role=login_role,
             name=staff.name or "",
             email=staff.email,
             linked_person_id=staff.staff_id,
@@ -375,16 +413,54 @@ def _sync_pilot_from_staff(
 def update_staff(db: Session, staff: Staff, data: dict) -> Staff:
     changes = _changed_fields(db, staff, data)
     old_email = staff.email
+    old_label = staff.role
+    old_active = staff.is_active
     for k, v in data.items():
         if v is not None:
             setattr(staff, k, v)
-    if staff.person_type == "pilot":
+    if staff.person_type == "pilot" and not is_subadmin_label(staff.role):
         _sync_pilot_from_staff(db, staff)
+    _sync_subadmin_login(db, staff, old_label=old_label, old_active=old_active)
     db.commit()
     db.refresh(staff)
     if changes:
         _notify_record_update(db, "Staff member", staff.name, staff.school_id, changes, [old_email, staff.email])
     return staff
+
+
+def _sync_subadmin_login(
+    db: Session, staff: Staff, *, old_label: str | None, old_active: bool
+) -> None:
+    """Keep the linked login's role and state in step with an edited record.
+
+    Only the Sub-Admin boundary is synchronized, and only for logins in
+    staff/teacher/subadmin roles: relabelling a record into Sub-Admin
+    promotes its login, relabelling it out demotes a Sub-Admin login back to
+    staff, and toggling is_active mirrors onto a Sub-Admin login so the
+    activate/deactivate path closes through PATCH as well as DELETE. Admin
+    logins and everything else are never touched here — existing behaviour
+    for every other role is unchanged, and authorization for who may perform
+    these edits lives in the router (common.authz), not here.
+    """
+    user = (
+        db.query(User)
+        .filter(
+            User.linked_person_id == staff.staff_id,
+            User.role.in_(("staff", "teacher", "subadmin")),
+        )
+        .first()
+    )
+    if user is None:
+        return
+    was_subadmin_label = is_subadmin_label(old_label)
+    is_subadmin_label_now = is_subadmin_label(staff.role)
+    if is_subadmin_label_now and not was_subadmin_label and user.role in ("staff", "teacher"):
+        user.role = "subadmin"
+    elif was_subadmin_label and not is_subadmin_label_now and user.role == "subadmin":
+        user.role = "staff"
+    if user.role == "subadmin" and staff.is_active != old_active:
+        user.is_active = staff.is_active
+    db.add(user)
 
 
 def delete_staff(db: Session, staff: Staff) -> None:

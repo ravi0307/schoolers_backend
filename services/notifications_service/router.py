@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from common.database import get_db
+from common.authz import is_school_admin
 from common.dependencies import require_role, CurrentUser
 from common.exceptions import NotFoundError
 import repository as repo
@@ -16,7 +17,7 @@ def list_for_school(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin", "master")),
 ):
-    if current_user.role == "admin" and current_user.school_id != school_id:
+    if is_school_admin(current_user.role) and current_user.school_id != school_id:
         return []
     return [NotificationRead.from_notification(n) for n in repo.list_for_school(db, school_id)]
 

@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.dependencies import CurrentUser
+from common.authz import is_school_admin
 from common.models import (
     Parent, ParentStudent, Pilot, Route, RouteStop, RouteStudent,
     SchoolClass, Staff, Student, Trip, TripStudent, User, Vehicle,
@@ -1057,7 +1058,7 @@ def _authorize_trip(db: Session, trip: Trip, current_user: CurrentUser, allow_pi
     currently-assigned route. Ownership checks BOTH the snapshot pilot_id (who
     was driving when the trip was created) and the live route assignment, so a
     reassigned driver cannot touch an old trip."""
-    if current_user.role == "admin":
+    if is_school_admin(current_user.role):
         return
     if current_user.role == "pilot" and allow_pilot:
         pilot = resolve_pilot(db, trip.school_id, current_user.linked_person_id)

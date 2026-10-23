@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.authz import is_master_like
+from common.authz import is_school_admin
 from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import NotFoundError, ForbiddenError, AppError
 from common.storage import (
@@ -33,7 +34,7 @@ def _guard_school_access(current_user: CurrentUser, school_id: int):
     """Master Admin and Sub-Master can touch any school; School Admin only their own."""
     if is_master_like(current_user.role):
         return
-    if current_user.role == "admin" and current_user.school_id == school_id:
+    if is_school_admin(current_user.role) and current_user.school_id == school_id:
         return
     raise ForbiddenError("Not allowed to access this school")
 

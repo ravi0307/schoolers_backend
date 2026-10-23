@@ -5,6 +5,7 @@ class Role(str, Enum):
     parent = "parent"
     teacher = "teacher"
     admin = "admin"
+    subadmin = "subadmin"
     pilot = "pilot"
     master = "master"
     submaster = "submaster"

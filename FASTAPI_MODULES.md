@@ -25,7 +25,7 @@ app/
 │   ├── database.py             # SQLAlchemy engine/session, get_db dependency
 │   ├── security.py             # JWT issue/verify, password hashing (passlib)
 │   ├── dependencies.py         # current_user, current_school, role guards
-│   ├── permissions.py          # RBAC rules per role (parent/teacher/admin/pilot/master)
+│   ├── permissions.py          # RBAC rules per role (parent/teacher/admin/subadmin/pilot/master/submaster)
 │   ├── exceptions.py           # domain exceptions -> HTTP error mapping
 │   └── pagination.py           # shared limit/offset or cursor helpers
 │
@@ -77,7 +77,9 @@ modules/attendance/
   from the token — never trust a `school_id` passed in the request body/query
   for anything except Master Admin endpoints
 - **Role guard**: `require_role("teacher", "admin")` dependency factory, used
-  per-endpoint
+  per-endpoint; admission goes through `common.authz.role_allowed`, so a
+  Sub-Master is admitted wherever Master is and a Sub-Admin wherever Admin
+  is (operational inheritance — the guarded endpoints themselves are unchanged)
 - **Response envelope**: consistent `{data, meta}` or plain resource — pick
   one convention early
 
@@ -113,7 +115,13 @@ modules/attendance/
 
 ### `modules/people` — School Admin (+ self-service for own profile)
 - Teachers: CRUD, assign to class+subject (`teacher_class_subjects`)
-- Staff: CRUD
+- Staff: CRUD — also the Sub-Admin creation path: the staff form's
+  `role: "Sub-Admin"` label provisions the login with role `subadmin`
+  (services/people_service). Two guards in the router keep the privileged
+  edges Admin-only (`common.authz.assert_can_assign_subadmin` — only an
+  Admin sends the Sub-Admin label; `assert_can_manage_school_account` — a
+  Sub-Admin may not update/remove any staff record whose linked login is
+  Admin or Sub-Admin, its own row included)
 - Parents: CRUD, link to students (`parent_student`, supports multiple children)
 - Students: CRUD, move between classes, search by name/admission no.
 - Tables: `teachers`, `staff`, `parents`, `students`, `parent_student`,
@@ -212,6 +220,14 @@ modules/attendance/
 | website | – | – | full | – | – |
 | notifications | – | – | read | – | write |
 | reports | – | – | own school | – | all schools |
+
+Two inherited tiers sit alongside this table (enforced by
+`common/authz.role_allowed`, not by extra columns): **Sub-Master** mirrors
+every Master Admin cell, and **Sub-Admin** mirrors every School Admin cell.
+Neither tier touches privileged-account management: Sub-Master is barred from
+the `/auth/privileged-accounts` lifecycle (Master-only), and Sub-Admin is
+barred from assigning the Sub-Admin role or mutating staff records linked to
+Admin/Sub-Admin logins (Add Staff guards, see `modules/people`).
 
 This table is worth encoding directly as your `permissions.py` — one
 dict/lookup per (module, action) → allowed roles, checked in a single
