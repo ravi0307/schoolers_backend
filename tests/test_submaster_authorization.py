@@ -703,7 +703,7 @@ class SubMasterSchemaContractTests(unittest.TestCase):
     def test_db_migrations_support_check_lists_submaster(self):
         migrations = (self.ROOT / "db-migrations.sql").read_text(encoding="utf-8")
         self.assertIn(
-            "CHECK (author_role IN ('admin','master','submaster'))", migrations)
+            "CHECK (author_role IN ('admin','master','submaster','subadmin'))", migrations)
 
     def test_users_model_carries_no_role_check_that_could_narrow_the_role(self):
         # The live CHECK lives only in the database (widened by the

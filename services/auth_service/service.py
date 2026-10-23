@@ -125,7 +125,7 @@ def display_name_for(db: Session, role: str, linked_person_id: int | None) -> st
     """
     if linked_person_id is None:
         return None
-    if role in ("teacher", "staff", "admin", "pilot"):
+    if role in ("teacher", "staff", "admin", "subadmin", "pilot"):
         person = db.query(Staff).filter(Staff.staff_id == linked_person_id).first()
         return person.name if person else None
     if role == "parent":
@@ -148,7 +148,7 @@ def account_email_address(db: Session, user: User) -> str | None:
     if user.role == "admin":
         school = db.query(School).filter(School.school_id == user.school_id).first()
         return school.primary_email if school else None
-    if user.role in ("teacher", "staff", "pilot"):
+    if user.role in ("teacher", "staff", "pilot", "subadmin"):
         person = db.query(Staff).filter(Staff.staff_id == user.linked_person_id).first()
         return person.email if person else None
     if user.role == "parent":
@@ -186,7 +186,7 @@ def user_email_address(db: Session, user: User) -> str | None:
     if user.role == "admin":
         school = db.query(School).filter(School.school_id == user.school_id).first()
         return school.primary_email if school else None
-    if user.role in ("teacher", "staff", "pilot"):
+    if user.role in ("teacher", "staff", "pilot", "subadmin"):
         person = db.query(Staff).filter(Staff.staff_id == user.linked_person_id).first()
         return person.email if person else None
     if user.role == "parent":

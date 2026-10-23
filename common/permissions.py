@@ -10,20 +10,23 @@ from common.exceptions import ForbiddenError
 PERMISSIONS: dict[str, dict[str, set[str]]] = {
     # Master and Sub-Master share one operational surface; privileged-account
     # management is enforced by common.authz, not by this matrix.
-    "schools":        {"read": {"admin", "master", "submaster"}, "write": {"master", "submaster"}},
-    "academics":      {"read": {"parent", "teacher", "admin"}, "write": {"admin"}},
-    "people":         {"read": {"parent", "teacher", "admin"}, "write": {"admin"}},
-    "attendance":     {"read": {"parent", "teacher", "admin"}, "write": {"teacher", "admin"}},
-    "marks":          {"read": {"parent", "teacher", "admin"}, "write": {"teacher", "admin"}},
-    "timetable":      {"read": {"parent", "teacher", "admin"}, "write": {"teacher", "admin"}},
-    "transport":      {"read": {"parent", "admin"}, "write": {"admin", "pilot"}},
-    "leave":          {"read": {"admin"}, "write": {"parent", "teacher", "staff", "pilot", "admin"}},
-    "communication":  {"read": {"parent", "teacher", "admin", "pilot"}, "write": {"teacher", "admin", "pilot"}},
+    # Sub-Admin mirrors every Admin entry (school-level operational parity);
+    # it never appears in master-only sets, and the Add Staff assignment /
+    # privileged-target restrictions live in common.authz.
+    "schools":        {"read": {"admin", "subadmin", "master", "submaster"}, "write": {"master", "submaster"}},
+    "academics":      {"read": {"parent", "teacher", "admin", "subadmin"}, "write": {"admin", "subadmin"}},
+    "people":         {"read": {"parent", "teacher", "admin", "subadmin"}, "write": {"admin", "subadmin"}},
+    "attendance":     {"read": {"parent", "teacher", "admin", "subadmin"}, "write": {"teacher", "admin", "subadmin"}},
+    "marks":          {"read": {"parent", "teacher", "admin", "subadmin"}, "write": {"teacher", "admin", "subadmin"}},
+    "timetable":      {"read": {"parent", "teacher", "admin", "subadmin"}, "write": {"teacher", "admin", "subadmin"}},
+    "transport":      {"read": {"parent", "admin", "subadmin"}, "write": {"admin", "subadmin", "pilot"}},
+    "leave":          {"read": {"admin", "subadmin"}, "write": {"parent", "teacher", "staff", "pilot", "admin", "subadmin"}},
+    "communication":  {"read": {"parent", "teacher", "admin", "pilot", "subadmin"}, "write": {"teacher", "admin", "pilot", "subadmin"}},
     "barter":         {"read": {"parent"}, "write": {"parent"}},
-    "activities":     {"read": {"parent"}, "write": {"admin"}},
-    "website":        {"read": {"admin"}, "write": {"admin"}},
-    "notifications":  {"read": {"admin"}, "write": {"master", "submaster"}},
-    "reports":        {"read": {"admin", "master", "submaster"}, "write": set()},
+    "activities":     {"read": {"parent"}, "write": {"admin", "subadmin"}},
+    "website":        {"read": {"admin", "subadmin"}, "write": {"admin", "subadmin"}},
+    "notifications":  {"read": {"admin", "subadmin"}, "write": {"master", "submaster"}},
+    "reports":        {"read": {"admin", "subadmin", "master", "submaster"}, "write": set()},
 }
 
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from common.database import get_db
+from common.authz import is_school_admin
 from common.dependencies import require_role, require_school_scope, CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
 import repository as repo
@@ -27,7 +28,7 @@ def school_overview(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("admin", "master")),
 ):
-    if current_user.role == "admin" and current_user.school_id != school_id:
+    if is_school_admin(current_user.role) and current_user.school_id != school_id:
         raise ForbiddenError("Not allowed to view another school's report")
     return repo.school_overview(db, school_id)
 

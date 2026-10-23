@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from common.database import get_db
 from common.authz import is_master_like
+from common.authz import is_master_like, is_school_admin
 from common.dependencies import require_role, require_examinations_enabled, CurrentUser
 from common.exceptions import AppError, ForbiddenError, NotFoundError
 import bulk
@@ -352,7 +353,7 @@ def commit_import(
     session, _ = _session_and_exam(db, batch.school_id, batch.session_id)
     _require_session_grader(db, current_user, session)
     return bulk.commit_batch(
-        db, batch, apply_partial, is_admin=(current_user.role == "admin")
+        db, batch, apply_partial, is_admin=is_school_admin(current_user.role)
     )
 
 

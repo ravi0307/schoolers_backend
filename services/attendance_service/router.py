@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from common.database import get_db
+from common.authz import is_school_admin
 from common.dependencies import require_role, CurrentUser
 from common.exceptions import ForbiddenError, NotFoundError
 import repository as repo
@@ -23,7 +24,7 @@ def mark_attendance(
 ):
     # The class must belong to the caller's school; a teacher must additionally
     # be assigned to the class. Never trust the class/student ids in the body.
-    if current_user.role == "admin":
+    if is_school_admin(current_user.role):
         if current_user.school_id is not None and not repo.class_in_school(
             db, payload.class_id, current_user.school_id
         ):
@@ -82,7 +83,7 @@ def class_summary(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_role("teacher", "admin")),
 ):
-    if current_user.role == "admin":
+    if is_school_admin(current_user.role):
         if current_user.school_id is not None and not repo.class_in_school(
             db, class_id, current_user.school_id
         ):
@@ -133,8 +134,8 @@ def get_staff_attendance(
     if school_id is None:
         raise ForbiddenError("No school is associated with this account")
 
-    # A non-admin may only ever read their own row.
-    if current_user.role != "admin":
+    # A non-school-admin may only ever read their own row.
+    if not is_school_admin(current_user.role):
         if not current_user.linked_person_id:
             raise ForbiddenError("This account isn't linked to a staff record")
         if staff_id is not None and staff_id != current_user.linked_person_id:

@@ -55,9 +55,10 @@ def require_role(*allowed_roles: str):
     """Dependency factory: require_role("admin", "master") etc.
 
     Admission uses common.authz.role_allowed: a Sub-Master is admitted
-    wherever a Master is (operational inheritance), so master-guarded
-    endpoints do not each need editing, while roles never granted to Master
-    (parent/teacher/admin/...) still deny Sub-Master exactly as before.
+    wherever a Master is and a Sub-Admin wherever an Admin is (operational
+    inheritance), so guarded endpoints do not each need editing, while roles
+    never granted to those tiers (e.g. parent/teacher for master guards, or
+    master guards for Sub-Admin) still deny exactly as before.
     """
     def _checker(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if not role_allowed(current_user.role, allowed_roles):

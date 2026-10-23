@@ -9,11 +9,14 @@ from common.models import (
 )
 from common.exceptions import NotFoundError, ForbiddenError
 from common.dependencies import CurrentUser
+from common.authz import is_school_admin
 
 # Which broadcast audiences each role may address. Identity (role_name and
 # sender_name) is always derived server-side, never accepted from the client.
 ALLOWED_BROADCAST_SCOPES = {
     "admin": {"school", "class", "route", "pilot"},
+    # Sub-Admin broadcasts with exactly the Admin's reach (school-level parity).
+    "subadmin": {"school", "class", "route", "pilot"},
     # Staff run the front office and transport desk, so they may address any
     # audience a school admin can -- including routes and pilots.
     "staff": {"school", "class", "route", "pilot"},
@@ -140,6 +143,18 @@ def resolve_sender_identity(db: Session, current_user: CurrentUser) -> tuple[str
             raise ForbiddenError("Staff record not found")
         return {"teacher": "Teacher", "pilot": "Pilot", "staff": "Staff"}[role], staff.name
 
+    if role == "subadmin":
+        # Same linked-staff requirement as a teacher/poster: the sender name
+        # must come from the caller's own live staff record.
+        if not current_user.linked_person_id:
+            raise ForbiddenError(
+                "This subadmin account isn't linked to a staff record"
+            )
+        staff = linked_staff()
+        if not staff:
+            raise ForbiddenError("Staff record not found")
+        return "Sub-Admin", staff.name
+
     if current_user.linked_person_id:
         staff = linked_staff()
         if staff:
@@ -158,7 +173,7 @@ def list_broadcasts(
     q = db.query(Broadcast).filter(Broadcast.school_id == school_id, Broadcast.is_active.is_(True))
 
     role = current_user.role
-    if role in ("admin", "staff"):
+    if role in ("admin", "subadmin", "staff"):
         # School admins and staff see every broadcast in their school. Staff run
         # the front desk, so they need the whole feed rather than a scoped slice.
         pass
@@ -211,7 +226,7 @@ def update_broadcast_message(
     # only rewrite a broadcast they posted themselves. Authorship is the user id
     # recorded at creation, never the display name, because two staff can share
     # the same derived label.
-    if current_user.role != "admin" and broadcast.sender_user_id != current_user.user_id:
+    if not is_school_admin(current_user.role) and broadcast.sender_user_id != current_user.user_id:
         raise ForbiddenError("You can only edit broadcasts you posted")
     broadcast.message = message
     if created_at is not None:
@@ -236,7 +251,7 @@ def delete_broadcast(
     )
     if not broadcast:
         raise NotFoundError("Broadcast not found")
-    if current_user.role != "admin" and broadcast.sender_user_id != current_user.user_id:
+    if not is_school_admin(current_user.role) and broadcast.sender_user_id != current_user.user_id:
         raise ForbiddenError("You can only delete broadcasts you posted")
     broadcast.is_active = False
     db.commit()

@@ -1226,7 +1226,7 @@ class SupportTicketMessage(AuditColumnsMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "author_role IN ('admin','master','submaster')",
+            "author_role IN ('admin','master','submaster','subadmin')",
             name="support_ticket_messages_role_check",
         ),
     )
