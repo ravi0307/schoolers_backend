@@ -218,6 +218,172 @@ class PasswordResetTokenTests(unittest.TestCase):
             self.assertIn("reset", subject.lower())
             self.assertIn(raw, body)
 
+    def test_reset_email_prefers_account_email_over_linked_person_email(self):
+        """Recovery must use the address the account actually signs in with.
+
+        Seeded staff rows can retain placeholder/demo addresses while the
+        corresponding user row has the real delivery address. Using the
+        linked-person email here makes the OTP appear to be sent while it can
+        never reach the account owner.
+        """
+        self.db.add(Staff(
+            staff_id=22,
+            school_id=1,
+            name="Pilot Six",
+            role="Pilot",
+            email="pilot-six@bh.edu.demo",
+        ))
+        self.db.add(User(
+            user_id=6,
+            school_id=1,
+            role="pilot",
+            username="pilot6",
+            email="account-owner@example.com",
+            password_hash=hash_password("x"),
+            linked_person_id=22,
+        ))
+        self.db.commit()
+
+        with mock.patch("common.email.send_email") as mock_send:
+            raw, _ = auth_service.forgot_password_request(
+                self.db, "account-owner@example.com"
+            )
+
+        self.assertRegex(raw, r"^\d{6}$")
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args[0][0], ["account-owner@example.com"])
+        auth_service.forgot_password_reset(
+            self.db, "account-owner@example.com", raw, "newpassword"
+        )
+        self.assertTrue(
+            verify_password(
+                "newpassword",
+                self.db.query(User).filter(User.user_id == 6).one().password_hash,
+            )
+        )
+
+    def test_subadmin_linked_staff_email_resolves_reset(self):
+        self.db.add(Staff(
+            staff_id=23,
+            school_id=1,
+            name="Sub-Admin Seven",
+            role="Sub-Admin",
+            email="subadmin-seven@school.org",
+        ))
+        self.db.add(User(
+            user_id=7,
+            school_id=1,
+            role="subadmin",
+            username="subadmin7",
+            password_hash=hash_password("x"),
+            linked_person_id=23,
+        ))
+        self.db.commit()
+
+        with mock.patch("common.email.send_email") as mock_send:
+            raw, _ = auth_service.forgot_password_request(
+                self.db, "subadmin-seven@school.org"
+            )
+
+        self.assertRegex(raw, r"^\d{6}$")
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args[0][0], ["subadmin-seven@school.org"])
+        auth_service.forgot_password_reset(
+            self.db, "subadmin-seven@school.org", raw, "newpassword"
+        )
+        self.assertTrue(
+            verify_password(
+                "newpassword",
+                self.db.query(User).filter(User.user_id == 7).one().password_hash,
+            )
+        )
+
+    def test_ambiguous_account_email_does_not_issue_or_send_reset(self):
+        self.db.add_all([
+            User(
+                user_id=8,
+                role="pilot",
+                username="pilot8",
+                email="shared@example.com",
+                password_hash=hash_password("x"),
+            ),
+            User(
+                user_id=9,
+                role="pilot",
+                username="pilot9",
+                email="shared@example.com",
+                password_hash=hash_password("x"),
+            ),
+        ])
+        self.db.commit()
+
+        with mock.patch("common.email.send_email") as mock_send:
+            self.assertEqual(
+                auth_service.forgot_password_request(self.db, "shared@example.com"),
+                (None, None),
+            )
+
+        mock_send.assert_not_called()
+
+    def test_ambiguous_linked_person_email_does_not_issue_or_send_reset(self):
+        self.db.add_all([
+            Staff(
+                staff_id=24,
+                school_id=1,
+                name="Staff Eight",
+                role="Staff",
+                email="shared-linked@example.com",
+            ),
+            Staff(
+                staff_id=25,
+                school_id=1,
+                name="Staff Nine",
+                role="Staff",
+                email="shared-linked@example.com",
+            ),
+            User(
+                user_id=10,
+                school_id=1,
+                role="staff",
+                username="staff8",
+                password_hash=hash_password("x"),
+                linked_person_id=24,
+            ),
+            User(
+                user_id=11,
+                school_id=1,
+                role="staff",
+                username="staff9",
+                password_hash=hash_password("x"),
+                linked_person_id=25,
+            ),
+        ])
+        self.db.commit()
+
+        with mock.patch("common.email.send_email") as mock_send:
+            self.assertEqual(
+                auth_service.forgot_password_request(
+                    self.db, "shared-linked@example.com"
+                ),
+                (None, None),
+            )
+
+        mock_send.assert_not_called()
+
+    def test_subadmin_auth_requires_an_active_linked_staff_record(self):
+        self.db.add(User(
+            user_id=12,
+            school_id=1,
+            role="subadmin",
+            username="subadmin12",
+            password_hash=hash_password("x"),
+            linked_person_id=999,
+        ))
+        self.db.commit()
+
+        with self.assertRaises(UnauthorizedError):
+            auth_service.authenticate(self.db, "subadmin12", "x")
+
 
 class BroadcastAuthorizationTests(unittest.TestCase):
     POLICY = comm_repo.ALLOWED_BROADCAST_SCOPES

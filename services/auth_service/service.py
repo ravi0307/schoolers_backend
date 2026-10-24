@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from jose import JWTError
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import exists, func, or_
 
 import common.email
 from common.authz import PRIVILEGED_ROLES, SUBMASTER_ROLE, assert_can_manage_privileged
@@ -29,7 +29,7 @@ def authenticate(db: Session, username: str, password: str) -> User:
     user = find_user_by_identifier(db, username)
     if not user or not verify_password(password, user.password_hash):
         raise UnauthorizedError("Invalid username or password")
-    if user.role in ("teacher", "staff", "pilot"):
+    if user.role in ("teacher", "staff", "subadmin", "pilot"):
         person = (
             db.query(Staff)
             .filter(
@@ -71,7 +71,12 @@ def refresh_access_token(db: Session, refresh_token: str) -> str:
 
 
 def find_user_by_identifier(db: Session, identifier: str) -> User | None:
-    """Return the active account matching a username or linked email address."""
+    """Return one active account matching a username or account email.
+
+    Linked person emails remain supported for older records, but the account's
+    own email is canonical when it is present. Shared email addresses are
+    treated as ambiguous rather than selecting an arbitrary account.
+    """
     normalized_identifier = identifier.strip().lower()
 
     # Usernames exist directly on the users table, including admin and master
@@ -87,31 +92,36 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     if user:
         return user
 
-    # linked_person_id is only unique within its own table, so match the
-    # account role and its person table together to stop an email from
-    # selecting an unrelated account that happens to share the numeric id.
-    # Teachers, staff, admins and pilots all resolve through the staff table.
-    lookups = (
-        ("teacher", Staff, Staff.staff_id),
-        ("staff", Staff, Staff.staff_id),
-        ("admin", Staff, Staff.staff_id),
-        ("pilot", Staff, Staff.staff_id),
-        ("parent", Parent, Parent.parent_id),
+    # The account email is the address password recovery delivers to. Linked
+    # person emails remain supported for older records, but all sources are
+    # collected in one bounded query so ambiguity never selects an arbitrary
+    # account or loads an unbounded shared-email result set.
+    staff_email_match = exists().where(
+        Staff.staff_id == User.linked_person_id,
+        User.role.in_(("teacher", "staff", "admin", "subadmin", "pilot")),
+        func.lower(Staff.email) == normalized_identifier,
     )
-    for role, person_model, person_id in lookups:
-        user = (
-            db.query(User)
-            .join(person_model, User.linked_person_id == person_id)
-            .filter(
-                User.role == role,
-                User.is_active.is_(True),
-                func.lower(person_model.email) == normalized_identifier,
-            )
-            .first()
+    parent_email_match = exists().where(
+        Parent.parent_id == User.linked_person_id,
+        User.role == "parent",
+        func.lower(Parent.email) == normalized_identifier,
+    )
+    matches = (
+        db.query(User)
+        .filter(
+            User.is_active.is_(True),
+            or_(
+                func.lower(User.email) == normalized_identifier,
+                staff_email_match,
+                parent_email_match,
+            ),
         )
-        if user:
-            return user
-    return None
+        .limit(2)
+        .all()
+    )
+    if len(matches) != 1:
+        return None
+    return matches[0]
 
 
 def display_name_for(db: Session, role: str, linked_person_id: int | None) -> str | None:
@@ -135,13 +145,13 @@ def display_name_for(db: Session, role: str, linked_person_id: int | None) -> st
 
 
 def account_email_address(db: Session, user: User) -> str | None:
-    """The address on file for an account, preferring users.email.
+    """Return the canonical deliverable address for an account.
 
     A user row may carry its own email, but staff and parent rows also hold
     one, and some accounts are created without a users.email. Prefer the one
     on the account itself so the profile shows what the account actually uses,
-    then fall back to the linked person. Admin accounts resolve to their
-    school's primary email, matching user_email_address().
+    then fall back to the linked person. Admin accounts without an account
+    email resolve to their school's primary email.
     """
     if user.email:
         return user.email
@@ -175,11 +185,11 @@ def change_password(db: Session, user: User, current_password: str, new_password
 
 
 def user_email_address(db: Session, user: User) -> str | None:
-    """Resolve a deliverable email address for an account, or None.
+    """Resolve the legacy role-based email address for an account, or None.
 
-    Students have no account/email of their own; master accounts are global and
-    have none either. Sub-Master accounts are standalone (no linked person) but
-    may carry an address on their own row, so password recovery can reach them.
+    This helper remains for callers that explicitly need the linked person or
+    school address. Password recovery uses account_email_address() instead so
+    it can honor the account's own delivery address first.
     """
     if user.role == "submaster":
         return user.email or None
@@ -259,7 +269,7 @@ def forgot_password_request(db: Session, identifier: str) -> tuple[str | None, d
     if user is None:
         return None, None
     raw_token, expires_at = _issue_reset_token(db, user)
-    email = user_email_address(db, user)
+    email = account_email_address(db, user)
     if email:
         _deliver_reset_token(email, raw_token)
     return raw_token, expires_at
