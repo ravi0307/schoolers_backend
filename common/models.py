@@ -390,6 +390,7 @@ class Staff(AuditColumnsMixin, Base):
             "person_type IN ('teacher', 'pilot', 'admin', 'staff')",
             name="ck_staff_person_type",
         ),
+        Index("staff_lower_email_idx", func.lower(email)),
     )
 
 
@@ -405,6 +406,8 @@ class Parent(AuditColumnsMixin, Base):
     emergency_number = Column(String(30))
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (Index("parents_lower_email_idx", func.lower(email)),)
 
 
 class Student(AuditColumnsMixin, Base):
@@ -1099,6 +1102,11 @@ class User(AuditColumnsMixin, Base):
     last_login = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    __table_args__ = (
+        Index("users_lower_username_idx", func.lower(username)),
+        Index("users_lower_email_idx", func.lower(email)),
+    )
 
 
 class Pilot(AuditColumnsMixin, Base):

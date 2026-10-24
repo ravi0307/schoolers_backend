@@ -118,10 +118,48 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
 | access_token | string | JWT token for API requests (expires in 8 hours) |
 | refresh_token | string | JWT token to get new access token (expires in 14 days) |
 | token_type | string | Always "bearer" |
-| role | string | User role (admin, teacher, student, parent, school_admin) |
+| role | string | User role (admin, teacher, staff, subadmin, pilot, parent, master, submaster) |
 | school_id | integer | Associated school ID |
 | user_id | integer | User's unique ID |
 | linked_person_id | integer | ID of linked person record (teacher/student/parent) |
+
+---
+
+## 🔐 Endpoint: FORGOT PASSWORD
+
+The password recovery flow accepts exactly one account identifier: `identifier`,
+`email`, or `username`. Identifiers are matched case-insensitively. The service
+always returns the same generic response so callers cannot discover whether an
+account exists. For a registered account with a deliverable recovery address, a
+short-lived six-digit OTP is sent to that address and is never returned in the
+API response. If an email matches more than one active account, no OTP is
+issued. When available, the account's own email is preferred over a linked
+staff/parent address; admin accounts without an email use their school's
+primary email.
+
+### Request code
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"person@example.com"}'
+```
+
+`POST /auth/forgot-password/verify` accepts the same identifier payload and
+issues a fresh OTP. Both endpoints return the generic request message whether
+the identifier is known or not.
+
+### Reset with the emailed OTP
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/forgot-password/reset \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identifier":"person@example.com",
+    "otp":"493812",
+    "new_password":"new-password-123"
+  }'
+```
+
+The OTP is six digits, expires after 30 minutes, and can be used only once.
 
 ---
 
@@ -365,4 +403,3 @@ psql -l | grep schoolers
 - Ensure PostgreSQL is running on port 5432
 - Check `.env` file DATABASE_URL is correct
 - Verify network connectivity: `psql -h 127.0.0.1 -U postgres`
-
